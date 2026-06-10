@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  MANAGER
+  RECEPTION
+  SALES
+  AUDITOR
+}
+
+enum Channel {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  TELEGRAM
+  EMAIL
+  WEBCHAT
+  GOOGLE_BUSINESS
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING_HUMAN
+  RESOLVED
+  ARCHIVED
+}
+
+enum MessageSender {
+  GUEST
+  BELLA
+  HUMAN_AGENT
+  SYSTEM
+}
+
+enum LeadStage {
+  NEW_LEAD
+  INQUIRY
+  QUOTE_SENT
+  NEGOTIATION
+  RESERVATION_CONFIRMED
+  CHECKED_IN
+  POST_STAY
+  RECURRING_CUSTOMER
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  NO_SHOW
+  COMPLETED
+}
+
+enum PolicyCategory {
+  CANCELLATION
+  REFUND
+  NO_SHOW
+  PETS
+  CHILDREN
+  GROUPS
+  PAYMENT
+  CHECK_IN
+  CHECK_OUT
+  CHANGES
+  COURTESY
+}
+
+enum EmbeddingStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+model Hotel {
+  id        String   @id @default(uuid())
+  name      String
+  cnpj      String?  @unique
+  phone     String?
+  email     String?
+  website   String?
+  timezone  String   @default("America/Sao_Paulo")
+  createdAt DateTime @default(now())
+
+  users        User[]
+  guests       Guest[]
+  knowledge    KnowledgeDocument[]
+  policies     Policy[]
+  aiSettings   AiSettings?
+
+  @@map("hotels")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  hotelId      String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(RECEPTION)
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+
+  hotel         Hotel          @relation(fields: [hotelId], references: [id])
+  conversations Conversation[]
+  leads         Lead[]
+
+  @@map("users")
+}
+
+model Guest {
+  id            String    @id @default(uuid())
+  hotelId       String
+  name          String?
+  phone         String?
+  email         String?
+  city          String?
+  country       String?
+  language      String    @default("pt")
+  preferences   Json      @default("{}")
+  lastVisit     DateTime?
+  lifetimeValue Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt     DateTime  @default(now())
+
+  hotel         Hotel          @relation(fields: [hotelId], references: [id])
+  conversations Conversation[]
+  leads         Lead[]
+  reservations  Reservation[]
+
+  @@unique([hotelId, phone])
+  @@index([hotelId, email])
+  @@map("guests")
+}
+
+model Conversation {
+  id             String             @id @default(uuid())
+  guestId        String
+  channel        Channel
+  status         ConversationStatus @default(OPEN)
+  assignedUserId String?
+  summary        String? // memória de médio prazo (resumo gerado por LLM)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  guest        Guest      @relation(fields: [guestId], references: [id])
+  assignedUser User?      @relation(fields: [assignedUserId], references: [id])
+  messages     Message[]
+  audits       AiAudit[]
+
+  @@index([guestId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  conversationId String
+  sender         MessageSender
+  content        String
+  type           String        @default("text")
+  attachments    Json          @default("[]")
+  timestamp      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, timestamp])
+  @@map("messages")
+}
+
+model Lead {
+  id             String    @id @default(uuid())
+  guestId        String
+  stage          LeadStage @default(NEW_LEAD)
+  probability    Int       @default(0) // 0-100
+  estimatedValue Decimal   @default(0) @db.Decimal(12, 2)
+  ownerId        String?
+  lostReason     String?
+  nextFollowUpAt DateTime?
+  followUpStep   Int       @default(0) // 0=nenhum, 1=24h, 2=72h, 3=7d, 4=15d
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  guest Guest @relation(fields: [guestId], references: [id])
+  owner User? @relation(fields: [ownerId], references: [id])
+
+  @@index([stage, nextFollowUpAt])
+  @@map("leads")
+}
+
+model Reservation {
+  id          String            @id @default(uuid())
+  guestId     String
+  checkin     DateTime
+  checkout    DateTime
+  adults      Int
+  children0_6 Int               @default(0)
+  children7_9 Int               @default(0)
+  total       Decimal           @default(0) @db.Decimal(12, 2)
+  status      ReservationStatus @default(PENDING)
+  source      Channel?
+  bookingLink String?
+  createdAt   DateTime          @default(now())
+
+  guest Guest @relation(fields: [guestId], references: [id])
+
+  @@index([guestId])
+  @@map("reservations")
+}
+
+model KnowledgeDocument {
+  id              String          @id @default(uuid())
+  hotelId         String
+  title           String
+  type            String // pdf | docx | txt | csv | xlsx | whatsapp_export | instagram_export | faq
+  fileUrl         String?
+  embeddingStatus EmbeddingStatus @default(PENDING)
+  createdAt       DateTime        @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId])
+  @@map("knowledge_base")
+}
+
+model Policy {
+  id        String         @id @default(uuid())
+  hotelId   String
+  category  PolicyCategory
+  title     String
+  version   Int            @default(1)
+  content   String
+  active    Boolean        @default(true)
+  authorId  String?
+  approved  Boolean        @default(false)
+  createdAt DateTime       @default(now())
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@index([hotelId, category, active])
+  @@map("policies")
+}
+
+model AiAudit {
+  id             String   @id @default(uuid())
+  conversationId String
+  question       String
+  response       String
+  sources        Json     @default("[]") // documentos RAG utilizados
+  policyUsed     String?
+  confidence     Float?
+  model          String
+  guardrailLevel Int      @default(1)
+  escalated      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId, createdAt])
+  @@map("ai_audit")
+}
+
+model AiSettings {
+  id            String  @id @default(uuid())
+  hotelId       String  @unique
+  assistantName String  @default("Bella")
+  personality   String  @default("acolhedora, educada e natural")
+  language      String  @default("pt")
+  temperature   Float   @default(0.7)
+  modelSales    String  @default("claude-fable-5")
+  modelPolicies String  @default("claude-opus-4-8")
+  modelBooking  String  @default("claude-haiku-4-5-20251001")
+  masterPrompt  String?
+  salesPrompt   String?
+  opsPrompt     String?
+  bookingPrompt String?
+  cancelPrompt  String?
+
+  hotel Hotel @relation(fields: [hotelId], references: [id])
+
+  @@map("ai_settings")
+}
