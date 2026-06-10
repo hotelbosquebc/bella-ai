@@ -12,6 +12,8 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { PoliciesModule } from './modules/policies/policies.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { OutboundModule } from './modules/outbound/outbound.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { AuthModule } from './modules/auth/auth.module';
     KnowledgeModule,
     PoliciesModule,
     AuditModule,
+    AnalyticsModule,
+    OutboundModule,
   ],
 })
 export class AppModule {}

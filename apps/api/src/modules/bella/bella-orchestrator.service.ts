@@ -7,6 +7,7 @@ import { ModelRouterService } from './model-router.service';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
 import { ReservationEngineService } from '../reservations/reservation-engine.service';
+import { OutboundService } from '../outbound/outbound.service';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesService } from '../policies/policies.service';
 import { AuditService } from '../audit/audit.service';
@@ -31,6 +32,7 @@ export class BellaOrchestratorService {
     private readonly knowledge: KnowledgeService,
     private readonly policies: PoliciesService,
     private readonly audit: AuditService,
+    private readonly outbound: OutboundService,
   ) {}
 
   async handleInbound(inbound: NormalizedInboundMessage): Promise<void> {
@@ -150,8 +152,10 @@ export class BellaOrchestratorService {
     await this.prisma.message.create({
       data: { conversationId, sender: MessageSender.BELLA, content, type: 'text' },
     });
-    // TODO: entrega real via API do canal de origem (WhatsApp Cloud API etc.)
-    this.logger.log(`Resposta enviada via ${inbound.channel} para ${inbound.senderExternalId}`);
+    const delivered = await this.outbound.send(inbound.channel, inbound.senderExternalId, content);
+    this.logger.log(
+      `Resposta ${delivered ? 'entregue' : 'registrada (entrega pendente)'} via ${inbound.channel} para ${inbound.senderExternalId}`,
+    );
   }
 
   private async findOrCreateGuest(inbound: NormalizedInboundMessage) {

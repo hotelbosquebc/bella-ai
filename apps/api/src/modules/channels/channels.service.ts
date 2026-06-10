@@ -54,8 +54,13 @@ export class ChannelsService {
 
   private async dispatch(message: NormalizedInboundMessage): Promise<void> {
     this.logger.log(`Mensagem recebida via ${message.channel} de ${message.senderExternalId}`);
-    // TODO: publicar em RabbitMQ (inbound.messages) e consumir no orquestrador
-    await this.bella.handleInbound(message);
+    try {
+      // TODO: publicar em RabbitMQ (inbound.messages) e consumir no orquestrador
+      await this.bella.handleInbound(message);
+    } catch (err) {
+      // Webhook nunca deve falhar para o provedor (a Meta desativa endpoints com erro)
+      this.logger.error(`Falha ao processar mensagem de ${message.senderExternalId}`, err instanceof Error ? err.stack : String(err));
+    }
   }
 
   getChannelStatus(channel: Channel) {

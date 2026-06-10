@@ -2,7 +2,11 @@
   "name": "@bella/api",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
   "scripts": {
+    "db:seed": "node prisma/seed.js",
     "dev": "nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
