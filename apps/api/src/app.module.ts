@@ -13,6 +13,7 @@ import { PoliciesModule } from './modules/policies/policies.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { HealthController } from './health.controller';
 import { OutboundModule } from './modules/outbound/outbound.module';
 
 @Module({
@@ -33,5 +34,6 @@ import { OutboundModule } from './modules/outbound/outbound.module';
     AnalyticsModule,
     OutboundModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
