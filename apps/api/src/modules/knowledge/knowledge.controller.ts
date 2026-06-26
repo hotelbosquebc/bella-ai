@@ -5,6 +5,11 @@ import { KnowledgeService } from './knowledge.service';
 export class KnowledgeController {
   constructor(private readonly knowledge: KnowledgeService) {}
 
+  @Get()
+  list(@Query('hotelId') hotelId: string) {
+    return this.knowledge.list(hotelId);
+  }
+
   @Post('upload')
   upload(@Body() body: { hotelId: string; title: string; type: string; fileUrl?: string }) {
     return this.knowledge.registerDocument(body.hotelId, body.title, body.type, body.fileUrl);

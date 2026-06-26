@@ -13,6 +13,13 @@ export class KnowledgeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  list(hotelId: string) {
+    return this.prisma.knowledgeDocument.findMany({
+      where: { hotelId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async registerDocument(hotelId: string, title: string, type: string, fileUrl?: string) {
     const doc = await this.prisma.knowledgeDocument.create({
       data: { hotelId, title, type, fileUrl },
