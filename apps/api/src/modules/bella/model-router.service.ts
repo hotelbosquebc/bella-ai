@@ -57,9 +57,11 @@ export class ModelRouterService {
   private modelFor(task: AiTask): string {
     const env = process.env;
     if (this.provider === 'gemini') {
-      const fast = env.GEMINI_MODEL_FAST ?? 'gemini-2.0-flash';
-      const precise = env.GEMINI_MODEL_PRECISE ?? 'gemini-2.0-flash';
-      return task === 'booking_extraction' ? fast : task === 'policy_answer' ? precise : fast;
+      // gemini-2.5-flash é o mais confiável no nível gratuito; o -lite retorna 503
+      // com frequência. Mantemos flash para extração e resposta (override via env).
+      const fast = env.GEMINI_MODEL_FAST ?? 'gemini-2.5-flash';
+      const main = env.GEMINI_MODEL_PRECISE ?? 'gemini-2.5-flash';
+      return task === 'booking_extraction' ? fast : main;
     }
     if (this.provider === 'ollama') {
       return env.OLLAMA_MODEL ?? 'llama3.1';
@@ -106,19 +108,39 @@ export class ModelRouterService {
       contents,
       generationConfig: {
         temperature: req.temperature ?? 0.7,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 2048,
+        // Modelos Gemini 2.5 "pensam" por padrão e gastam tokens de saída nisso,
+        // o que truncava as respostas. Desligamos o thinking: chat fica rápido e completo.
+        thinkingConfig: { thinkingBudget: 0 },
         ...(wantsJson ? { responseMimeType: 'application/json' } : {}),
       },
     };
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
-    );
-    if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-    const data: any = await res.json();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const data = await this.fetchWithRetry(url, body);
     const text: string = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
     return this.pack(text, model, wantsJson);
+  }
+
+  /** POST ao Gemini com retry em 503/429 (transitórios comuns no nível gratuito) */
+  private async fetchWithRetry(url: string, body: unknown, attempts = 3): Promise<any> {
+    let lastErr = '';
+    for (let i = 0; i < attempts; i++) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return res.json();
+      lastErr = `Gemini ${res.status}: ${await res.text()}`;
+      if (res.status === 503 || res.status === 429) {
+        // backoff curto e crescente (0,8s, 1,6s) antes de nova tentativa
+        await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+        continue;
+      }
+      break; // erros não-transitórios (400/401/403): não adianta repetir
+    }
+    throw new Error(lastErr);
   }
 
   // ---------- Ollama (local, gratuito) ----------

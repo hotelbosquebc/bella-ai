@@ -103,15 +103,28 @@ export class ReservationEngineService {
     return { available: true };
   }
 
+  /**
+   * Gera o link do motor de reservas oficial do hotel (sistema Silbeck).
+   * Mapeamento das categorias de hóspede (confirmado no formulário do hotel):
+   *   000001 = Adultos | 000003 = Crianças 0-6 (cortesia) | 000004 = Crianças 7-9
+   * Datas no formato DD/MM/AAAA exigido pelo motor.
+   */
   buildBookingLink(stay: StayDetails): string {
-    const base = process.env.BOOKING_ENGINE_BASE_URL ?? 'https://reservas.example.com';
+    const base = process.env.BOOKING_ENGINE_BASE_URL ?? 'https://sbreserva.silbeck.com.br/hotelbosque';
+    const path = process.env.BOOKING_ENGINE_PATH ?? '/pt-br/reserva';
     const params = new URLSearchParams({
-      checkin: stay.checkin!,
-      checkout: stay.checkout!,
-      adults: String(stay.adults),
-      children_0_6: String(stay.children0_6 ?? 0),
-      children_7_9: String(stay.children7_9 ?? 0),
+      data_inicio: this.toBrDate(stay.checkin!),
+      data_fim: this.toBrDate(stay.checkout!),
+      'categorias_hospede[000001]': String(stay.adults ?? 0),
+      'categorias_hospede[000003]': String(stay.children0_6 ?? 0),
+      'categorias_hospede[000004]': String(stay.children7_9 ?? 0),
     });
-    return `${base}/busca?${params.toString()}`;
+    return `${base}${path}?${params.toString()}`;
+  }
+
+  /** Converte YYYY-MM-DD (ISO) para DD/MM/AAAA (formato do motor de reservas) */
+  private toBrDate(iso: string): string {
+    const [y, m, d] = iso.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : iso;
   }
 }

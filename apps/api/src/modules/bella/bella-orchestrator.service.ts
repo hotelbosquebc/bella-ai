@@ -67,7 +67,8 @@ export class BellaOrchestratorService {
       tools: [STAY_EXTRACTION_TOOL],
     });
     const stay = extraction.toolInput ?? { intent: 'other' };
-    const intent = String(stay.intent ?? 'other');
+    const intent = this.normalizeIntent(stay);
+    this.logger.log(`Extração [${extraction.model}]: intent=${intent} stay=${JSON.stringify(stay)}`);
 
     // 5-6. Políticas oficiais + base vetorial (RAG)
     const relevantPolicies = await this.policies.findRelevant(guest.hotelId, inbound.content);
@@ -157,6 +158,29 @@ export class BellaOrchestratorService {
     this.logger.log(
       `Resposta ${delivered ? 'entregue' : 'registrada (entrega pendente)'} via ${inbound.channel} para ${inbound.senderExternalId}`,
     );
+  }
+
+  /**
+   * Normaliza a intenção para o enum canônico em inglês. O LLM frequentemente
+   * responde em português ("reserva", "cancelamento"); aqui mapeamos sinônimos
+   * e idiomas. Se houver datas extraídas, tratamos como reserva por padrão.
+   */
+  private normalizeIntent(stay: Record<string, unknown>): string {
+    const raw = String(stay.intent ?? '').toLowerCase().trim();
+    const map: [RegExp, string][] = [
+      [/book|reserv|hosped|di[áa]ria|or[çc]amento|cota[çc]/, 'booking'],
+      [/cancel/, 'cancellation'],
+      [/refund|reembols|estorno|devolu/, 'refund'],
+      [/discount|desconto|promo/, 'discount_request'],
+      [/complain|reclama[çc]/, 'complaint'],
+      [/question|d[úu]vida|pergunt|informa[çc]/, 'question'],
+    ];
+    for (const [re, canonical] of map) {
+      if (re.test(raw)) return canonical;
+    }
+    // Sem intenção clara, mas com datas → é uma reserva
+    if (stay.checkin || stay.checkout) return 'booking';
+    return raw || 'other';
   }
 
   private async findOrCreateGuest(inbound: NormalizedInboundMessage) {
