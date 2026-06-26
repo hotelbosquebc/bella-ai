@@ -5,29 +5,20 @@ Arquitetura 100% gratuita com o melhor desempenho possível sem gastar:
 | Peça | Serviço | Plano |
 |---|---|---|
 | Painel web (Next.js) | [Vercel](https://vercel.com) | Hobby (grátis) |
-| API (NestJS) | [Render](https://render.com) | Free (750h/mês) |
-| Banco PostgreSQL | [Neon](https://neon.tech) | Free |
+| API (NestJS) + Banco PostgreSQL | [Render](https://render.com) | Free |
 | Manter API acordada | [cron-job.org](https://cron-job.org) | Grátis |
+
+> O banco PostgreSQL é criado pelo próprio Render (definido no `render.yaml`),
+> conectado automaticamente à API — não é preciso conta separada de banco.
+> Atenção: o banco gratuito do Render expira em ~30 dias; migrar para um banco
+> permanente (Neon/Supabase grátis, ou Render pago) antes do uso real.
 
 ## Passo 1 — Publicar o repositório no GitHub
 
-No **GitHub Desktop**: o repositório `bella-ai` já aparece na lista → botão **"Publish repository"** → marcar **"Keep this code private"** → Publish.
+No **GitHub Desktop**: repositório `bella-ai` → **"Publish repository"** → marcar
+**"Keep this code private"** → Publish. (Já feito.)
 
-## Passo 2 — Banco de dados (Neon)
-
-1. Criar conta em https://neon.tech (pode entrar com a conta do GitHub).
-2. Criar projeto `bella-ai` (região AWS São Paulo, se disponível).
-3. Copiar a **connection string** (formato `postgresql://...@....neon.tech/neondb?sslmode=require`).
-4. Rodar as migrações e o seed a partir do seu computador:
-
-```powershell
-cd $env:USERPROFILE\Documents\GitHub\bella-ai\apps\api
-$env:DATABASE_URL = "COLE_AQUI_A_CONNECTION_STRING"
-npx prisma migrate deploy
-node prisma/seed.js
-```
-
-## Passo 3 — API (Render)
+## Passo 2 — API + Banco (Render)
 
 1. Criar conta em https://render.com (entrar com GitHub).
 2. **New → Blueprint** → escolher o repositório `bella-ai` (ele lê o `render.yaml` automaticamente).

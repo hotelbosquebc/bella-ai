@@ -1,18 +1,29 @@
-# Blueprint do Render — publica a API da Bella gratuitamente (plano Free).
-# No Render: New > Blueprint > conectar este repositório. As variáveis marcadas
-# com "sync: false" você preenche no painel do Render (ficam fora do git).
+# Blueprint do Render — publica a API + banco PostgreSQL da Bella (plano Free).
+# No Render: New > Blueprint > conectar este repositório. O banco é criado e
+# conectado automaticamente; as variáveis "sync: false" você preenche no painel.
+
+databases:
+  - name: bella-db
+    plan: free
+    databaseName: bella_ai
+    user: bella
+    region: virginia
+
 services:
   - type: web
     name: bella-api
     runtime: node
     plan: free
+    region: virginia
     buildCommand: npm install && npm run db:generate -w apps/api && npm run build -w apps/api
     # migrate (cria as tabelas) + seed idempotente (admin, hotel, políticas) + start
     startCommand: cd apps/api && npx prisma migrate deploy && node prisma/seed.js && node dist/main.js
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL # connection string do Neon (postgresql://...sslmode=require)
-        sync: false
+      - key: DATABASE_URL # conectado automaticamente ao banco bella-db acima
+        fromDatabase:
+          name: bella-db
+          property: connectionString
       - key: JWT_SECRET
         generateValue: true
       - key: DEFAULT_HOTEL_ID
