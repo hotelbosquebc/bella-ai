@@ -58,9 +58,10 @@ export class BellaOrchestratorService {
 
     // 3-4. Memória + extração de intenção/dados de reserva
     const mem = await this.memory.load(guest.id, conversation.id);
+    const today = new Date().toISOString().slice(0, 10);
     const extraction = await this.modelRouter.complete({
       task: 'booking_extraction',
-      system: 'Extraia os dados de hospedagem da conversa usando a ferramenta.',
+      system: `Extraia os dados de hospedagem mencionados pelo hóspede. Hoje é ${today}. Converta datas relativas (ex.: "julho", "próximo fim de semana") para o formato YYYY-MM-DD no ano correto.`,
       messages: [{ role: 'user', content: inbound.content }],
       temperature: 0,
       tools: [STAY_EXTRACTION_TOOL],
