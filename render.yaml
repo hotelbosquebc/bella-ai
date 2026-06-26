@@ -1,27 +1,43 @@
-# Blueprint do Render — publica a API gratuitamente (plano Free).
-# No Render: New > Blueprint > conectar este repositório.
+# Blueprint do Render — publica a API da Bella gratuitamente (plano Free).
+# No Render: New > Blueprint > conectar este repositório. As variáveis marcadas
+# com "sync: false" você preenche no painel do Render (ficam fora do git).
 services:
   - type: web
     name: bella-api
     runtime: node
     plan: free
     buildCommand: npm install && npm run db:generate -w apps/api && npm run build -w apps/api
-    startCommand: cd apps/api && npx prisma migrate deploy && node dist/main.js
+    # migrate (cria as tabelas) + seed idempotente (admin, hotel, políticas) + start
+    startCommand: cd apps/api && npx prisma migrate deploy && node prisma/seed.js && node dist/main.js
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL # cole aqui a connection string do Neon
+      - key: DATABASE_URL # connection string do Neon (postgresql://...sslmode=require)
         sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: DEFAULT_HOTEL_ID
         value: hotel-do-bosque
       - key: BOOKING_ENGINE_BASE_URL
-        value: https://reservas.hoteldobosque.com.br
-      - key: ANTHROPIC_API_KEY
+        value: https://sbreserva.silbeck.com.br/hotelbosque
+      - key: BOOKING_ENGINE_PATH
+        value: /pt-br/reserva
+      # ===== Inteligência (Gemini gratuito) =====
+      - key: AI_PROVIDER
+        value: gemini
+      - key: GOOGLE_API_KEY # mesma chave gratuita do Gemini já usada localmente
+        sync: false
+      # ===== Canais =====
+      - key: META_WEBHOOK_VERIFY_TOKEN
         sync: false
       - key: WHATSAPP_ACCESS_TOKEN
         sync: false
       - key: WHATSAPP_PHONE_NUMBER_ID
         sync: false
-      - key: META_WEBHOOK_VERIFY_TOKEN
+      - key: FACEBOOK_PAGE_ID
+        sync: false
+      - key: FACEBOOK_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: INSTAGRAM_PAGE_ACCESS_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
         sync: false
