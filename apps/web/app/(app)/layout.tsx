@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import ThemeToggle from '../components/ThemeToggle';
 
 const NAV = [
   { href: '/dashboard', label: '📊 Dashboard' },
@@ -23,6 +24,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
+        <div style={{ marginTop: 24 }}>
+          <ThemeToggle />
+        </div>
       </aside>
       <main className="content">{children}</main>
     </div>
