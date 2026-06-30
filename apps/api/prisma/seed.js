@@ -1,6 +1,7 @@
 /* Seed inicial: Hotel do Bosque, usuário admin, configurações da Bella e políticas base. */
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 
 const prisma = new PrismaClient();
 
@@ -16,14 +17,23 @@ async function main() {
     },
   });
 
+  // Admin: e-mail e senha vêm do ambiente (defina ADMIN_PASSWORD no Render).
+  // O repositório NÃO contém senha real. Sem ADMIN_PASSWORD, gera-se uma senha
+  // aleatória descartável apenas na criação inicial.
+  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@hoteldobosque.com.br';
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const effectivePassword = adminPassword ?? crypto.randomBytes(12).toString('base64url');
+  const passwordHash = await bcrypt.hash(effectivePassword, 10);
+
   await prisma.user.upsert({
-    where: { email: 'admin@hoteldobosque.com.br' },
-    update: {},
+    where: { email: adminEmail },
+    // Só sobrescreve a senha do admin existente quando ADMIN_PASSWORD foi definido.
+    update: adminPassword ? { passwordHash } : {},
     create: {
       hotelId: hotel.id,
       name: 'Administrador',
-      email: 'admin@hoteldobosque.com.br',
-      passwordHash: await bcrypt.hash('admin123', 10),
+      email: adminEmail,
+      passwordHash,
       role: 'OWNER',
     },
   });
@@ -76,7 +86,12 @@ async function main() {
     }
   }
 
-  console.log('Seed concluído: hotel, admin (admin@hoteldobosque.com.br / admin123), configurações da Bella e 5 políticas.');
+  console.log(
+    `Seed concluído: hotel, admin (${adminEmail}), configurações da Bella e 5 políticas. ` +
+      (adminPassword
+        ? 'Senha do admin definida via ADMIN_PASSWORD.'
+        : 'ATENÇÃO: ADMIN_PASSWORD não definido — senha aleatória gerada na criação; defina ADMIN_PASSWORD para controlá-la.'),
+  );
 }
 
 main()

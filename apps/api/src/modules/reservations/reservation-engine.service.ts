@@ -79,9 +79,12 @@ export class ReservationEngineService {
     return {
       quoteSent: true,
       contextForPrompt:
-        `Disponibilidade CONFIRMADA para ${stay.checkin} a ${stay.checkout} ` +
+        `Há DISPONIBILIDADE para ${stay.checkin} a ${stay.checkout} ` +
         `(${stay.adults} adulto(s), ${stay.children0_6 ?? 0} criança(s) 0-6, ${stay.children7_9 ?? 0} criança(s) 7-9).\n` +
         (availability.rateInfo ? `Tarifa: ${availability.rateInfo}\n` : '') +
+        `IMPORTANTE: a reserva NÃO está confirmada. Apresente isto como uma COTAÇÃO. ` +
+        `A reserva só se concretiza quando o hóspede finalizar e pagar pelo link. ` +
+        `NÃO diga que a reserva "está confirmada"; convide-o a finalizar pelo link.\n` +
         `LINK OFICIAL DE RESERVA (envie exatamente este link): ${link}`,
     };
   }
