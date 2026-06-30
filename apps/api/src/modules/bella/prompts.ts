@@ -57,7 +57,8 @@ export const STAY_EXTRACTION_TOOL = {
       intent: {
         type: 'string',
         enum: ['booking', 'question', 'cancellation', 'refund', 'discount_request', 'complaint', 'other'],
-        description: 'Intenção principal da mensagem',
+        description:
+          "Um de: 'booking' (quer fazer ou cotar uma reserva); 'cancellation' SOMENTE se o hóspede quer CANCELAR uma reserva existente (ação concreta, ex.: 'quero cancelar minha reserva'); 'refund' SOMENTE se pede reembolso/estorno (ação); 'discount_request' se pede desconto; 'complaint' se é reclamação; 'question' para QUALQUER dúvida ou pedido de informação — INCLUSIVE perguntas sobre as políticas de cancelamento, reembolso, regras, valores, café, estrutura, pets; 'other' caso contrário. ATENÇÃO: perguntar SOBRE a política de cancelamento ('qual a política de cancelamento?') é 'question', NÃO 'cancellation'.",
       },
     },
     required: ['intent'],
