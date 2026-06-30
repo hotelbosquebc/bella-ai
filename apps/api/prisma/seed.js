@@ -69,13 +69,13 @@ async function main() {
       category: 'CHECK_IN',
       title: 'Horários de Check-in e Check-out',
       content:
-        'Check-in a partir das 14h. Check-out até as 11h. O não cumprimento do horário de check-out acarreta multa equivalente a 2 diárias, além da desocupação imediata. Atraso superior a 4 horas no check-in deve ser comunicado para não ser caracterizado como no-show. Early check-in e late check-out sujeitos a disponibilidade e taxa.',
+        'Check-in a partir das 14h, devendo ser realizado até as 18h. Check-out até as 11h da manhã. Caso o hóspede chegue após as 18h, deve comunicar o atraso para manter a reserva ativa e não ser caracterizado como no-show. O não cumprimento do horário de check-out acarreta multa equivalente a 2 diárias, além da desocupação imediata. Early check-in e late check-out sujeitos a disponibilidade e taxa.',
     },
     {
       category: 'NO_SHOW',
       title: 'Política de No-show',
       content:
-        'Atraso superior a 4 horas no check-in deve ser comunicado, sob pena de ser caracterizado como no-show (não comparecimento) e a reserva ser cancelada. Em caso de parcelamento, o atraso ou não pagamento na data combinada resulta em cancelamento da reserva e perda dos valores pagos.',
+        'O check-in deve ser realizado até as 18h. Após esse horário, o hóspede deve comunicar o atraso para manter a reserva ativa, sob pena de ser caracterizado como no-show (não comparecimento) e a reserva ser cancelada. Em caso de parcelamento, o atraso ou não pagamento na data combinada resulta em cancelamento da reserva e perda dos valores pagos.',
     },
     {
       category: 'PAYMENT',
