@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { KnowledgeService } from './knowledge.service';
 
 @Controller('knowledge')
@@ -11,8 +11,18 @@ export class KnowledgeController {
   }
 
   @Post('upload')
-  upload(@Body() body: { hotelId: string; title: string; type: string; fileUrl?: string }) {
-    return this.knowledge.registerDocument(body.hotelId, body.title, body.type, body.fileUrl);
+  upload(@Body() body: { hotelId: string; title: string; type: string; fileUrl?: string; content?: string }) {
+    return this.knowledge.registerDocument(body.hotelId, body.title, body.type, body.fileUrl, body.content);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: { title?: string; content?: string; active?: boolean }) {
+    return this.knowledge.updateDocument(id, body);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.knowledge.deleteDocument(id);
   }
 
   @Post('reindex')

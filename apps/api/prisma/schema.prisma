@@ -218,8 +218,10 @@ model KnowledgeDocument {
   id              String          @id @default(uuid())
   hotelId         String
   title           String
-  type            String // pdf | docx | txt | csv | xlsx | whatsapp_export | instagram_export | faq
+  type            String // pdf | docx | txt | csv | xlsx | whatsapp_export | instagram_export | faq | manual
   fileUrl         String?
+  content         String? // texto do conhecimento injetado nas respostas da Bella
+  active          Boolean         @default(true)
   embeddingStatus EmbeddingStatus @default(PENDING)
   createdAt       DateTime        @default(now())
 

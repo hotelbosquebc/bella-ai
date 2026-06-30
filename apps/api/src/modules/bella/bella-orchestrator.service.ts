@@ -70,9 +70,9 @@ export class BellaOrchestratorService {
     const intent = this.normalizeIntent(stay);
     this.logger.log(`Extração [${extraction.model}]: intent=${intent} stay=${JSON.stringify(stay)}`);
 
-    // 5-6. Políticas oficiais + base vetorial (RAG)
+    // 5-6. Políticas oficiais + base de conhecimento do hotel
     const relevantPolicies = await this.policies.findRelevant(guest.hotelId, inbound.content);
-    const knowledgeChunks = await this.knowledge.search(guest.hotelId, inbound.content);
+    const knowledgeText = await this.knowledge.getKnowledgeContext(guest.hotelId);
 
     // 7. Motor de reservas: com dados completos, gera link automaticamente
     let bookingContext = '';
@@ -97,7 +97,7 @@ export class BellaOrchestratorService {
       .replace('{{personality}}', settings?.personality ?? 'acolhedora, educada e natural')
       .replace('{{guestContext}}', this.memory.buildGuestContext(mem))
       .replace('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
-      .replace('{{knowledgeContext}}', (knowledgeChunks.join('\n---\n') || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : ''));
+      .replace('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : ''));
 
     const history = mem.recentMessages.map((m) => ({
       role: m.sender === MessageSender.GUEST ? ('user' as const) : ('assistant' as const),
@@ -141,7 +141,7 @@ export class BellaOrchestratorService {
       conversationId: conversation.id,
       question: inbound.content,
       response: verdict.requiresHuman ? `[ESCALADO] ${verdict.reason}` : draft.text,
-      sources: knowledgeChunks,
+      sources: knowledgeText ? ['base-de-conhecimento'] : [],
       policyUsed: relevantPolicies[0]?.title ?? null,
       confidence: draft.confidence,
       model: draft.model,
