@@ -19,6 +19,9 @@ export default function KnowledgePage() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ title: '', content: '' });
   const [saving, setSaving] = useState(false);
+  const [waText, setWaText] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +51,27 @@ export default function KnowledgePage() {
       await load();
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function importWhatsapp() {
+    if (waText.trim().length < 20) return;
+    setImporting(true);
+    setImportMsg('');
+    try {
+      const res = await apiFetch('/api/training/import-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hotelId: HOTEL_ID, content: waText }),
+      });
+      const data = await res.json();
+      setImportMsg(data.message ?? 'Concluído.');
+      setWaText('');
+      await load();
+    } catch {
+      setImportMsg('Falha ao importar. Tente novamente.');
+    } finally {
+      setImporting(false);
     }
   }
 
@@ -96,6 +120,27 @@ export default function KnowledgePage() {
         <button className="btn" onClick={save} disabled={saving}>
           {saving ? 'Salvando…' : 'Salvar conhecimento'}
         </button>
+      </div>
+
+      <div className="form-card">
+        <strong>📱 Importar conversa do WhatsApp</strong>
+        <p className="muted" style={{ fontSize: 13, margin: '4px 0 12px' }}>
+          Exporte uma conversa no WhatsApp (⋮ → Mais → Exportar conversa → Sem mídia) e cole o texto aqui.
+          A Bella lê e extrai automaticamente as informações e dúvidas frequentes — que ficam <strong>inativas</strong> para
+          você revisar antes de valer.
+        </p>
+        <div className="form-field">
+          <textarea
+            rows={5}
+            value={waText}
+            onChange={(e) => setWaText(e.target.value)}
+            placeholder="Cole aqui o texto da conversa exportada do WhatsApp…"
+          />
+        </div>
+        <button className="btn" onClick={importWhatsapp} disabled={importing}>
+          {importing ? 'Analisando com a IA…' : 'Importar e aprender'}
+        </button>
+        {importMsg && <span className="badge green" style={{ marginLeft: 12 }}>{importMsg}</span>}
       </div>
 
       <div className="toolbar">

@@ -17,6 +17,7 @@ import { HealthController } from './health.controller';
 import { OutboundModule } from './modules/outbound/outbound.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AdminModule } from './modules/admin/admin.module';
+import { TrainingModule } from './modules/training/training.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { AdminModule } from './modules/admin/admin.module';
     OutboundModule,
     SettingsModule,
     AdminModule,
+    TrainingModule,
   ],
   controllers: [HealthController],
 })
