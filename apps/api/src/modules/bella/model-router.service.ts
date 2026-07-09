@@ -57,10 +57,11 @@ export class ModelRouterService {
   private modelFor(task: AiTask): string {
     const env = process.env;
     if (this.provider === 'gemini') {
-      // gemini-2.5-flash é o mais confiável no nível gratuito; o -lite retorna 503
-      // com frequência. Mantemos flash para extração e resposta (override via env).
-      const fast = env.GEMINI_MODEL_FAST ?? 'gemini-2.5-flash';
-      const main = env.GEMINI_MODEL_PRECISE ?? 'gemini-2.5-flash';
+      // Usamos os aliases "-latest": auto-atualizam e não quebram quando o Google
+      // descontinua uma versão (ex.: gemini-2.5-flash foi aposentado em jul/2026).
+      // Override por env se quiser fixar um modelo específico.
+      const fast = env.GEMINI_MODEL_FAST ?? 'gemini-flash-lite-latest';
+      const main = env.GEMINI_MODEL_PRECISE ?? 'gemini-flash-lite-latest';
       return task === 'booking_extraction' ? fast : main;
     }
     if (this.provider === 'ollama') {
