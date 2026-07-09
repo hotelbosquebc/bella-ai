@@ -1,11 +1,14 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { Channel } from '@prisma/client';
 import { ChannelsService } from './channels.service';
+import { Public } from '../auth/public.decorator';
 
 /**
  * Webhooks de entrada de cada canal. Cada handler normaliza o payload
  * específico do provedor e entrega ao ChannelsService.
  */
+/** Webhooks são públicos por natureza (Meta/Telegram chamam sem nosso JWT). */
+@Public()
 @Controller('channels')
 export class ChannelsController {
   constructor(private readonly channels: ChannelsService) {}

@@ -49,6 +49,31 @@ export class AnalyticsController {
       _count: true,
     });
   }
+
+  /** Visão de Analytics: canais, funil, desempenho da IA e motivos de perda */
+  @Get('overview')
+  async overview() {
+    const [byChannel, funnel, audits, escalated, lossReasons] = await Promise.all([
+      this.prisma.conversation.groupBy({ by: ['channel'], _count: true }),
+      this.prisma.lead.groupBy({ by: ['stage'], _count: true }),
+      this.prisma.aiAudit.aggregate({ _avg: { confidence: true }, _count: true }),
+      this.prisma.aiAudit.count({ where: { escalated: true } }),
+      this.prisma.lead.groupBy({ by: ['lostReason'], where: { lostReason: { not: null } }, _count: true }),
+    ]);
+
+    const totalAudits = audits._count || 0;
+    return {
+      channels: byChannel.map((c) => ({ channel: c.channel, conversations: c._count })),
+      funnel: funnel.map((f) => ({ stage: f.stage, count: f._count })),
+      ai: {
+        interactions: totalAudits,
+        avgConfidence: audits._avg.confidence != null ? Math.round(audits._avg.confidence * 100) : null,
+        escalated,
+        autoResolvedRate: totalAudits > 0 ? Math.round(((totalAudits - escalated) / totalAudits) * 100) : null,
+      },
+      lossReasons: lossReasons.map((l) => ({ reason: l.lostReason, count: l._count })),
+    };
+  }
 }
 
 @Module({ controllers: [AnalyticsController] })

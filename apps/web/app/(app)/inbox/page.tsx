@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { CHANNEL_LABELS, SENDER_LABELS } from '../../lib/config';
+import { apiFetch } from '../../lib/api';
 
 type Guest = { id: string; name?: string; phone?: string; email?: string; city?: string; language?: string };
 type Message = { id: string; sender: string; content: string; timestamp: string };
@@ -30,7 +31,7 @@ export default function InboxPage() {
   const loadList = useCallback(async () => {
     try {
       const url = '/api/conversations' + (filter ? `?channel=${filter}` : '');
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await apiFetch(url, { cache: 'no-store' });
       setConversations(res.ok ? await res.json() : []);
     } catch {
       setConversations([]);
@@ -44,7 +45,7 @@ export default function InboxPage() {
   }, [loadList]);
 
   async function openConversation(id: string) {
-    const res = await fetch(`/api/conversations/${id}`, { cache: 'no-store' });
+    const res = await apiFetch(`/api/conversations/${id}`, { cache: 'no-store' });
     if (res.ok) setSelected(await res.json());
   }
 
@@ -52,7 +53,7 @@ export default function InboxPage() {
     if (!draft.trim() || !selected) return;
     setSending(true);
     try {
-      await fetch('/api/messages/send', {
+      await apiFetch('/api/messages/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversationId: selected.id, content: draft.trim() }),

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { STAGE_LABELS } from '../../lib/config';
+import { apiFetch } from '../../lib/api';
 
 const STAGES = Object.keys(STAGE_LABELS);
 
@@ -21,7 +22,7 @@ export default function CrmPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/leads', { cache: 'no-store' });
+      const res = await apiFetch('/api/leads', { cache: 'no-store' });
       setLeads(res.ok ? await res.json() : []);
     } catch {
       setLeads([]);
@@ -43,7 +44,7 @@ export default function CrmPage() {
 
     // Atualização otimista + persistência
     setLeads((prev) => prev.map((l) => (l.id === dragId ? { ...l, stage } : l)));
-    await fetch(`/api/leads/${lead.id}`, {
+    await apiFetch(`/api/leads/${lead.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ stage }),

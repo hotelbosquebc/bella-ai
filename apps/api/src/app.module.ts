@@ -16,6 +16,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { HealthController } from './health.controller';
 import { OutboundModule } from './modules/outbound/outbound.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     AnalyticsModule,
     OutboundModule,
     SettingsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

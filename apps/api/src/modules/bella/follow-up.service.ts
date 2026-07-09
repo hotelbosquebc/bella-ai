@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { LeadStage } from '@prisma/client';
+import { ConversationStatus, LeadStage, MessageSender } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OutboundService } from '../outbound/outbound.service';
 
 interface FollowUpStep {
   step: number;
@@ -25,7 +26,10 @@ const FOLLOW_UP_STEPS: FollowUpStep[] = [
 export class FollowUpService {
   private readonly logger = new Logger(FollowUpService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly outbound: OutboundService,
+  ) {}
 
   @Cron(CronExpression.EVERY_30_MINUTES)
   async run(): Promise<void> {
@@ -42,8 +46,22 @@ export class FollowUpService {
       const next = FOLLOW_UP_STEPS[lead.followUpStep];
       if (!next) continue;
 
-      this.logger.log(`Follow-up passo ${next.step} para lead ${lead.id} (${lead.guest.name ?? 'sem nome'})`);
-      // TODO: enviar via canal de origem do hóspede (ChannelsService/outbound)
+      // Conversa mais recente do hóspede define o canal de entrega
+      const conversation = await this.prisma.conversation.findFirst({
+        where: { guestId: lead.guestId, status: { not: ConversationStatus.ARCHIVED } },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      // Não perturba quem já está sob atendimento humano
+      if (conversation && conversation.status !== ConversationStatus.PENDING_HUMAN && lead.guest.phone) {
+        const delivered = await this.outbound.send(conversation.channel, lead.guest.phone, next.message);
+        await this.prisma.message.create({
+          data: { conversationId: conversation.id, sender: MessageSender.BELLA, content: next.message },
+        });
+        this.logger.log(
+          `Follow-up passo ${next.step} ${delivered ? 'enviado' : 'registrado'} para ${lead.guest.name ?? lead.guest.phone} via ${conversation.channel}`,
+        );
+      }
 
       const upcoming = FOLLOW_UP_STEPS[next.step];
       await this.prisma.lead.update({

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { apiFetch } from '../../lib/api';
 
 type Audit = {
   id: string;
@@ -24,7 +25,7 @@ export default function AuditPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/audit', { cache: 'no-store' });
+        const res = await apiFetch('/api/audit', { cache: 'no-store' });
         setRows(res.ok ? await res.json() : []);
       } catch {
         setRows([]);

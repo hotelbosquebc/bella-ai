@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { HOTEL_ID } from '../../lib/config';
+import { apiFetch } from '../../lib/api';
 
 type Settings = {
   assistantName: string;
@@ -21,7 +22,7 @@ export default function BellaConfigPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/settings?hotelId=${HOTEL_ID}`, { cache: 'no-store' });
+        const res = await apiFetch(`/api/settings?hotelId=${HOTEL_ID}`, { cache: 'no-store' });
         if (res.ok) setS(await res.json());
       } catch {
         setS(null);
@@ -34,7 +35,7 @@ export default function BellaConfigPage() {
     setSaving(true);
     setSaved(false);
     try {
-      await fetch(`/api/settings/${HOTEL_ID}`, {
+      await apiFetch(`/api/settings/${HOTEL_ID}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(s),

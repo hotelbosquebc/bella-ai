@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import ThemeToggle from '../components/ThemeToggle';
+import LogoutButton from '../components/LogoutButton';
+import AuthGuard from '../components/AuthGuard';
 
 const NAV = [
   { href: '/dashboard', label: '📊 Dashboard' },
@@ -14,21 +16,24 @@ const NAV = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="logo">Bella AI 🌿</div>
-        <nav>
-          {NAV.map((item) => (
-            <Link key={item.href} href={item.href}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div style={{ marginTop: 24 }}>
-          <ThemeToggle />
-        </div>
-      </aside>
-      <main className="content">{children}</main>
-    </div>
+    <AuthGuard>
+      <div className="shell">
+        <aside className="sidebar">
+          <div className="logo">Bella AI 🌿</div>
+          <nav>
+            {NAV.map((item) => (
+              <Link key={item.href} href={item.href}>
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <ThemeToggle />
+            <LogoutButton />
+          </div>
+        </aside>
+        <main className="content">{children}</main>
+      </div>
+    </AuthGuard>
   );
 }

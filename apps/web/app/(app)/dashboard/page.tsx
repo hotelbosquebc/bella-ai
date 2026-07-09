@@ -1,17 +1,34 @@
-async function getKpis() {
-  try {
-    const res = await fetch(`${process.env.API_URL ?? 'http://localhost:3002'}/api/analytics/kpis`, {
-      cache: 'no-store',
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+'use client';
 
-export default async function DashboardPage() {
-  const kpis = await getKpis();
+import { useEffect, useState } from 'react';
+import { apiFetch } from '../../lib/api';
+
+type Kpis = {
+  messagesToday: number;
+  reservationsGenerated: number;
+  revenue: number | string;
+  conversionRate: number;
+  quotesSent: number;
+  bellaVsHumans: { bella: number; humans: number };
+  activeLeads: number;
+};
+
+export default function DashboardPage() {
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await apiFetch('/api/analytics/kpis', { cache: 'no-store' });
+        if (res.ok) setKpis(await res.json());
+      } catch {
+        setKpis(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const cards = [
     { label: 'Mensagens recebidas hoje', value: kpis?.messagesToday ?? '—' },
@@ -30,9 +47,10 @@ export default async function DashboardPage() {
   return (
     <>
       <h1>Dashboard Executivo</h1>
-      {!kpis && (
-        <p style={{ color: 'var(--muted)', marginBottom: 16 }}>
-          API indisponível — inicie o backend para ver os indicadores em tempo real.
+      {loading && <p className="muted" style={{ marginBottom: 16 }}>Carregando indicadores…</p>}
+      {!loading && !kpis && (
+        <p className="muted" style={{ marginBottom: 16 }}>
+          Não foi possível carregar os indicadores — verifique sua conexão ou faça login novamente.
         </p>
       )}
       <div className="cards">

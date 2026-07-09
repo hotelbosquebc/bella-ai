@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { HOTEL_ID } from '../../lib/config';
+import { apiFetch } from '../../lib/api';
 
 type Doc = {
   id: string;
@@ -21,7 +22,7 @@ export default function KnowledgePage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/knowledge?hotelId=${HOTEL_ID}`, { cache: 'no-store' });
+      const res = await apiFetch(`/api/knowledge?hotelId=${HOTEL_ID}`, { cache: 'no-store' });
       setDocs(res.ok ? await res.json() : []);
     } catch {
       setDocs([]);
@@ -38,7 +39,7 @@ export default function KnowledgePage() {
     if (!form.title.trim() || !form.content.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/knowledge/upload', {
+      await apiFetch('/api/knowledge/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hotelId: HOTEL_ID, title: form.title, type: 'manual', content: form.content }),
@@ -52,12 +53,12 @@ export default function KnowledgePage() {
 
   async function remove(id: string) {
     if (!confirm('Remover este conhecimento? A Bella deixará de usá-lo.')) return;
-    await fetch(`/api/knowledge/${id}`, { method: 'DELETE' });
+    await apiFetch(`/api/knowledge/${id}`, { method: 'DELETE' });
     await load();
   }
 
   async function toggleActive(d: Doc) {
-    await fetch(`/api/knowledge/${d.id}`, {
+    await apiFetch(`/api/knowledge/${d.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ active: !d.active }),

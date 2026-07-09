@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { HOTEL_ID, POLICY_LABELS } from '../../lib/config';
+import { apiFetch } from '../../lib/api';
 
 type Policy = {
   id: string;
@@ -23,7 +24,7 @@ export default function PoliciesPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/policies?hotelId=${HOTEL_ID}`, { cache: 'no-store' });
+      const res = await apiFetch(`/api/policies?hotelId=${HOTEL_ID}`, { cache: 'no-store' });
       setPolicies(res.ok ? await res.json() : []);
     } catch {
       setPolicies([]);
@@ -40,7 +41,7 @@ export default function PoliciesPage() {
     if (!form.title.trim() || !form.content.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/policies', {
+      await apiFetch('/api/policies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hotelId: HOTEL_ID, ...form }),
@@ -54,7 +55,7 @@ export default function PoliciesPage() {
   }
 
   async function approve(id: string) {
-    await fetch(`/api/policies/${id}/approve`, { method: 'POST' });
+    await apiFetch(`/api/policies/${id}/approve`, { method: 'POST' });
     await load();
   }
 

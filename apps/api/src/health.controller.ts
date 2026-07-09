@@ -1,6 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
+import { Public } from './modules/auth/public.decorator';
 
-/** Usado pelo Render (health check) e pelo cron-job.org (manter a API acordada). */
+/** Usado pelo Render (health check) e pelo GitHub Actions (manter a API acordada). */
+@Public()
 @Controller('health')
 export class HealthController {
   @Get()
