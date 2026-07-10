@@ -123,6 +123,41 @@ export class ModelRouterService {
     return this.pack(text, model, wantsJson);
   }
 
+  /**
+   * Transcreve um áudio (nota de voz do WhatsApp/Telegram) usando o Gemini,
+   * que é multimodal. Custo zero (mesmo nível gratuito). Retorna o texto falado.
+   */
+  async transcribeAudio(base64: string, mimeType: string): Promise<string> {
+    if (this.provider !== 'gemini') {
+      this.logger.warn(`Transcrição de áudio requer Gemini (provedor atual: ${this.provider})`);
+      return '';
+    }
+    const key = process.env.GOOGLE_API_KEY!;
+    // Usa o mesmo alias vigente do provedor (gemini-2.5-flash foi descontinuado)
+    const model = process.env.GEMINI_MODEL_AUDIO ?? process.env.GEMINI_MODEL_PRECISE ?? 'gemini-flash-latest';
+    const body = {
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { inline_data: { mime_type: mimeType, data: base64 } },
+            { text: 'Transcreva fielmente este áudio, retornando APENAS o texto falado, no idioma original, sem comentários.' },
+          ],
+        },
+      ],
+      generationConfig: { temperature: 0, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
+    };
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    try {
+      const data = await this.fetchWithRetry(url, body);
+      const text: string = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
+      return text.trim();
+    } catch (err) {
+      this.logger.error(`Falha ao transcrever áudio: ${err instanceof Error ? err.message : err}`);
+      return '';
+    }
+  }
+
   /** POST ao Gemini com retry em 503/429 (transitórios comuns no nível gratuito) */
   private async fetchWithRetry(url: string, body: unknown, attempts = 3): Promise<any> {
     let lastErr = '';
