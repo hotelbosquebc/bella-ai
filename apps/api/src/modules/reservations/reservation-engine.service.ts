@@ -107,27 +107,23 @@ export class ReservationEngineService {
   }
 
   /**
-   * Gera o link do motor de reservas oficial do hotel (sistema Silbeck).
-   * Mapeamento das categorias de hóspede (confirmado no formulário do hotel):
-   *   000001 = Adultos | 000003 = Crianças 0-6 (cortesia) | 000004 = Crianças 7-9
-   * Datas no formato DD/MM/AAAA exigido pelo motor.
+   * Gera o link do motor de reservas oficial do hotel (sistema Silbeck),
+   * no MESMO formato que a equipe usa no WhatsApp — página de busca que já
+   * leva o hóspede aos resultados:
+   *   /pt-br/reserva/busca/?checkin=YYYY-MM-DD&checkout=YYYY-MM-DD&adultos-000001=N
+   * Categorias: 000001 = Adultos | 000003 = Crianças 0-6 | 000004 = Crianças 7-9.
+   * As datas já vêm em ISO (YYYY-MM-DD) da extração — é o formato desta rota.
    */
   buildBookingLink(stay: StayDetails): string {
     const base = process.env.BOOKING_ENGINE_BASE_URL ?? 'https://sbreserva.silbeck.com.br/hotelbosque';
-    const path = process.env.BOOKING_ENGINE_PATH ?? '/pt-br/reserva';
+    const path = process.env.BOOKING_ENGINE_PATH ?? '/pt-br/reserva/busca/';
     const params = new URLSearchParams({
-      data_inicio: this.toBrDate(stay.checkin!),
-      data_fim: this.toBrDate(stay.checkout!),
-      'categorias_hospede[000001]': String(stay.adults ?? 0),
-      'categorias_hospede[000003]': String(stay.children0_6 ?? 0),
-      'categorias_hospede[000004]': String(stay.children7_9 ?? 0),
+      checkin: stay.checkin!,
+      checkout: stay.checkout!,
+      'adultos-000001': String(stay.adults ?? 0),
+      'criancas-000003': String(stay.children0_6 ?? 0),
+      'criancas-000004': String(stay.children7_9 ?? 0),
     });
     return `${base}${path}?${params.toString()}`;
-  }
-
-  /** Converte YYYY-MM-DD (ISO) para DD/MM/AAAA (formato do motor de reservas) */
-  private toBrDate(iso: string): string {
-    const [y, m, d] = iso.split('-');
-    return d && m && y ? `${d}/${m}/${y}` : iso;
   }
 }

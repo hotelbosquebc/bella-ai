@@ -33,7 +33,7 @@ services:
       - key: BOOKING_ENGINE_BASE_URL
         value: https://sbreserva.silbeck.com.br/hotelbosque
       - key: BOOKING_ENGINE_PATH
-        value: /pt-br/reserva
+        value: /pt-br/reserva/busca/
       # ===== Inteligência (Gemini gratuito) =====
       - key: AI_PROVIDER
         value: gemini
