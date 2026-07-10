@@ -7,6 +7,8 @@ const NAV = [
   { href: '/dashboard', label: '📊 Dashboard' },
   { href: '/inbox', label: '💬 Caixa de Entrada' },
   { href: '/crm', label: '🗂️ CRM / Pipeline' },
+  { href: '/contacts', label: '👤 Contatos' },
+  { href: '/quick-replies', label: '⚡ Respostas Rápidas' },
   { href: '/bella', label: '🌿 Central da Bella' },
   { href: '/knowledge', label: '📚 Conhecimento' },
   { href: '/policies', label: '📋 Políticas' },

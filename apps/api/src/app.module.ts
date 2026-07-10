@@ -18,6 +18,7 @@ import { OutboundModule } from './modules/outbound/outbound.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { TrainingModule } from './modules/training/training.module';
+import { QuickRepliesModule } from './modules/quick-replies/quick-replies.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { TrainingModule } from './modules/training/training.module';
     SettingsModule,
     AdminModule,
     TrainingModule,
+    QuickRepliesModule,
   ],
   controllers: [HealthController],
 })

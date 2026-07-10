@@ -180,6 +180,13 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; }
 .bubble .who { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 .chat-compose { display: flex; gap: 8px; margin-top: 12px; }
 .chat-compose input { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: var(--card); color: var(--text); }
+
+/* Seletor de respostas rápidas ("/") */
+.qr-picker { border: 1px solid var(--border); border-radius: 8px; background: var(--card); margin-bottom: 8px; max-height: 200px; overflow-y: auto; }
+.qr-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 13px; }
+.qr-item:last-child { border-bottom: none; }
+.qr-item:hover { background: var(--green-soft); }
+.qr-preview { color: var(--muted); font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-col { display: flex; flex-direction: column; }
 
 /* Kanban cards */

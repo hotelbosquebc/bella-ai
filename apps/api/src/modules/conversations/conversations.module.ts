@@ -72,6 +72,24 @@ export class ConversationsController {
 
     return { ...message, delivered };
   }
+
+  /** Atendente assume a conversa: a Bella para de responder aqui. */
+  @Post('conversations/:id/takeover')
+  takeover(@Param('id') id: string, @Body() body: { userId?: string }) {
+    return this.prisma.conversation.update({
+      where: { id },
+      data: { status: 'PENDING_HUMAN', assignedUserId: body?.userId ?? undefined },
+    });
+  }
+
+  /** Devolve a conversa para a Bella voltar a atender automaticamente. */
+  @Post('conversations/:id/release')
+  release(@Param('id') id: string) {
+    return this.prisma.conversation.update({
+      where: { id },
+      data: { status: 'OPEN', assignedUserId: null },
+    });
+  }
 }
 
 @Module({

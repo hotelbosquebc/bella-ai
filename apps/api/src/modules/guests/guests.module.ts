@@ -1,9 +1,36 @@
-import { Controller, Get, Module, Param, Query } from '@nestjs/common';
+import { Body, Controller, Get, Module, Param, Patch, Post, Query } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+
+type ContactInput = { name?: string; phone?: string; email?: string; city?: string; language?: string };
 
 @Controller('guests')
 export class GuestsController {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** Cadastra um contato manualmente (agenda do painel). */
+  @Post()
+  create(@Body() body: ContactInput & { hotelId: string }) {
+    return this.prisma.guest.create({
+      data: {
+        hotelId: body.hotelId,
+        name: body.name,
+        phone: body.phone || null,
+        email: body.email,
+        city: body.city,
+        language: body.language ?? 'pt',
+      },
+    });
+  }
+
+  /** Edita os dados de um contato. */
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() body: ContactInput) {
+    const data: ContactInput = {};
+    for (const k of ['name', 'phone', 'email', 'city', 'language'] as const) {
+      if (k in body) data[k] = body[k];
+    }
+    return this.prisma.guest.update({ where: { id }, data });
+  }
 
   @Get()
   list(@Query('hotelId') hotelId: string, @Query('q') q?: string) {

@@ -288,3 +288,15 @@ model AiSettings {
 
   @@map("ai_settings")
 }
+
+model QuickReply {
+  id        String   @id @default(uuid())
+  hotelId   String
+  shortcut  String // usado como /atalho no chat (ex.: "cafe")
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([hotelId])
+  @@map("quick_replies")
+}

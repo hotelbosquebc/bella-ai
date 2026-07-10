@@ -27,6 +27,7 @@ export default function InboxPage() {
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<{ id: string; shortcut: string; title: string; content: string }[]>([]);
 
   const loadList = useCallback(async () => {
     try {
@@ -43,6 +44,22 @@ export default function InboxPage() {
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  useEffect(() => {
+    apiFetch('/api/quick-replies?hotelId=hotel-do-bosque', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then(setQuickReplies)
+      .catch(() => {});
+  }, []);
+
+  // Sugestões quando o atendente digita "/atalho"
+  const qrMatches =
+    draft.startsWith('/')
+      ? quickReplies.filter((q) => {
+          const term = draft.slice(1).toLowerCase();
+          return q.shortcut.toLowerCase().includes(term) || q.title.toLowerCase().includes(term);
+        })
+      : [];
 
   async function openConversation(id: string) {
     const res = await apiFetch(`/api/conversations/${id}`, { cache: 'no-store' });
@@ -64,6 +81,24 @@ export default function InboxPage() {
     } finally {
       setSending(false);
     }
+  }
+
+  async function takeover() {
+    if (!selected) return;
+    await apiFetch(`/api/conversations/${selected.id}/takeover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    await openConversation(selected.id);
+    await loadList();
+  }
+
+  async function release() {
+    if (!selected) return;
+    await apiFetch(`/api/conversations/${selected.id}/release`, { method: 'POST' });
+    await openConversation(selected.id);
+    await loadList();
   }
 
   return (
@@ -111,10 +146,21 @@ export default function InboxPage() {
           {!selected && <p className="muted">Selecione uma conversa para visualizar.</p>}
           {selected && (
             <>
-              <strong style={{ marginBottom: 12 }}>
-                {selected.guest?.name || selected.guest?.phone}
-                {selected.status === 'PENDING_HUMAN' && <span className="badge amber" style={{ marginLeft: 8 }}>Aguardando atendente</span>}
-              </strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
+                <strong>
+                  {selected.guest?.name || selected.guest?.phone}
+                  {selected.status === 'PENDING_HUMAN' && <span className="badge amber" style={{ marginLeft: 8 }}>Você no controle</span>}
+                </strong>
+                {selected.status === 'PENDING_HUMAN' ? (
+                  <button className="btn ghost" onClick={release} title="A Bella volta a responder automaticamente">
+                    ↩️ Devolver para a Bella
+                  </button>
+                ) : (
+                  <button className="btn" onClick={takeover} title="Você assume; a Bella para de responder aqui">
+                    ✋ Assumir controle
+                  </button>
+                )}
+              </div>
               <div className="chat-stream">
                 {selected.messages.map((m) => (
                   <div key={m.id} className={`bubble ${bubbleClass(m.sender)}`}>
@@ -123,9 +169,19 @@ export default function InboxPage() {
                   </div>
                 ))}
               </div>
+              {qrMatches.length > 0 && (
+                <div className="qr-picker">
+                  {qrMatches.slice(0, 6).map((q) => (
+                    <div key={q.id} className="qr-item" onClick={() => setDraft(q.content)}>
+                      <strong>/{q.shortcut}</strong> <span className="muted">{q.title}</span>
+                      <div className="qr-preview">{q.content}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="chat-compose">
                 <input
-                  placeholder="Escreva como atendente…"
+                  placeholder="Escreva como atendente… (digite / para respostas rápidas)"
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && send()}
