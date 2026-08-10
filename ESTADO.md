@@ -40,9 +40,18 @@ Tom "Victor" (saudação calorosa pedindo período/nº pessoas/idades <10). Funi
 Dashboard (KPIs), Caixa de Entrada (chat, perfil, **assumir/devolver controle**, respostas rápidas "/"), CRM Kanban (drag-drop), Central da Bella (editar identidade/prompts), Conhecimento, Contatos (criar/editar), Políticas, Auditoria, Analytics, modo escuro, logout. API protegida por JWT (guard global; @Public em webhooks/health/login; escape `DISABLE_AUTH=true`). Follow-up e outbound WhatsApp/IG/FB/Telegram implementados. Limpeza de teste: `DELETE /api/admin/cleanup-test-data`. Dados de teste JÁ foram limpos (caixa zerada).
 
 ## 🚨 ESTADO ATUAL — API FORA DO AR (prioridade nº1 ao retomar)
-- **A API de produção está DOWN** (`/api/health` = HTTP 0 / timeout). Foi feita a reversão do commit 1c2647f (→ revert **588b83a**, depois **c14cb59** com este ESTADO.md), **MAS a API NÃO voltou** mesmo com o código estável. ⇒ **provavelmente NÃO é o código.**
-- **SUSPEITO Nº1: o banco grátis do Render (bella-db) EXPIROU.** O Postgres free do Render dura ~30 dias; o bella-db foi criado ~fim de jun/2026 e estamos em jul → prazo bate. Se o banco foi suspenso/apagado, a API não inicia (o startCommand faz `prisma migrate deploy` que precisa do banco → trava no boot → serviço cai). Isso explica por que a reversão não resolveu.
-- **1ª AÇÃO ao retomar:** abrir o **Render → bella-db** e ver o status (Suspended? Expired? Deleted?). E **bella-api → Logs** para ver o erro de boot (provável falha de conexão com o banco).
+### ✅ DIAGNÓSTICO CONFIRMADO (sessão de 10/08/2026)
+- **CAUSA: o `bella-db` FOI DELETADO.** Verificado no painel do Render: em `Ungrouped Services` aparece **All (1)** — só o `bella-api`, com status **`Failed service`**. Não há banco na lista nem suspenso (`Suspended (0)`). O Postgres free expirou e foi removido. ⇒ **Não é o código** (a reversão de 1c2647f não tinha como resolver).
+- **Sintoma medido:** TCP 443 conecta no edge do Render (216.24.57.7), mas HTTP **não responde em 180s** — nem `/api/health`, nem a raiz. É o boot travado: o `startCommand` roda `prisma migrate deploy`, a conexão com o banco inexistente fica pendurada até o timeout e a porta HTTP nunca abre. (Erro de código daria 502 rápido, não silêncio.)
+- **Painel Vercel segue OK** (HTTP 200) — só a API caiu.
+- **Conta:** o Render da Bella está na conta **do hotel** (não na nutrestaurante); workspace **My Workspace**.
+- **PENDENTE:** decidir o banco substituto (Supabase free, que não expira, é o recomendado — já usado no Restaurante 360). O `render.yaml` ainda declara `databases: bella-db` no plano **free do Render**, que **expira de novo em ~30 dias** — se optar por Supabase/Neon, REMOVER esse bloco e trocar `DATABASE_URL` para `sync: false`, preenchendo a string de conexão no painel.
+
+### 🛡️ Treinamento da Bella agora está versionado (não se perde mais)
+- Os scripts de carga da sessão anterior **sumiram** (viviam no scratchpad temporário). Reconstruídos como **`apps/api/prisma/seed-conhecimento.js`**, idempotente, já plugado no `startCommand` do `render.yaml` — roda sozinho quando o banco novo subir.
+- ⚠️ Só o texto **documentado** foi gravado como ativo (11 conhecimentos + 3 atalhos). Os itens cujo texto original se perdeu (wifi, categorias de apto, limpeza, ingressos, menores; atalhos /banco, /financeiro, /confirmação, /confirmar, /ingressos) entram **inativos/com placeholder `[REVISAR]`** — regra do dono: a Bella não inventa. Precisam ser escritos à mão em /knowledge e /quick-replies.
+- O script **nunca sobrescreve** item já revisado à mão no painel.
+- ⚠️ Ainda **não foi executado** (não há banco) — validado apenas na sintaxe.
 - **PLANO DE RECUPERAÇÃO do banco:**
   1. Se o bella-db foi só suspenso e dá para reativar → reativar (mais simples).
   2. Se foi apagado → criar um Postgres novo. Melhor opção: **Neon ou Supabase (free que NÃO expira)** ou novo Render Postgres. Atualizar `DATABASE_URL` no Render (env do bella-api) e redeployar. O `render.yaml` cria um bella-db novo automaticamente se recriar via Blueprint.

@@ -16,8 +16,9 @@ services:
     plan: free
     region: virginia
     buildCommand: npm install && npm run db:generate -w apps/api && npm run build -w apps/api
-    # migrate (cria as tabelas) + seed idempotente (admin, hotel, políticas) + start
-    startCommand: cd apps/api && npx prisma migrate deploy && node prisma/seed.js && node dist/main.js
+    # migrate (cria as tabelas) + seed idempotente (admin, hotel, políticas) +
+    # seed do treinamento (conhecimentos e respostas rápidas) + start
+    startCommand: cd apps/api && npx prisma migrate deploy && node prisma/seed.js && node prisma/seed-conhecimento.js && node dist/main.js
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL # conectado automaticamente ao banco bella-db acima
