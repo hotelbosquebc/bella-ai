@@ -19,7 +19,6 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { TrainingModule } from './modules/training/training.module';
 import { QuickRepliesModule } from './modules/quick-replies/quick-replies.module';
-import { AssistModule } from './modules/assist/assist.module';
 
 @Module({
   imports: [
@@ -42,7 +41,6 @@ import { AssistModule } from './modules/assist/assist.module';
     AdminModule,
     TrainingModule,
     QuickRepliesModule,
-    AssistModule,
   ],
   controllers: [HealthController],
 })
