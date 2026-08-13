@@ -122,7 +122,29 @@ Estava privado no orquestrador → o co-piloto não via, e a Bella prometia "tra
 - Ambos os PCs falam com a mesma API; o modo vem do painel e vale para os dois.
 - 📌 Ideal criar usuário próprio para a recepção (auditoria) — ainda não feito.
 
-## 🖼️ PRÓXIMO PEDIDO (não iniciado): Bella enviar imagens
+## 🖼️ ANEXOS DA BELLA — implementado (13/08/2026, commits `7997d9f` + `2d56ae5`)
+A sugestão vem com o arquivo pronto para o atendente enviar (envio segue **manual**).
+- Modelo `Attachment` (migration `20260813200000_attachments`), arquivos em **base64 no próprio banco** — regra de custo ZERO, sem storage contratado.
+- Casamento anexo↔pergunta por **palavra-chave** (campo `keywords`), não por IA: previsível, sem gastar chamada, e o dono controla o que dispara cada arquivo.
+- `GET/POST/DELETE /api/attachments` + `GET /api/attachments/:id/file` (público — UUID não adivinhável; a extensão baixa sem token).
+- **Tela `/anexos` no painel** para o dono cadastrar sozinho (upload, palavras-chave, ver, excluir). Limite 18 MB no cliente.
+- ⚠️ `main.ts`: body limit subiu para **25mb** — base64 de PDF passa de 10 MB e o padrão de 100kb do Nest rejeitava.
+- Extensão: botão "📎 Anexar" insere via `input[type=file]` do WhatsApp (funciona até para PDF), com fallback de colar imagem; se ambos falharem, **avisa para usar o clipe manualmente** em vez de fingir que anexou.
+- ✅ Testado: pergunta de ingressos → PDF anexado + ela menciona o anexo sem repetir o conteúdo. Pergunta de check-in → nenhum anexo.
+- 🚨 **NÃO VALIDADO no WhatsApp Web real** — a inserção de arquivo depende dos seletores do WhatsApp. Testar no PC e, se falhar, ajustar `inserirArquivo()` em `content.js`.
+- **Cadastrados:** só o `INGRESSOS.pdf` (10,4 MB). **FALTAM** `PETS.png` e `NORMAS.png` — o dono precisa salvá-las em `Área de Trabalho\bella-anexos\` (as imagens vieram coladas no chat, não em disco). Script pronto: `scratchpad/anexos.js`.
+
+## 📚 Base de conhecimento quase completa (13/08/2026)
+Das 5 lacunas `[REVISAR]`, **4 foram preenchidas com fonte oficial** (folha "Bem Vindo ao Hotel do Bosque" enviada pelo dono + site de reservas):
+- **Wi-Fi:** senha **bosque00**, mesma para todo o hotel ✅
+- **Limpeza:** diária 8h-15h, louça é do hóspede, não se limpa com pets/hóspedes no apto ✅
+- **Categorias:** Suíte Bosque (7º-8º, 2 banheiros + aquecimento a gás), Luxo (3º-4º, mais novos), Superior (5º-6º, +1 TV), Standard (1º-2º, mais básicos) — todas cap. 6 ✅
+- **Ingressos:** lista das atrações do material ✅
+- **NOVO "Normas gerais do hotel":** chave (perda R$300), 220V, toalha de praia não emprestada (multa R$200), **proibido fumar (multa R$500)**, não hospedado sem aviso = diária extra, silêncio após 22h, bebidas na recepção.
+- ⚠️ **Sobra 1 `[REVISAR]`: "Menores de idade"** — só o dono tem essa regra.
+- ⚠️ **Telefones divergentes:** a folha traz Reservas (47) 99690-4414 e Recepção (47) 99609-1564, mas o prompt/handoff usa **(47) 3367-0211**. Confirmar qual vai ao hóspede.
+
+## 🖼️ (histórico) pedido original de imagens
 Dono quer que a sugestão já venha com imagem anexada (caso típico: **folha de normas de pets**). Envio segue manual.
 - Decisão pendente de **onde hospedar** a imagem (regra: custo ZERO). Candidatos: `KnowledgeDocument.fileUrl` (campo **já existe**) com URL pública do site do hotel, ou base64 no Postgres para poucas imagens.
 - Parte difícil: **inserir imagem no WhatsApp Web** exige colar via `ClipboardEvent`/`DataTransfer` com um `File` (texto é fácil, imagem não). Validar cedo — é o ponto de risco.
