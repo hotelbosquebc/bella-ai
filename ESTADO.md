@@ -154,6 +154,34 @@ Dono quer que a sugestão já venha com imagem anexada (caso típico: **folha de
 - Parte difícil: **inserir imagem no WhatsApp Web** exige colar via `ClipboardEvent`/`DataTransfer` com um `File` (texto é fácil, imagem não). Validar cedo — é o ponto de risco.
 - Precisa também de critério de "qual imagem para qual pergunta" (casar assunto → conhecimento com imagem).
 
+## 📖 BASE COMPLETA — questionário do dono (13/08/2026)
+O dono respondeu um questionário de 110 perguntas. Base foi de 17 → **25 conhecimentos**, todos ativos, 0 `[REVISAR]`. Políticas todas em **v2 aprovada**.
+
+### 🐛 Duas falhas SILENCIOSAS achadas ao carregar (commit `7be70d6`)
+1. **`getKnowledgeContext` cortava a base em 12.000 caracteres com um `break` sem aviso.** Com o questionário a base foi a **~10.625** — quase encostou. Sintoma seria a Bella "esquecer" um conhecimento que está ativo no painel, sem erro nenhum. Limite → **60.000** e agora o corte **loga** o que ficou de fora.
+2. **`findRelevant` devolvia TODAS as versões aprovadas da categoria, não só a mais recente.** Ao versionar uma política, a regra nova e a antiga iriam juntas ao prompt se contradizendo. Agora fica só a maior versão por categoria. ⚠️ Sem isso, a v1 da Política Infantil (com "50%") continuaria valendo junto com a v2.
+
+### Regras que MUDARAM em relação ao que estava cadastrado
+- **Crianças 7-9 anos:** NÃO é mais "50%" — é **valor adicional VARIÁVEL**. O dono reescreveu a pergunta trocando o percentual. A Bella estava afirmando 50% a hóspedes. Corrigido no conhecimento e na Política Infantil (v2).
+- **Cortesia infantil:** limite de **1 criança gratuita por adulto pagante**; a criança em cortesia **conta** na capacidade de 6.
+- **Pets:** pequeno **e médio** porte (antes só pequeno), até **2 por apartamento**.
+- **Limpeza:** NÃO é automática — só mediante **entrega da chave na recepção**, obrigatória a cada 3 dias. Toalha trocada se deixada no chão; roupa de cama a cada 3 dias.
+- **Silêncio:** sempre que incomodar outro hóspede (a folha de Normas diz "após 22h").
+- **Visitantes:** máx. **15 minutos** com aviso à recepção; acima disso ou sem aviso = **diária extra**.
+- **Área verde (17 mil m²):** é **área de preservação SEM ACESSO** — não prometer trilha/uso.
+
+### ⏰ TRÊS horários diferentes — não confundir
+| Operação | Horário | Onde vive |
+|---|---|---|
+| **Setor de reservas** (alteração/cancelamento **por escrito**) | seg-sex **8h-18h** | Política de Cancelamento v2 |
+| **Atendimento humano de reservas** (sinal PIX 50%, PIX parcelado) | seg-sex **9h-12h e 15h-18h** | Política de Pagamento v2 |
+| **`business-hours.ts`** (handoff + modo automático da Bella) | seg-sex **9h-12h e 14h30-17h30** | código |
+🚨 **PENDENTE:** o código ainda usa 14h30-17h30. O dono confirmou 15h-18h para atendimento humano. **Decidir qual janela controla o modo automático** e alinhar `business-hours.ts`.
+
+### Outros dados novos relevantes
+32 apartamentos · 2 elevadores · apto PCD existe (confirmar disponibilidade) · sem cofre · sem Smart TV (só TV a cabo; Standard só na sala) · sem micro-ondas nos aptos (um no térreo p/ empréstimo) · sem lavanderia · berço grátis sob solicitação · até 3 colchões extras · sofá-cama só em alguns · café p/ não hospedado a partir de R$40 · panquecaria/creperia à noite · delivery permitido · 3 churrasqueiras (grelha/espetos fornecidos, limite 22h) · ônibus não estaciona (terceirizado a poucos metros) · sem carregador elétrico · ~100m da praia · sem WhatsApp de recepção (ramal 9 ou fixo **(47) 3367-0211**, que fica CONFIRMADO como o contato oficial).
+- ⚠️ **Item 80 ambíguo:** "churrasqueira é gratuita ou paga?" → dono respondeu só "sim". Texto atual manda solicitar na recepção. **Confirmar.**
+
 ## Canais — situação
 - **Telegram:** código pronto; falta só criar bot (@BotFather) e pôr `TELEGRAM_BOT_TOKEN` no Render + setWebhook. É o caminho mais rápido para ver a Bella num canal real, sem burocracia.
 - **WhatsApp/Instagram oficiais (Cloud API):** caminho escolhido (A) = migrar o número principal para a Cloud API (seguro, sem ban; recepção passa a responder pelo painel — por isso as respostas rápidas/contatos/assumir-controle foram construídas). Bloqueio atual: registro de desenvolvedor na Meta travado por "dispositivo novo" (fazer pelo CELULAR do Victor Bosque, aparelho reconhecido). Depois: criar app → adicionar WhatsApp/Instagram → tokens (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, `INSTAGRAM_PAGE_ACCESS_TOKEN`, `META_WEBHOOK_VERIFY_TOKEN`) no Render → configurar webhook `https://bella-api-nh3h.onrender.com/api/channels/{whatsapp|instagram|facebook}/webhook`. Precisa de verificação do negócio (dias). Dono NÃO pode perder o número principal.
