@@ -29,7 +29,7 @@
 
 ## Treinamento da Bella (feito)
 - **Base de conhecimento USÁVEL:** `KnowledgeDocument.content` injetado no prompt (`KnowledgeService.getKnowledgeContext`). Editável em /knowledge e via API. **~22 conhecimentos** carregados (café 7-10h restaurante térreo, apartamentos, wifi, estacionamento rotativo, limpeza, pets, piscina=NÃO TEM, hóspedes/apto máx 6, secador/ferro, localização Av. Brasil 22 CEP 88330-040, ingressos, menores, pagamento 5% pix/até 10x/3x sem juros, horário reservas 9-12h/14:30-17:30).
-- **Políticas oficiais** (7): cancelamento em faixas (30d/10%, 29-15d/50%, 14-8d/80%, <7d/100% sem reembolso, só crédito 1 ano), check-in 14h até 18h, check-out 11h, no-show, pets (taxa mín R$200), pagamento (sinal 50%), grupos.
+- **Políticas oficiais** (7): cancelamento em faixas (30d/10%, 29-15d/50%, 14-8d/80%, <7d/100% sem reembolso, só crédito 1 ano), check-in 14h até 18h, check-out 11h, no-show, pets (**NÃO cobra diária do pet**; R$200 é taxa mínima só em caso de descumprimento de norma/limpeza extra — não confundir), pagamento (sinal 50%), grupos.
 - **NÃO cadastrar preços/promoções** (mudam sempre — regra do dono). Bella deve ESCALAR negociação/desconto/meia diária/grupos (anti-prejuízo).
 - **Respostas rápidas ("/")**: 8 atalhos cadastrados (/confirmação, /confirmar, /financeiro, /Banco, /24, /Bomdia, /ingressos, /endereço). Tela /quick-replies. Endpoint /api/quick-replies.
 
@@ -84,6 +84,18 @@ Dashboard (KPIs), Caixa de Entrada (chat, perfil, **assumir/devolver controle**,
 - ✅ **Parâmetros de CRIANÇA confirmados** (era pendência antiga). A URL é traduzida corretamente para os campos internos do Silbeck: `adultos-000001` → `categorias_hospede[000001]`, `criancas-000003` → `[000003]` (0-6), `criancas-000004` → `[000004]` (7-9). Teste 20-23/09/2026: 2 adultos → Standard R$385/diária; +1 criança 0-6 +1 criança 7-9 → R$485/diária (**+R$100**, a de 7-9 cobrada e a de 0-6 cortesia). ⇒ ocupação chega certa e o preço reflete.
 - ⚠️ `curl` no link dá **403 (Cloudflare/captcha)** — é proteção anti-bot, NÃO link quebrado. Para testar, usar navegador de verdade.
 - Como ela só manda link, os 5 atalhos `[REVISAR]` **não a afetam** — são ferramenta do atendente humano na extensão. Não bloqueiam o uso.
+
+### ✅ Bella VALIDADA em produção (13/08/2026, commit `a68a151`)
+Testes reais no `/api/assist/suggest`, modelo `gemini-flash-lite-latest` (não mock):
+| Cenário | Resultado |
+|---|---|
+| "Vocês têm piscina?" | "não contamos com piscina" ✅ (não inventou) |
+| "Horário do café?" | "7h às 10h, restaurante do térreo" ✅ (bate com a base) |
+| Reserva completa (2 ad + 1 criança 5a, 20-23/09) | link correto com `criancas-000003=1` ✅, **sem citar preço** ✅ |
+| Reserva incompleta ("feriado de 7/9") | pediu APENAS "quantos adultos" ✅, sem link ✅ |
+| "Aceitam cachorro?" | pet-friendly, sem diária do pet ✅ (correto — ver nota de pets acima) |
+
+- ⚠️ **`/api/assist/suggest` NÃO cria registros** (sem lead/conversa/follow-up). É só co-piloto. O CRM só é alimentado pelo orquestrador (canal oficial da Meta, ainda não ligado).
 
 ## Canais — situação
 - **Telegram:** código pronto; falta só criar bot (@BotFather) e pôr `TELEGRAM_BOT_TOKEN` no Render + setWebhook. É o caminho mais rápido para ver a Bella num canal real, sem burocracia.
