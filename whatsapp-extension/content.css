@@ -72,3 +72,13 @@
 }
 .bella-chip:hover { background: #cfe9db; }
 #bella-status { font-size: 12px; margin-top: 8px; min-height: 16px; }
+#bella-modo {
+  font-size: 12px;
+  font-weight: 600;
+  color: #14502f;
+  background: #f0f7f3;
+  border: 1px solid #d6e9de;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}

@@ -48,6 +48,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         await chrome.storage.local.set({ apiUrl: msg.apiUrl, email: msg.email, password: msg.password });
         await login();
         sendResponse({ ok: true });
+      } else if (msg.type === 'STATUS') {
+        // A Bella está ligada? Deve sugerir sozinha agora? Quem manda é o painel.
+        const st = await authed(`/api/assist/status?hotelId=${HOTEL_ID}`);
+        sendResponse({ ok: true, data: st });
       } else if (msg.type === 'QUICK_REPLIES') {
         const list = await authed(`/api/quick-replies?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: list });

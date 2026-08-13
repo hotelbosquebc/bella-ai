@@ -1,4 +1,4 @@
-import { Body, Controller, Module, Post } from '@nestjs/common';
+import { Body, Controller, Get, Module, Post, Query } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BellaModule } from '../bella/bella.module';
 import { ModelRouterService } from '../bella/model-router.service';
@@ -7,7 +7,7 @@ import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesModule } from '../policies/policies.module';
 import { PoliciesService } from '../policies/policies.service';
 import { MASTER_PROMPT, STAY_EXTRACTION_TOOL } from '../bella/prompts';
-import { contextoDeHorario } from '../bella/business-hours';
+import { contextoDeHorario, isWithinBusinessHours, HORARIO_RESERVAS_TEXTO } from '../bella/business-hours';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { ReservationEngineService } from '../reservations/reservation-engine.service';
 
@@ -68,11 +68,44 @@ export class AssistController {
     );
   }
 
+  /**
+   * A Bella deve agir agora? A extensão do WhatsApp Web consulta isto ao abrir
+   * cada conversa para decidir se sugere sozinha ou fica só no botão manual.
+   *
+   * O envio NUNCA é automático em nenhum modo — quem manda é sempre o atendente.
+   * "auto" liga a sugestão automática apenas fora do horário do setor de reservas,
+   * que é quando não há ninguém para escrever a resposta.
+   */
+  @Get('status')
+  async status(@Query('hotelId') hotelId?: string) {
+    const id = hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    const settings = await this.prisma.aiSettings.findUnique({ where: { hotelId: id } });
+    const mode = settings?.mode ?? 'auto';
+    const dentroDoHorario = isWithinBusinessHours();
+    const autoSuggest = mode === 'on' || (mode === 'auto' && !dentroDoHorario);
+    return {
+      mode,
+      dentroDoHorario,
+      horarioTexto: HORARIO_RESERVAS_TEXTO,
+      /** sugerir sozinha ao abrir a conversa */
+      autoSuggest,
+      /** botão manual disponível (some só com a Bella desligada) */
+      manualDisponivel: mode !== 'off',
+    };
+  }
+
   @Post('suggest')
   async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
     const focus = body.lastMessage || conversation;
+
+    // Desligada é desligada: não basta a extensão esconder o botão — o servidor
+    // também recusa, senão uma aba antiga em cache continuaria sugerindo.
+    const modo = (await this.prisma.aiSettings.findUnique({ where: { hotelId } }))?.mode ?? 'auto';
+    if (modo === 'off') {
+      return { suggestion: '', model: 'desligada', mode: modo };
+    }
 
     const [settings, hotel, relevantPolicies, knowledgeText, reserva] = await Promise.all([
       this.prisma.aiSettings.findUnique({ where: { hotelId } }),

@@ -4,7 +4,10 @@ import { useEffect, useState } from 'react';
 import { HOTEL_ID } from '../../lib/config';
 import { apiFetch } from '../../lib/api';
 
+type Mode = 'on' | 'auto' | 'off';
+
 type Settings = {
+  mode: Mode;
   assistantName: string;
   personality: string;
   language: string;
@@ -18,6 +21,7 @@ export default function BellaConfigPage() {
   const [s, setS] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [savingMode, setSavingMode] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -46,6 +50,24 @@ export default function BellaConfigPage() {
     }
   }
 
+  /**
+   * Liga/desliga vale na hora: salva sozinho, sem depender do botão "Salvar".
+   * Se o hóspede está esperando, o dono não pode ficar procurando onde confirmar.
+   */
+  async function setMode(mode: Mode) {
+    setS((prev) => (prev ? { ...prev, mode } : prev));
+    setSavingMode(true);
+    try {
+      await apiFetch(`/api/settings/${HOTEL_ID}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
+      });
+    } finally {
+      setSavingMode(false);
+    }
+  }
+
   function set<K extends keyof Settings>(key: K, value: Settings[K]) {
     setS((prev) => (prev ? { ...prev, [key]: value } : prev));
     setSaved(false);
@@ -59,6 +81,41 @@ export default function BellaConfigPage() {
       <p className="muted" style={{ marginBottom: 16 }}>
         Controle a identidade e o comportamento da Bella. As mudanças valem para todos os canais.
       </p>
+
+      <div className="form-card">
+        <strong>Bella no atendimento</strong>
+        <p className="muted" style={{ fontSize: 13, margin: '4px 0 12px' }}>
+          Vale na hora, sem precisar salvar. Em qualquer modo, no WhatsApp Web quem envia é sempre o atendente —
+          a Bella apenas escreve a sugestão.
+        </p>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {([
+            ['on', '🟢 Ligada', 'Sugere em qualquer horário'],
+            ['auto', '🌙 Automática', 'Só fora do horário de reservas'],
+            ['off', '🔴 Desligada', 'Não sugere nem responde'],
+          ] as [Mode, string, string][]).map(([valor, rotulo, ajuda]) => (
+            <button
+              key={valor}
+              className="btn"
+              onClick={() => setMode(valor)}
+              disabled={savingMode}
+              title={ajuda}
+              style={{
+                opacity: s.mode === valor ? 1 : 0.45,
+                outline: s.mode === valor ? '2px solid #14502f' : 'none',
+              }}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
+          {s.mode === 'auto' &&
+            'Fora do expediente (seg-sex, 9h-12h e 14h30-17h30) a Bella prepara a resposta sozinha. No horário, o atendimento fica com a equipe.'}
+          {s.mode === 'on' && 'A Bella prepara sugestões o tempo todo, inclusive durante o expediente.'}
+          {s.mode === 'off' && 'A Bella está parada. O botão de sugerir some da extensão e o servidor recusa pedidos.'}
+        </p>
+      </div>
 
       <div className="form-card">
         <strong>Identidade</strong>

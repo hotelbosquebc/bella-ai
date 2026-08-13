@@ -57,6 +57,18 @@ export class BellaOrchestratorService {
     // Conversa sob controle humano → Bella não responde
     if (conversation.status === ConversationStatus.PENDING_HUMAN) return;
 
+    // Modo de operação definido pelo dono no painel (Central da Bella).
+    // "auto" entrega o expediente à equipe e cobre só o fora de horário.
+    const modo = (await this.prisma.aiSettings.findUnique({ where: { hotelId: guest.hotelId } }))?.mode ?? 'auto';
+    if (modo === 'off') {
+      this.logger.log('Bella desligada no painel — mensagem registrada, sem resposta automática.');
+      return;
+    }
+    if (modo === 'auto' && isWithinBusinessHours()) {
+      this.logger.log('Modo automático dentro do expediente — atendimento fica com a equipe.');
+      return;
+    }
+
     // 3-4. Memória + extração de intenção/dados de reserva
     const mem = await this.memory.load(guest.id, conversation.id);
     const today = new Date().toISOString().slice(0, 10);

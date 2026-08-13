@@ -278,6 +278,9 @@ model AiSettings {
   modelSales    String  @default("claude-fable-5")
   modelPolicies String  @default("claude-opus-4-8")
   modelBooking  String  @default("claude-haiku-4-5-20251001")
+  /// Modo de operação da Bella, definido pelo dono no painel:
+  /// "on" = sempre ativa | "off" = desligada | "auto" = só fora do horário de reservas
+  mode          String  @default("auto")
   masterPrompt  String?
   salesPrompt   String?
   opsPrompt     String?

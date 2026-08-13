@@ -50,6 +50,7 @@
       <button id="bella-toggle" title="Recolher/expandir">—</button>
     </div>
     <div id="bella-body">
+      <div id="bella-modo">…</div>
       <button id="bella-suggest" class="bella-btn">🤖 Sugerir resposta da Bella</button>
       <div id="bella-suggestion" style="display:none">
         <textarea id="bella-sugtext" rows="5"></textarea>
@@ -96,27 +97,86 @@
   }
 
   // ---------- sugerir resposta ----------
-  panel.querySelector('#bella-suggest').onclick = async () => {
+  let sugerindo = false;
+
+  async function sugerir(automatica) {
+    if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
     const { conversation, lastMessage } = scrapeConversation();
     if (!conversation) {
-      status('Abra uma conversa com mensagens primeiro.', true);
+      if (!automatica) status('Abra uma conversa com mensagens primeiro.', true);
       return;
     }
-    status('Pensando… (pode levar alguns segundos)');
-    const r = await send('SUGGEST', { conversation, lastMessage });
-    if (!r || !r.ok) {
-      status(r ? r.error : 'Falha ao sugerir.', true);
-      return;
+    sugerindo = true;
+    status(automatica ? 'Bella preparando sugestão…' : 'Pensando… (pode levar alguns segundos)');
+    try {
+      const r = await send('SUGGEST', { conversation, lastMessage });
+      if (!r || !r.ok) {
+        status(r ? r.error : 'Falha ao sugerir.', true);
+        return;
+      }
+      if (r.data.model === 'desligada') {
+        status('A Bella está desligada no painel.', true);
+        return;
+      }
+      status(automatica ? 'Sugestão pronta — revise antes de enviar.' : '');
+      panel.querySelector('#bella-suggestion').style.display = 'block';
+      panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
+    } finally {
+      sugerindo = false;
     }
-    status('');
-    panel.querySelector('#bella-suggestion').style.display = 'block';
-    panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
-  };
+  }
+
+  panel.querySelector('#bella-suggest').onclick = () => sugerir(false);
 
   panel.querySelector('#bella-insert').onclick = () => {
     const t = panel.querySelector('#bella-sugtext').value;
     if (t) insertText(t);
   };
+
+  // ---------- modo de operação (ligada / desligada / automática) ----------
+  let modo = null;
+
+  async function carregarModo() {
+    const r = await send('STATUS');
+    if (!r || !r.ok) return null;
+    modo = r.data;
+    const rotulo = { on: '🟢 Bella ligada', off: '🔴 Bella desligada', auto: '🌙 Bella automática' }[modo.mode];
+    const detalhe =
+      modo.mode === 'auto'
+        ? modo.dentroDoHorario
+          ? ' — no horário, quem atende é a equipe'
+          : ' — fora do horário, sugerindo sozinha'
+        : '';
+    panel.querySelector('#bella-modo').textContent = rotulo + detalhe;
+    panel.querySelector('#bella-suggest').style.display = modo.manualDisponivel ? 'block' : 'none';
+    return modo;
+  }
+
+  /**
+   * Sugere sozinha ao abrir uma conversa, quando o modo permitir. O envio
+   * continua SEMPRE manual: a Bella escreve, quem manda é o atendente.
+   */
+  let ultimaConversa = '';
+  async function aoTrocarDeConversa() {
+    const { conversation } = scrapeConversation();
+    if (!conversation || conversation === ultimaConversa) return;
+    ultimaConversa = conversation;
+    panel.querySelector('#bella-suggestion').style.display = 'none';
+    panel.querySelector('#bella-sugtext').value = '';
+    if (modo && modo.autoSuggest) sugerir(true);
+  }
+
+  // O WhatsApp Web troca de conversa sem recarregar a página; observamos o DOM.
+  let debounce;
+  new MutationObserver(() => {
+    clearTimeout(debounce);
+    debounce = setTimeout(aoTrocarDeConversa, 1200);
+  }).observe(document.body, { childList: true, subtree: true });
+
+  carregarModo().then(() => aoTrocarDeConversa());
+  // O modo muda no painel a qualquer momento — reconsulta de minuto em minuto,
+  // e assim a virada do horário também entra sozinha.
+  setInterval(carregarModo, 60000);
 
   loadQuickReplies();
 })();

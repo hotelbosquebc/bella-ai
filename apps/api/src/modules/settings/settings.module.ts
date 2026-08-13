@@ -30,6 +30,7 @@ export class SettingsController {
       'modelSales',
       'modelPolicies',
       'modelBooking',
+      'mode',
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
