@@ -104,7 +104,7 @@ export class ModelRouterService {
       parts: [{ text: m.content }],
     }));
 
-    const body: any = {
+    const buildBody = (withThinking: boolean) => ({
       systemInstruction: { parts: [{ text: sys }] },
       contents,
       generationConfig: {
@@ -112,13 +112,13 @@ export class ModelRouterService {
         maxOutputTokens: 2048,
         // Modelos Gemini 2.5 "pensam" por padrão e gastam tokens de saída nisso,
         // o que truncava as respostas. Desligamos o thinking: chat fica rápido e completo.
-        thinkingConfig: { thinkingBudget: 0 },
+        ...(withThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
         ...(wantsJson ? { responseMimeType: 'application/json' } : {}),
       },
-    };
+    });
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    const data = await this.fetchWithRetry(url, body);
+    const data = await this.fetchGemini(url, model, buildBody);
     const text: string = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
     return this.pack(text, model, wantsJson);
   }
@@ -135,7 +135,7 @@ export class ModelRouterService {
     const key = process.env.GOOGLE_API_KEY!;
     // Usa o mesmo alias vigente do provedor (gemini-2.5-flash foi descontinuado)
     const model = process.env.GEMINI_MODEL_AUDIO ?? process.env.GEMINI_MODEL_PRECISE ?? 'gemini-flash-latest';
-    const body = {
+    const buildBody = (withThinking: boolean) => ({
       contents: [
         {
           role: 'user',
@@ -145,16 +145,48 @@ export class ModelRouterService {
           ],
         },
       ],
-      generationConfig: { temperature: 0, maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
-    };
+      generationConfig: {
+        temperature: 0,
+        maxOutputTokens: 1024,
+        ...(withThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+      },
+    });
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
     try {
-      const data = await this.fetchWithRetry(url, body);
+      const data = await this.fetchGemini(url, model, buildBody);
       const text: string = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
       return text.trim();
     } catch (err) {
       this.logger.error(`Falha ao transcrever áudio: ${err instanceof Error ? err.message : err}`);
       return '';
+    }
+  }
+
+  /**
+   * Modelos que rejeitam `thinkingConfig` com 400 INVALID_ARGUMENT — os aliases
+   * "-latest" são assim hoje. Descoberto em execução (não chumbamos nomes: o
+   * Google troca os aliases) e memorizado para não repetir a chamada perdida.
+   */
+  private readonly semThinkingConfig = new Set<string>();
+
+  /**
+   * POST ao Gemini que se adapta ao modelo: tenta com `thinkingConfig` e, se o
+   * modelo o recusar, repete sem ele e passa a omiti-lo dali em diante.
+   * Sem isso, um alias que não aceita o parâmetro derruba TODA resposta da Bella
+   * para o mock ("estou com a inteligência em configuração").
+   */
+  private async fetchGemini(url: string, model: string, buildBody: (withThinking: boolean) => unknown): Promise<any> {
+    const tentarComThinking = !this.semThinkingConfig.has(model);
+    try {
+      return await this.fetchWithRetry(url, buildBody(tentarComThinking));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (tentarComThinking && msg.includes('400') && msg.includes('INVALID_ARGUMENT')) {
+        this.semThinkingConfig.add(model);
+        this.logger.warn(`Modelo ${model} não aceita thinkingConfig; repetindo sem esse parâmetro.`);
+        return this.fetchWithRetry(url, buildBody(false));
+      }
+      throw err;
     }
   }
 
