@@ -141,9 +141,12 @@ Das 5 lacunas `[REVISAR]`, **4 foram preenchidas com fonte oficial** (folha "Bem
 - **Categorias:** Suíte Bosque (7º-8º, 2 banheiros + aquecimento a gás), Luxo (3º-4º, mais novos), Superior (5º-6º, +1 TV), Standard (1º-2º, mais básicos) — todas cap. 6 ✅
 - **Ingressos:** lista das atrações do material ✅
 - **NOVO "Normas gerais do hotel":** chave (perda R$300), 220V, toalha de praia não emprestada (multa R$200), **proibido fumar (multa R$500)**, não hospedado sem aviso = diária extra, silêncio após 22h, bebidas na recepção.
-- ⚠️ **Sobra 1 `[REVISAR]`: "Menores de idade"** — só o dono tem essa regra.
+- ✅ **"Menores de idade" preenchido** (ditado pelo dono em 13/08/2026): 0-6 anos **cortesia**; 7-9 anos **valor especial de criança**; 10+ **integral como adulto**. Bate com o motor de reservas (`criancas-000003` = 0-6, `criancas-000004` = 7-9, `adultos-000001` = 10+).
+- 🎉 **BASE COMPLETA: 17 conhecimentos, 0 com `[REVISAR]`, 0 inativos.** A perda do banco foi 100% revertida.
+- ⚠️ **CONFIRMAR com o dono:** a **Política Infantil** diz "7 a 9 anos pagam **50%** do valor por pessoa" e a Bella está informando isso ao hóspede. O dono descreveu como "valor especial" sem citar percentual — se os 50% mudaram, corrigir a política.
 - ☎️ **(47) 99690-4414 NÃO EXISTE MAIS** (número antigo do hotel, confirmado pelo dono em 13/08/2026). Removido do conhecimento "Normas gerais do hotel" — varredura confirmou **zero** ocorrências no banco e no código. O contato oficial da Bella é **(47) 3367-0211** (recepção 24h).
-- 🚨 **PENDENTE — o número morto está IMPRESSO na imagem `NORMAS.png`** (rodapé: "Reservas: (47) 99690-4414"), que está cadastrada como anexo ativo e é enviada ao hóspede quando ele pergunta de normas/regras/fumar/toalha/chave. **Apagar o texto não resolve a imagem.** Opções: (a) excluir o anexo "Normas do Hotel do Bosque" — o texto das normas já responde sozinho e está correto; (b) subir arte nova pela tela `/anexos`. Dono ainda não decidiu.
+- ✅ **RESOLVIDO — imagem `NORMAS.png` corrigida pelo dono** (13/08/2026): ele apagou a linha de telefones da arte; conferido visualmente (sobrou só o endereço) e o anexo foi **substituído** no banco (sobe o novo, só então apaga o antigo — nunca fica sem anexo).
+- (histórico) O número morto estava IMPRESSO na imagem `NORMAS.png` (rodapé: "Reservas: (47) 99690-4414"), que está cadastrada como anexo ativo e é enviada ao hóspede quando ele pergunta de normas/regras/fumar/toalha/chave. **Apagar o texto não resolve a imagem.** Opções: (a) excluir o anexo "Normas do Hotel do Bosque" — o texto das normas já responde sozinho e está correto; (b) subir arte nova pela tela `/anexos`. Dono ainda não decidiu.
 
 ## 🖼️ (histórico) pedido original de imagens
 Dono quer que a sugestão já venha com imagem anexada (caso típico: **folha de normas de pets**). Envio segue manual.
