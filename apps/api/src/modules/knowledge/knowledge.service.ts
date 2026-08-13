@@ -56,17 +56,35 @@ export class KnowledgeService {
    * documentos ativos do hotel. Para um hotel, cabe inteiro no contexto do
    * modelo (sem necessidade de busca vetorial). Limitado por segurança.
    */
-  async getKnowledgeContext(hotelId: string, maxChars = 12000): Promise<string> {
+  /**
+   * Base do hotel injetada no prompt. O corte por tamanho é SILENCIOSO (break
+   * abaixo): o que não couber some do prompt sem erro nenhum, e a Bella passa a
+   * "não saber" algo que está cadastrado. Com o questionário do dono a base foi
+   * a ~10,6 mil caracteres e quase encostou no teto antigo de 12 mil — por isso
+   * o limite subiu. O Gemini aguenta folgado; o risco real era o corte mudo.
+   */
+  async getKnowledgeContext(hotelId: string, maxChars = 60000): Promise<string> {
     const docs = await this.prisma.knowledgeDocument.findMany({
       where: { hotelId, active: true, content: { not: null } },
       orderBy: { createdAt: 'asc' },
       select: { title: true, content: true },
     });
     let out = '';
+    const cortados: string[] = [];
     for (const d of docs) {
       const block = `## ${d.title}\n${d.content}\n\n`;
-      if (out.length + block.length > maxChars) break;
+      if (out.length + block.length > maxChars) {
+        cortados.push(d.title);
+        continue;
+      }
       out += block;
+    }
+    if (cortados.length) {
+      // Sem este aviso, o sintoma seria a Bella "esquecendo" um conhecimento
+      // que está cadastrado e ativo no painel — quase impossível de diagnosticar.
+      this.logger.warn(
+        `Base de conhecimento excedeu ${maxChars} caracteres; ${cortados.length} item(ns) FORA do prompt: ${cortados.join(', ')}`,
+      );
     }
     return out.trim();
   }

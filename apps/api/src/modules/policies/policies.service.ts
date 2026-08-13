@@ -20,14 +20,27 @@ const CATEGORY_KEYWORDS: [RegExp, PolicyCategory][] = [
 export class PoliciesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Toda resposta da Bella consulta a base oficial de políticas */
+  /**
+   * Toda resposta da Bella consulta a base oficial de políticas.
+   *
+   * Políticas são versionadas e as versões antigas continuam `active/approved`.
+   * Sem filtrar, o prompt receberia TODAS as versões da mesma categoria de uma
+   * vez — a regra nova e a antiga juntas, se contradizendo. Fica só a de maior
+   * versão por categoria.
+   */
   async findRelevant(hotelId: string, messageText: string): Promise<Policy[]> {
     const categories = CATEGORY_KEYWORDS.filter(([re]) => re.test(messageText)).map(([, cat]) => cat);
     if (categories.length === 0) return [];
-    return this.prisma.policy.findMany({
+    const todas = await this.prisma.policy.findMany({
       where: { hotelId, active: true, approved: true, category: { in: categories } },
       orderBy: { version: 'desc' },
     });
+    const maisRecentePorCategoria = new Map<string, Policy>();
+    for (const p of todas) {
+      const atual = maisRecentePorCategoria.get(p.category);
+      if (!atual || p.version > atual.version) maisRecentePorCategoria.set(p.category, p);
+    }
+    return [...maisRecentePorCategoria.values()];
   }
 
   list(hotelId: string) {
