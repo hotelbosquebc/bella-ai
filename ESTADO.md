@@ -182,6 +182,22 @@ O dono respondeu um questionário de 110 perguntas. Base foi de 17 → **25 conh
 32 apartamentos · 2 elevadores · apto PCD existe (confirmar disponibilidade) · sem cofre · sem Smart TV (só TV a cabo; Standard só na sala) · sem micro-ondas nos aptos (um no térreo p/ empréstimo) · sem lavanderia · berço grátis sob solicitação · até 3 colchões extras · sofá-cama só em alguns · café p/ não hospedado a partir de R$40 · panquecaria/creperia à noite · delivery permitido · 3 churrasqueiras (grelha/espetos fornecidos, limite 22h) · ônibus não estaciona (terceirizado a poucos metros) · sem carregador elétrico · ~100m da praia · sem WhatsApp de recepção (ramal 9 ou fixo **(47) 3367-0211**, que fica CONFIRMADO como o contato oficial).
 - ✅ **Churrasqueira: uso GRATUITO** para hóspedes (confirmado pelo dono em 13/08/2026). Reserva na recepção, limite 22h, grelha e espetos fornecidos.
 
+## ✅ EXTENSÃO VALIDADA NO WHATSAPP WEB REAL (13/08/2026)
+Instalada no PC do dono e testada em conversa real. Dois bugs achados só no uso real:
+
+1. **A extensão não lia mais NENHUMA mensagem** (commit `ea6b23f`). O WhatsApp Web mudou a estrutura: `div.message-in` / `span.selectable-text` não achavam nada. Sintoma enganoso: o painel dizia *"Abra uma conversa com mensagens primeiro"* numa conversa cheia de mensagens, a Bella **nunca era consultada**, e sobravam só os atalhos — o dono percebeu como "ela só dá resposta pré-pronta".
+   - Agora a leitura é em camadas: `message-in/out` → `div[role="row"]` → `div[data-id]`; remetente pela classe, pelo ícone de status (`[data-icon^="msg-"]`, só mensagem nossa tem) ou pelo prefixo `true_`/`false_` do `data-id`; último recurso manda o texto cru de `#main`.
+   - `__bellaDebug()` no console do WhatsApp mostra o que a extensão enxerga.
+   - 💡 **Como saber se o Chrome está rodando código velho:** a frase de erro antiga era "Abra uma conversa **com mensagens** primeiro". Se ela aparecer, a extensão NÃO foi recarregada em `chrome://extensions` (botão 🔄 no cartão).
+2. **Formatação impublicável** (commit `247aca5`). O link saía colado no texto (`reservas:https://...`) — o WhatsApp quebra o endereço e o hóspede recebe link morto. Texto corrido e `**markdown**` que o WhatsApp não renderiza.
+   - Prompt pede blocos curtos + link isolado + sem markdown, **e** `formatarParaWhatsApp()` aplica as mesmas regras de forma determinística na saída (não confia na obediência do modelo).
+   - Identidade: agora se apresenta SEMPRE como **"Bella, assistente online do Hotel do Bosque"** (pedido do dono).
+
+✅ **Funcionamento confirmado ponta a ponta:** hóspede escreveu "de hoje até domingo duas pessoas" → a Bella leu a conversa, converteu as datas relativas (13/08 → 16/08), montou o link com 2 adultos e o atendente enviou.
+
+📌 Instalação do dono: pasta **`C:\Bella\whatsapp-extension`** (ID `iijccindcfcienihooalcfiilcillfdb`). Opções direto por `chrome-extension://iijccindcfcienihooalcfiilcillfdb/options.html`. **Ao mexer na extensão, sempre copiar o arquivo alterado para `C:\Bella\` e mandar recarregar em `chrome://extensions`.**
+- ⚠️ Ainda NÃO testado: o botão **📎 Anexar** (inserir arquivo no WhatsApp) e o teste do modo Desligada.
+
 ## Canais — situação
 - **Telegram:** código pronto; falta só criar bot (@BotFather) e pôr `TELEGRAM_BOT_TOKEN` no Render + setWebhook. É o caminho mais rápido para ver a Bella num canal real, sem burocracia.
 - **WhatsApp/Instagram oficiais (Cloud API):** caminho escolhido (A) = migrar o número principal para a Cloud API (seguro, sem ban; recepção passa a responder pelo painel — por isso as respostas rápidas/contatos/assumir-controle foram construídas). Bloqueio atual: registro de desenvolvedor na Meta travado por "dispositivo novo" (fazer pelo CELULAR do Victor Bosque, aparelho reconhecido). Depois: criar app → adicionar WhatsApp/Instagram → tokens (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, `INSTAGRAM_PAGE_ACCESS_TOKEN`, `META_WEBHOOK_VERIFY_TOKEN`) no Render → configurar webhook `https://bella-api-nh3h.onrender.com/api/channels/{whatsapp|instagram|facebook}/webhook`. Precisa de verificação do negócio (dias). Dono NÃO pode perder o número principal.
