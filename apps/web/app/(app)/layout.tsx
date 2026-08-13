@@ -11,6 +11,7 @@ const NAV = [
   { href: '/quick-replies', label: '⚡ Respostas Rápidas' },
   { href: '/bella', label: '🌿 Central da Bella' },
   { href: '/knowledge', label: '📚 Conhecimento' },
+  { href: '/anexos', label: '📎 Anexos' },
   { href: '/policies', label: '📋 Políticas' },
   { href: '/audit', label: '🔍 Auditoria' },
   { href: '/analytics', label: '📈 Analytics' },
