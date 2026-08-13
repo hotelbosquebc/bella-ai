@@ -28,6 +28,18 @@ Ajuda a recepção a responder mais rápido no **WhatsApp Web**, com os **atalho
 
 > A Bella **nunca envia sozinha** por aqui. Ela só escreve para você — quem manda é sempre o atendente.
 
+## Ligar, desligar e o modo automático
+
+No topo do painel da extensão aparece o modo atual. Ele é definido no **painel da Bella → Central da Bella**, e vale na hora (a extensão reconsulta a cada minuto, sem precisar recarregar):
+
+| Modo | O que acontece no WhatsApp Web |
+|---|---|
+| 🟢 **Ligada** | Ao abrir uma conversa, a Bella já prepara a sugestão sozinha — a qualquer hora. |
+| 🌙 **Automática** (padrão) | Prepara sozinha **apenas fora** do horário do setor de reservas (seg-sex, 9h-12h e 14h30-17h30). Durante o expediente, só se você clicar em "Sugerir". |
+| 🔴 **Desligada** | O botão some e a Bella não escreve nada. |
+
+Em **todos** os modos o envio continua manual. "Automática" significa que o texto já vem pronto — não que ela responde ao hóspede sozinha.
+
 ## Observações
 - Se os atalhos não carregarem, refaça a configuração (login).
 - A extensão funciona junto com o app normal do WhatsApp — não substitui nem migra o número.

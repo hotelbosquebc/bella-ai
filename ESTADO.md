@@ -97,6 +97,37 @@ Testes reais no `/api/assist/suggest`, modelo `gemini-flash-lite-latest` (não m
 
 - ⚠️ **`/api/assist/suggest` NÃO cria registros** (sem lead/conversa/follow-up). É só co-piloto. O CRM só é alimentado pelo orquestrador (canal oficial da Meta, ainda não ligado).
 
+## 🎛️ Modos da Bella — liga/desliga e automático (13/08/2026, commit `6e06381`)
+`AiSettings.mode` (migration `20260813180000_ai_settings_mode`), editável na **Central da Bella** e aplicado **na hora** (sem botão Salvar):
+| Modo | Efeito |
+|---|---|
+| `on` | sugere sempre |
+| `auto` (**padrão**) | só **fora** do horário de reservas; no expediente o atendimento fica com a equipe |
+| `off` | parada — botão some na extensão E `/api/assist/suggest` recusa (`model: "desligada"`) |
+
+- `GET /api/assist/status` → `{mode, dentroDoHorario, autoSuggest, manualDisponivel}`. A extensão consulta **a cada 60s**, então trocar o modo no painel e a virada do horário entram sozinhas.
+- **Envio NUNCA é automático no WhatsApp Web.** "Automática" = a sugestão já vem pronta ao abrir a conversa (auto-sugestão via MutationObserver); quem envia é sempre o atendente. Decisão do dono (13/08/2026) — o número principal não recebe automação de envio.
+- O orquestrador (canal oficial da Meta) respeita os mesmos modos.
+- ✅ Testado em produção nos 3 modos (off recusa, on auto-sugere, auto respeita o expediente).
+
+## 🕐 Horário de atendimento centralizado (`apps/api/src/modules/bella/business-hours.ts`)
+Estava privado no orquestrador → o co-piloto não via, e a Bella prometia "transferir agora" às 22h de domingo. Agora `isWithinBusinessHours()` + `contextoDeHorario()` são usados pelos dois caminhos. **Testado: 11 casos** (bordas das duas janelas, almoço, fim de semana, fuso America/Sao_Paulo vs servidor em UTC).
+- **Grupos/excursões:** regra explícita no `MASTER_PROMPT` — nunca cotar/negociar; informar o horário do setor; fora do horário, não prometer atendente imediato e oferecer a recepção 24h. ✅ Validado: escala excursão de 40 pessoas e time de futebol sem cotar.
+
+## 💻 Instalação nos PCs (recepção + dono)
+- **A API NÃO é instalada em PC** — roda no Render. Nos PCs instala-se só a **extensão do Chrome**.
+- ZIP gerado em `Área de Trabalho\Bella-Extensao-WhatsApp.zip` (regerar: `Compress-Archive` da pasta `whatsapp-extension`).
+- Extrair em pasta **definitiva** (ex.: `C:\Bella\whatsapp-extension`) — o Chrome carrega dali para sempre; se apagar, quebra.
+- `chrome://extensions` → Modo desenvolvedor → Carregar sem compactação → 🧩 Bella → Opções → login do painel.
+- Ambos os PCs falam com a mesma API; o modo vem do painel e vale para os dois.
+- 📌 Ideal criar usuário próprio para a recepção (auditoria) — ainda não feito.
+
+## 🖼️ PRÓXIMO PEDIDO (não iniciado): Bella enviar imagens
+Dono quer que a sugestão já venha com imagem anexada (caso típico: **folha de normas de pets**). Envio segue manual.
+- Decisão pendente de **onde hospedar** a imagem (regra: custo ZERO). Candidatos: `KnowledgeDocument.fileUrl` (campo **já existe**) com URL pública do site do hotel, ou base64 no Postgres para poucas imagens.
+- Parte difícil: **inserir imagem no WhatsApp Web** exige colar via `ClipboardEvent`/`DataTransfer` com um `File` (texto é fácil, imagem não). Validar cedo — é o ponto de risco.
+- Precisa também de critério de "qual imagem para qual pergunta" (casar assunto → conhecimento com imagem).
+
 ## Canais — situação
 - **Telegram:** código pronto; falta só criar bot (@BotFather) e pôr `TELEGRAM_BOT_TOKEN` no Render + setWebhook. É o caminho mais rápido para ver a Bella num canal real, sem burocracia.
 - **WhatsApp/Instagram oficiais (Cloud API):** caminho escolhido (A) = migrar o número principal para a Cloud API (seguro, sem ban; recepção passa a responder pelo painel — por isso as respostas rápidas/contatos/assumir-controle foram construídas). Bloqueio atual: registro de desenvolvedor na Meta travado por "dispositivo novo" (fazer pelo CELULAR do Victor Bosque, aparelho reconhecido). Depois: criar app → adicionar WhatsApp/Instagram → tokens (`WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN`, `INSTAGRAM_PAGE_ACCESS_TOKEN`, `META_WEBHOOK_VERIFY_TOKEN`) no Render → configurar webhook `https://bella-api-nh3h.onrender.com/api/channels/{whatsapp|instagram|facebook}/webhook`. Precisa de verificação do negócio (dias). Dono NÃO pode perder o número principal.
