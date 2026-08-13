@@ -75,6 +75,7 @@ Dashboard (KPIs), Caixa de Entrada (chat, perfil, **assumir/devolver controle**,
 **A Bella NÃO fecha reserva.** Ela apenas (1) envia o link do site para o hóspede reservar sozinho e (2) responde dúvidas. Quem fecha é o hóspede no site ou a equipe humana.
 - ✅ Guardrails do `MASTER_PROMPT` já batem com isso: não inventa, não promete desconto, não autoriza cancelamento/estorno/reembolso, escala para humano na dúvida.
 - ✅ **Link de reserva VALIDADO em 13/08/2026** (aberto em navegador real): `buildBookingLink` gera `/pt-br/reserva/busca/?checkin=YYYY-MM-DD&checkout=…&adultos-000001=N&criancas-000003=&criancas-000004=` e a página abre **direto nos resultados**, com as 4 categorias e "TOTAL (3 Diárias)" correto. ⇒ A divergência de formato anotada no bloco "Motor de reservas real" **já foi corrigida**; ignorar aquele ⚠️.
+- ✅ **Parâmetros de CRIANÇA confirmados** (era pendência antiga). A URL é traduzida corretamente para os campos internos do Silbeck: `adultos-000001` → `categorias_hospede[000001]`, `criancas-000003` → `[000003]` (0-6), `criancas-000004` → `[000004]` (7-9). Teste 20-23/09/2026: 2 adultos → Standard R$385/diária; +1 criança 0-6 +1 criança 7-9 → R$485/diária (**+R$100**, a de 7-9 cobrada e a de 0-6 cortesia). ⇒ ocupação chega certa e o preço reflete.
 - ⚠️ `curl` no link dá **403 (Cloudflare/captcha)** — é proteção anti-bot, NÃO link quebrado. Para testar, usar navegador de verdade.
 - Como ela só manda link, os 5 atalhos `[REVISAR]` **não a afetam** — são ferramenta do atendente humano na extensão. Não bloqueiam o uso.
 
