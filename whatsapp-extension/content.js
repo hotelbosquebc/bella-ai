@@ -26,20 +26,83 @@
     document.execCommand('insertText', false, text);
   }
 
+  /**
+   * Lê as mensagens da conversa aberta.
+   *
+   * O WhatsApp Web troca classes e estrutura sem aviso — a versão anterior
+   * dependia só de `div.message-in`/`span.selectable-text` e parou de achar
+   * qualquer mensagem, fazendo a Bella nunca ser consultada. Aqui vamos por
+   * camadas: se uma estratégia falhar, a próxima assume.
+   */
   function scrapeConversation() {
-    const rows = document.querySelectorAll('div.message-in, div.message-out');
+    // #main é o painel da conversa aberta; evita varrer a lista de contatos
+    // e o próprio painel da Bella.
+    const main = document.querySelector('#main') || document.body;
+
+    let rows = [...main.querySelectorAll('div.message-in, div.message-out')];
+    if (!rows.length) rows = [...main.querySelectorAll('div[role="row"]')];
+    if (!rows.length) rows = [...main.querySelectorAll('div[data-id]')];
+
+    /** A mensagem é do hóspede (entrada) ou nossa (saída)? */
+    const ehEntrada = (r) => {
+      if (r.classList.contains('message-in')) return true;
+      if (r.classList.contains('message-out')) return false;
+      if (r.querySelector('.message-in')) return true;
+      if (r.querySelector('.message-out')) return false;
+      if (r.closest && r.closest('.message-in')) return true;
+      if (r.closest && r.closest('.message-out')) return false;
+      // Sem as classes: só mensagens NOSSAS exibem o status de entrega.
+      if (r.querySelector('[data-icon^="msg-"], [aria-label*="Entregue"], [aria-label*="Lida"]')) return false;
+      // data-id de mensagem própria começa com "true_" no WhatsApp.
+      const id = r.getAttribute && r.getAttribute('data-id');
+      if (id) return !id.startsWith('true_');
+      return true;
+    };
+
+    /** Texto da mensagem, ignorando hora, nome e status. */
+    const textoDe = (r) => {
+      const alvo =
+        r.querySelector('span.selectable-text') ||
+        r.querySelector('.copyable-text span[dir]') ||
+        r.querySelector('span[dir="ltr"], span[dir="auto"]') ||
+        r.querySelector('.copyable-text');
+      let t = alvo ? alvo.innerText : '';
+      if (!t && r.innerText) t = r.innerText;
+      return (t || '')
+        .replace(/ /g, ' ')
+        .replace(/^\s*\d{1,2}:\d{2}\s*/, '')
+        .trim();
+    };
+
     const msgs = [];
     let lastIn = '';
-    rows.forEach((r) => {
-      const isIn = r.classList.contains('message-in');
-      const el = r.querySelector('span.selectable-text');
-      const t = el ? el.innerText.trim() : '';
-      if (!t) return;
+    for (const r of rows) {
+      const t = textoDe(r);
+      if (!t || t.length > 4000) continue;
+      const isIn = ehEntrada(r);
       msgs.push((isIn ? 'Hóspede: ' : 'Nós: ') + t);
       if (isIn) lastIn = t;
-    });
-    return { conversation: msgs.slice(-25).join('\n'), lastMessage: lastIn };
+    }
+
+    // Se nada casou, ainda dá para mandar o texto cru do painel: é melhor a
+    // Bella responder com contexto imperfeito do que não responder nada.
+    if (!msgs.length && main !== document.body) {
+      const cru = (main.innerText || '').trim();
+      if (cru.length > 20) {
+        const linhas = cru.split('\n').map((l) => l.trim()).filter(Boolean).slice(-25);
+        return { conversation: linhas.join('\n'), lastMessage: linhas[linhas.length - 1] || '', bruto: true };
+      }
+    }
+
+    return { conversation: msgs.slice(-25).join('\n'), lastMessage: lastIn, lidas: msgs.length };
   }
+
+  // Diagnóstico rápido no console do WhatsApp Web: __bellaDebug()
+  window.__bellaDebug = () => {
+    const r = scrapeConversation();
+    console.log('[Bella] mensagens lidas:', r.lidas ?? '(modo bruto)', '\n', r.conversation);
+    return r;
+  };
 
   // ---------- painel ----------
   const panel = document.createElement('div');
@@ -180,13 +243,26 @@
 
   async function sugerir(automatica) {
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
-    const { conversation, lastMessage } = scrapeConversation();
+    const { conversation, lastMessage, lidas } = scrapeConversation();
     if (!conversation) {
-      if (!automatica) status('Abra uma conversa com mensagens primeiro.', true);
+      if (!automatica) {
+        // Distingue "nenhuma conversa aberta" de "não consegui LER a conversa",
+        // que é falha da extensão e não do usuário.
+        const temConversaAberta = Boolean(document.querySelector('#main'));
+        status(
+          temConversaAberta
+            ? 'Não consegui ler as mensagens desta conversa — o WhatsApp Web mudou. Avise para ajustarmos.'
+            : 'Abra uma conversa primeiro.',
+          true,
+        );
+      }
       return;
     }
     sugerindo = true;
-    status(automatica ? 'Bella preparando sugestão…' : 'Pensando… (pode levar alguns segundos)');
+    status(
+      (automatica ? 'Bella preparando sugestão…' : 'Pensando… (pode levar alguns segundos)') +
+        (lidas ? ` (${lidas} msgs)` : ''),
+    );
     try {
       const r = await send('SUGGEST', { conversation, lastMessage });
       if (!r || !r.ok) {
