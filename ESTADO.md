@@ -39,8 +39,20 @@ Tom "Victor" (saudação calorosa pedindo período/nº pessoas/idades <10). Funi
 ## Funções do painel (todas funcionais)
 Dashboard (KPIs), Caixa de Entrada (chat, perfil, **assumir/devolver controle**, respostas rápidas "/"), CRM Kanban (drag-drop), Central da Bella (editar identidade/prompts), Conhecimento, Contatos (criar/editar), Políticas, Auditoria, Analytics, modo escuro, logout. API protegida por JWT (guard global; @Public em webhooks/health/login; escape `DISABLE_AUTH=true`). Follow-up e outbound WhatsApp/IG/FB/Telegram implementados. Limpeza de teste: `DELETE /api/admin/cleanup-test-data`. Dados de teste JÁ foram limpos (caixa zerada).
 
-## 🚨 ESTADO ATUAL — API FORA DO AR (prioridade nº1 ao retomar)
-### ✅ DIAGNÓSTICO CONFIRMADO (sessão de 10/08/2026)
+## ✅ RESOLVIDO — API DE VOLTA AO AR (13/08/2026)
+- `GET /api/health` → **200** em 0,3s. `POST /api/auth/login` autentica de verdade (retorna user OWNER) ⇒ **o banco novo está conectado e funcionando**.
+- O **seed `seed-conhecimento.js` EXECUTOU com sucesso** (não é mais só sintaxe). Estado medido via API:
+  - **16 conhecimentos** — 11 ativos com texto real + **5 inativos com `[REVISAR]`**: Wi-Fi, Categorias de apartamentos, Limpeza dos apartamentos, Ingressos, Menores de idade.
+  - **8 atalhos** — 3 com texto real (`/24`, `/bomdia`, `/endereco`) + **5 com `[REVISAR]`**: `/banco`, `/confirmacao`, `/confirmar`, `/financeiro`, `/ingressos`.
+  - **7 políticas** completas (cancelamento, no-show, pets, infantil, grupos, pagamento, check-in).
+- ✅ Conhecimentos `[REVISAR]` estão `active: false` e `getKnowledgeContext` filtra `active: true` ⇒ **a Bella não enxerga os placeholders**.
+- ⚠️ **RISCO ABERTO:** o model `QuickReply` (`schema.prisma`) **não tem campo `active`**. Os 5 atalhos `[REVISAR]` aparecem normalmente no painel — um atendente pode digitar `/banco` e mandar `"[REVISAR — conteúdo original perdido...]"` para o hóspede. **Corrigir:** escrever os 5 textos à mão em /quick-replies (rápido), ou adicionar `active` ao model + filtro na tela.
+- ✅ **Conteúdo do 1c2647f REAPLICADO** (commit `10cb1d0`, `git revert 588b83a`): AssistModule (`/api/assist/suggest`), transcrição de áudio, saudação "especialista em reservas", handoff por horário e `whatsapp-extension/`. Revert sem conflitos, `nest build` local passou, `AssistModule` registrado no `app.module.ts`, push feito.
+- 🚨 **A IA ESTÁ DESLIGADA em produção.** `POST /api/assist/suggest` responde `{"model":"mock"}` — o texto "estou com a inteligência em configuração". `resolveProvider()` só cai em `mock` quando **nem `AI_PROVIDER` nem `GOOGLE_API_KEY`** existem no ambiente. Como o `render.yaml` fixa `AI_PROVIDER: gemini` (valor literal, não `sync: false`), o serviço rodando **está sem as envs do Blueprint**. **AÇÃO:** no painel do Render (bella-api > Environment) repor `AI_PROVIDER=gemini` + `GOOGLE_API_KEY` (chave gratuita do Gemini) e redeployar.
+- ⚠️ **PENDENTE confirmar no painel do Render:** qual banco está em uso agora (Dashboard > bella-api > Environment > `DATABASE_URL`). O `render.yaml` ainda declara `databases: bella-db` no plano **free do Render** e amarra a `DATABASE_URL` via `fromDatabase` — se um re-sync do Blueprint acontecer, ele reconecta ao banco free e a API cai de novo em ~30 dias. Se a string for do Supabase, **remover o bloco `databases:`** e trocar `DATABASE_URL` para `sync: false`. (Deixado intocado nesta sessão por falta de acesso ao painel.)
+- ⚠️ Conferir também se `ADMIN_PASSWORD`, `JWT_SECRET`, `DEFAULT_HOTEL_ID` e `BOOKING_ENGINE_*` sobreviveram — se a env da IA se perdeu, outras podem ter se perdido junto.
+
+### Diagnóstico original (sessão de 10/08/2026) — histórico
 - **CAUSA: o `bella-db` FOI DELETADO.** Verificado no painel do Render: em `Ungrouped Services` aparece **All (1)** — só o `bella-api`, com status **`Failed service`**. Não há banco na lista nem suspenso (`Suspended (0)`). O Postgres free expirou e foi removido. ⇒ **Não é o código** (a reversão de 1c2647f não tinha como resolver).
 - **Sintoma medido:** TCP 443 conecta no edge do Render (216.24.57.7), mas HTTP **não responde em 180s** — nem `/api/health`, nem a raiz. É o boot travado: o `startCommand` roda `prisma migrate deploy`, a conexão com o banco inexistente fica pendurada até o timeout e a porta HTTP nunca abre. (Erro de código daria 502 rápido, não silêncio.)
 - **Painel Vercel segue OK** (HTTP 200) — só a API caiu.
