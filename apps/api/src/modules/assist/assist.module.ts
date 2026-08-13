@@ -7,6 +7,7 @@ import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesModule } from '../policies/policies.module';
 import { PoliciesService } from '../policies/policies.service';
 import { MASTER_PROMPT, STAY_EXTRACTION_TOOL } from '../bella/prompts';
+import { contextoDeHorario } from '../bella/business-hours';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { ReservationEngineService } from '../reservations/reservation-engine.service';
 
@@ -89,6 +90,7 @@ export class AssistController {
         .replace('{{guestContext}}', 'Atendimento em andamento pelo WhatsApp.')
         .replace('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
         .replace('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
+      contextoDeHorario() +
       reserva +
       '\n\nVocê está SUGERINDO uma resposta para um atendente humano usar. Escreva apenas a mensagem sugerida ao hóspede, pronta para enviar, sem rótulos nem aspas.';
 

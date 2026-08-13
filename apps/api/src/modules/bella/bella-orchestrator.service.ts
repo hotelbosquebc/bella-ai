@@ -12,6 +12,7 @@ import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesService } from '../policies/policies.service';
 import { AuditService } from '../audit/audit.service';
 import { MASTER_PROMPT, STAY_EXTRACTION_TOOL } from './prompts';
+import { isWithinBusinessHours, contextoDeHorario } from './business-hours';
 
 /**
  * Fluxo de IA do PRD:
@@ -97,7 +98,8 @@ export class BellaOrchestratorService {
       .replace('{{personality}}', settings?.personality ?? 'acolhedora, educada e natural')
       .replace('{{guestContext}}', this.memory.buildGuestContext(mem))
       .replace('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
-      .replace('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : ''));
+      .replace('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : '')) +
+      contextoDeHorario();
 
     const history = mem.recentMessages.map((m) => ({
       role: m.sender === MessageSender.GUEST ? ('user' as const) : ('assistant' as const),
@@ -179,34 +181,12 @@ export class BellaOrchestratorService {
   }
 
   /**
-   * Horário do setor de reservas (Brasília): seg-sex, 9h-12h e 14h30-17h30.
-   * Usa o fuso America/Sao_Paulo independente do fuso do servidor.
-   */
-  private isWithinBusinessHours(now = new Date()): boolean {
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: 'America/Sao_Paulo',
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(now);
-    const weekday = parts.find((p) => p.type === 'weekday')?.value ?? '';
-    const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '0') % 24;
-    const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
-    if (!['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(weekday)) return false;
-    const m = hour * 60 + minute;
-    const manha = m >= 9 * 60 && m < 12 * 60; // 09:00–12:00
-    const tarde = m >= 14 * 60 + 30 && m < 17 * 60 + 30; // 14:30–17:30
-    return manha || tarde;
-  }
-
-  /**
    * Mensagem de encaminhamento para humano, conforme o horário:
    * - Dentro do expediente: a equipe assume o atendimento.
    * - Fora do expediente: informa o horário e orienta ligar para a recepção 24h.
    */
   private humanHandoffMessage(): string {
-    if (this.isWithinBusinessHours()) {
+    if (isWithinBusinessHours()) {
       return 'Claro! Vou encaminhar você para um de nossos atendentes, que assumirá seu atendimento em instantes. 🌿';
     }
     return (
