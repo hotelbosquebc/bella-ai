@@ -34,6 +34,31 @@ export function formatarParaWhatsApp(texto: string): string {
 }
 
 /**
+ * A Bella deve se apresentar nesta mensagem?
+ *
+ * O modelo vê a conversa mas não sabe se já se apresentou, então repetia
+ * "Olá, sou a Bella, assistente online..." em TODA resposta — o que soa
+ * robótico numa conversa em andamento. Aqui a decisão é tomada no código e
+ * entregue pronta ao prompt.
+ */
+export function contextoDeApresentacao(conversation: string): string {
+  const texto = conversation || '';
+  // Já respondemos alguma vez nesta conversa? (o scraper marca com "Nós:")
+  const jaRespondemos = /(^|\n)\s*N[óo]s\s*:/.test(texto);
+  // Ou a apresentação já aparece no histórico, venha de quem vier.
+  const jaSeApresentou = /sou a bella|assistente (online|virtual)/i.test(texto);
+
+  if (jaRespondemos || jaSeApresentou) {
+    return (
+      `\n\nAPRESENTAÇÃO: esta conversa JÁ está em andamento e o hóspede já sabe quem você é. ` +
+      `NÃO se apresente de novo, NÃO comece com "Olá, sou a Bella..." nem repita seu cargo. ` +
+      `Responda direto ao que foi perguntado, como quem continua um papo.`
+    );
+  }
+  return `\n\nAPRESENTAÇÃO: esta é a PRIMEIRA resposta desta conversa — apresente-se uma única vez, de forma breve.`;
+}
+
+/**
  * Co-piloto do atendente (extensão do WhatsApp Web): sugere uma resposta a
  * partir do texto da conversa, SEM enviar nada e SEM criar registros. O humano
  * revisa e envia. Não há automação de envio — risco de ban praticamente nulo.
@@ -170,6 +195,7 @@ export class AssistController {
         .replace('{{guestContext}}', 'Atendimento em andamento pelo WhatsApp.')
         .replace('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
         .replace('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
+      contextoDeApresentacao(conversation) +
       contextoDeHorario() +
       reserva +
       (anexos.length
