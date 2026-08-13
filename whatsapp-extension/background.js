@@ -52,6 +52,19 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         // A Bella está ligada? Deve sugerir sozinha agora? Quem manda é o painel.
         const st = await authed(`/api/assist/status?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: st });
+      } else if (msg.type === 'FETCH_FILE') {
+        // Baixa o anexo e devolve em base64: não dá para passar um File pelo
+        // sendMessage, então o content script remonta o arquivo do outro lado.
+        const { apiUrl } = await getCfg();
+        const res = await fetch(`${apiUrl}/api/attachments/${msg.id}/file`);
+        if (!res.ok) throw new Error(`Falha ao baixar anexo (${res.status})`);
+        const buf = await res.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 8192) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+        }
+        sendResponse({ ok: true, data: { base64: btoa(bin), mimeType: res.headers.get('Content-Type') || '' } });
       } else if (msg.type === 'QUICK_REPLIES') {
         const list = await authed(`/api/quick-replies?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: list });

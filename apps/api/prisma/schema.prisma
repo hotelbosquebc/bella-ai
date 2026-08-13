@@ -292,6 +292,25 @@ model AiSettings {
   @@map("ai_settings")
 }
 
+/// Arquivo que a Bella anexa à sugestão (folha de regras de pets, catálogo de
+/// ingressos...). Guardado no próprio banco em base64 — regra do dono é custo
+/// ZERO, então nada de storage contratado. O envio ao hóspede segue manual.
+model Attachment {
+  id        String   @id @default(uuid())
+  hotelId   String
+  title     String
+  mimeType  String
+  /// Conteúdo em base64 (sem o prefixo data:). Pesado — nunca incluir em listagens.
+  data      String
+  /// Palavras que disparam o anexo (ex.: "pet,cachorro,animal"). Minúsculas, sem acento.
+  keywords  String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([hotelId])
+  @@map("attachments")
+}
+
 model QuickReply {
   id        String   @id @default(uuid())
   hotelId   String

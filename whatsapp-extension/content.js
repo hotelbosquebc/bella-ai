@@ -56,6 +56,7 @@
         <textarea id="bella-sugtext" rows="5"></textarea>
         <button id="bella-insert" class="bella-btn">Inserir no chat</button>
       </div>
+      <div id="bella-anexos" style="display:none"></div>
       <div id="bella-qr-title">⚡ Respostas rápidas</div>
       <div id="bella-qr">Carregando…</div>
       <div id="bella-status"></div>
@@ -96,6 +97,84 @@
     });
   }
 
+  // ---------- anexos (regras de pets, catálogo de ingressos) ----------
+
+  /**
+   * Coloca o arquivo no campo de anexo do WhatsApp Web. Texto é fácil de
+   * inserir; arquivo não. Duas estratégias, porque o WhatsApp muda de tempos
+   * em tempos e uma delas costuma sobreviver:
+   *   1) input[type=file] escondido — funciona para qualquer arquivo (PDF inclusive)
+   *   2) colar como imagem na caixa de texto — só serve para imagem
+   * Em ambas quem confirma o envio é o atendente.
+   */
+  function inserirArquivo(file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+
+    const inputs = [...document.querySelectorAll('input[type="file"]')].filter((i) => {
+      const aceita = (i.accept || '').toLowerCase();
+      return !aceita || aceita.includes('*') || aceita.includes(file.type) || aceita.includes(file.type.split('/')[0]);
+    });
+    for (const input of inputs) {
+      try {
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return 'input';
+      } catch (_) {
+        /* tenta o próximo */
+      }
+    }
+
+    if (file.type.startsWith('image/')) {
+      const box = composeBox();
+      if (box) {
+        box.focus();
+        box.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+        return 'paste';
+      }
+    }
+    return null;
+  }
+
+  async function anexar(a) {
+    status(`Baixando "${a.title}"…`);
+    const r = await send('FETCH_FILE', { id: a.id });
+    if (!r || !r.ok) {
+      status(r ? r.error : 'Falha ao baixar o anexo.', true);
+      return;
+    }
+    const bin = atob(r.data.base64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const tipo = r.data.mimeType || a.mimeType;
+    const ext = tipo.includes('pdf') ? '.pdf' : tipo.includes('png') ? '.png' : '.jpg';
+    const file = new File([bytes], a.title.replace(/[\\/:*?"<>|]/g, '') + ext, { type: tipo });
+
+    const via = inserirArquivo(file);
+    if (via) {
+      status('Arquivo anexado — confira e envie.');
+    } else {
+      status('Não consegui anexar automaticamente. Abra o clipe 📎 do WhatsApp e escolha o arquivo.', true);
+    }
+  }
+
+  function mostrarAnexos(lista) {
+    const box = panel.querySelector('#bella-anexos');
+    box.innerHTML = '';
+    if (!lista || !lista.length) {
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+    lista.forEach((a) => {
+      const b = document.createElement('button');
+      b.className = 'bella-btn';
+      b.textContent = '📎 Anexar: ' + a.title;
+      b.onclick = () => anexar(a);
+      box.appendChild(b);
+    });
+  }
+
   // ---------- sugerir resposta ----------
   let sugerindo = false;
 
@@ -121,6 +200,7 @@
       status(automatica ? 'Sugestão pronta — revise antes de enviar.' : '');
       panel.querySelector('#bella-suggestion').style.display = 'block';
       panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
+      mostrarAnexos(r.data.attachments);
     } finally {
       sugerindo = false;
     }
@@ -163,6 +243,7 @@
     ultimaConversa = conversation;
     panel.querySelector('#bella-suggestion').style.display = 'none';
     panel.querySelector('#bella-sugtext').value = '';
+    mostrarAnexos([]);
     if (modo && modo.autoSuggest) sugerir(true);
   }
 
