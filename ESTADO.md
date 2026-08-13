@@ -180,7 +180,7 @@ O dono respondeu um questionário de 110 perguntas. Base foi de 17 → **25 conh
 
 ### Outros dados novos relevantes
 32 apartamentos · 2 elevadores · apto PCD existe (confirmar disponibilidade) · sem cofre · sem Smart TV (só TV a cabo; Standard só na sala) · sem micro-ondas nos aptos (um no térreo p/ empréstimo) · sem lavanderia · berço grátis sob solicitação · até 3 colchões extras · sofá-cama só em alguns · café p/ não hospedado a partir de R$40 · panquecaria/creperia à noite · delivery permitido · 3 churrasqueiras (grelha/espetos fornecidos, limite 22h) · ônibus não estaciona (terceirizado a poucos metros) · sem carregador elétrico · ~100m da praia · sem WhatsApp de recepção (ramal 9 ou fixo **(47) 3367-0211**, que fica CONFIRMADO como o contato oficial).
-- ⚠️ **Item 80 ambíguo:** "churrasqueira é gratuita ou paga?" → dono respondeu só "sim". Texto atual manda solicitar na recepção. **Confirmar.**
+- ✅ **Churrasqueira: uso GRATUITO** para hóspedes (confirmado pelo dono em 13/08/2026). Reserva na recepção, limite 22h, grelha e espetos fornecidos.
 
 ## Canais — situação
 - **Telegram:** código pronto; falta só criar bot (@BotFather) e pôr `TELEGRAM_BOT_TOKEN` no Render + setWebhook. É o caminho mais rápido para ver a Bella num canal real, sem burocracia.
