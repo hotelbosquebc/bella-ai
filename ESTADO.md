@@ -142,7 +142,8 @@ Das 5 lacunas `[REVISAR]`, **4 foram preenchidas com fonte oficial** (folha "Bem
 - **Ingressos:** lista das atrações do material ✅
 - **NOVO "Normas gerais do hotel":** chave (perda R$300), 220V, toalha de praia não emprestada (multa R$200), **proibido fumar (multa R$500)**, não hospedado sem aviso = diária extra, silêncio após 22h, bebidas na recepção.
 - ⚠️ **Sobra 1 `[REVISAR]`: "Menores de idade"** — só o dono tem essa regra.
-- ⚠️ **Telefones divergentes:** a folha traz Reservas (47) 99690-4414 e Recepção (47) 99609-1564, mas o prompt/handoff usa **(47) 3367-0211**. Confirmar qual vai ao hóspede.
+- ☎️ **(47) 99690-4414 NÃO EXISTE MAIS** (número antigo do hotel, confirmado pelo dono em 13/08/2026). Removido do conhecimento "Normas gerais do hotel" — varredura confirmou **zero** ocorrências no banco e no código. O contato oficial da Bella é **(47) 3367-0211** (recepção 24h).
+- 🚨 **PENDENTE — o número morto está IMPRESSO na imagem `NORMAS.png`** (rodapé: "Reservas: (47) 99690-4414"), que está cadastrada como anexo ativo e é enviada ao hóspede quando ele pergunta de normas/regras/fumar/toalha/chave. **Apagar o texto não resolve a imagem.** Opções: (a) excluir o anexo "Normas do Hotel do Bosque" — o texto das normas já responde sozinho e está correto; (b) subir arte nova pela tela `/anexos`. Dono ainda não decidiu.
 
 ## 🖼️ (histórico) pedido original de imagens
 Dono quer que a sugestão já venha com imagem anexada (caso típico: **folha de normas de pets**). Envio segue manual.
