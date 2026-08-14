@@ -127,13 +127,18 @@ const conhecimentos = [
       'Se alguém enviar currículo ou perguntar sobre vagas, responda com cordialidade que no momento não estamos contratando e que o contato fica registrado. Não é assunto de reservas.',
   },
 
-  // --- Rótulo conhecido, texto original perdido: entram inativos p/ revisão ---
   {
     title: 'Wi-Fi',
-    revisar: true,
     content:
-      'Há Wi-Fi nos apartamentos. Falta registrar o nome da rede, a senha e como o hóspede recebe esses dados.',
+      'O hotel tem Wi-Fi. A senha é sempre "bosque00". Pode informá-la ao hóspede quando perguntarem.',
   },
+  {
+    title: 'Descontos autorizados',
+    content:
+      'O ÚNICO desconto que você pode informar é o de 5% para pagamento via pix no site do hotel. Qualquer outro desconto, condição especial ou percentual maior depende de autorização da gerência e você NÃO tem como concedê-lo nem prometê-lo. Se o hóspede pedir desconto além disso, não negue de forma seca nem invente um valor: diga com cordialidade que vai encaminhar para a equipe de reservas avaliar, e informe o horário de atendimento dela.',
+  },
+
+  // --- Rótulo conhecido, texto original perdido: entram inativos p/ revisão ---
   {
     title: 'Categorias de apartamentos',
     revisar: true,
