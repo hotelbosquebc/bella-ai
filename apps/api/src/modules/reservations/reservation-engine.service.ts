@@ -57,7 +57,13 @@ export class ReservationEngineService {
     }
 
     // 4. Gerar link do motor de reservas
-    const link = this.buildBookingLink(stay);
+    // Com mais de um apartamento a ocupação não cabe num link só (o máximo é 6
+    // por apartamento): somar todo mundo num link traria resultado errado. O
+    // hóspede monta a composição no próprio site.
+    const varios = Number((stay as { apartamentos?: number }).apartamentos) > 1;
+    const link = varios
+      ? this.buildBookingLink({ ...stay, adults: 0, children0_6: 0, children7_9: 0 })
+      : this.buildBookingLink(stay);
 
     // Registrar reserva pendente + persistir no histórico do hóspede
     await this.prisma.reservation.create({
@@ -81,6 +87,10 @@ export class ReservationEngineService {
       contextForPrompt:
         `Há DISPONIBILIDADE para ${stay.checkin} a ${stay.checkout} ` +
         `(${stay.adults} adulto(s), ${stay.children0_6 ?? 0} criança(s) 0-6, ${stay.children7_9 ?? 0} criança(s) 7-9).\n` +
+        (varios
+          ? `São ${(stay as { apartamentos?: number }).apartamentos} APARTAMENTOS. Confirme a composição que você entendeu ` +
+            `(quantos apartamentos e quantas pessoas em cada um) antes de enviar o link. Isto NÃO é grupo/excursão.\n`
+          : '') +
         (availability.rateInfo ? `Tarifa: ${availability.rateInfo}\n` : '') +
         `IMPORTANTE: a reserva NÃO está confirmada. Apresente isto como uma COTAÇÃO. ` +
         `A reserva só se concretiza quando o hóspede finalizar e pagar pelo link. ` +

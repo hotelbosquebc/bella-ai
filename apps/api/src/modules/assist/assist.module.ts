@@ -152,6 +152,20 @@ export class AssistController {
       );
     }
 
+    // Mais de um apartamento: o link carrega a ocupação de UM apartamento só.
+    // Mandar 7 pessoas num link único traria o resultado errado (o máximo é 6
+    // por apartamento), então enviamos o link da busca e o hóspede monta lá.
+    if (Number(stay.apartamentos) > 1) {
+      const linkBase = this.reservations.buildBookingLink({ ...stay, adults: 0, children0_6: 0, children7_9: 0 });
+      return (
+        `\n\nRESERVA: o hóspede quer ${stay.apartamentos} apartamentos. ` +
+        `PRIMEIRO confirme a composição que você entendeu (quantos apartamentos e quantas pessoas em cada um), ` +
+        `depois envie ESTE link para ele escolher os apartamentos e reservar no site:\n${linkBase}\n` +
+        `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois.\n` +
+        `NÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.`
+      );
+    }
+
     const link = this.reservations.buildBookingLink(stay);
     return (
       `\n\nRESERVA: envie ESTE link ao hóspede, exatamente como está, para ele ver ` +
