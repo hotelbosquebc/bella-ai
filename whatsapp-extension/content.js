@@ -15,6 +15,17 @@
     );
   }
 
+  /**
+   * Insere o texto na caixa de mensagem PRESERVANDO as quebras de linha.
+   *
+   * `execCommand('insertText')` sozinho DESCARTA os "\n" no contenteditable do
+   * WhatsApp Web: a mensagem chegava certa no painel da Bella e virava um bloco
+   * corrido depois de inserida, sem as linhas em branco entre os parágrafos.
+   *
+   * Caminho principal: evento de colagem com text/plain — o editor do WhatsApp
+   * trata o paste e cria as quebras sozinho. Se ele ignorar o evento, caímos
+   * para a inserção linha a linha, criando cada quebra explicitamente.
+   */
   function insertText(text) {
     const box = composeBox();
     if (!box) {
@@ -22,8 +33,29 @@
       return;
     }
     box.focus();
-    // execCommand insere no contenteditable e dispara os eventos do WhatsApp
-    document.execCommand('insertText', false, text);
+
+    const normalizado = String(text).replace(/\r\n?/g, '\n');
+
+    try {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', normalizado);
+      const ev = new ClipboardEvent('paste', {
+        bubbles: true,
+        cancelable: true,
+        clipboardData: dt,
+      });
+      box.dispatchEvent(ev);
+      // O WhatsApp cancela o evento quando de fato o processou.
+      if (ev.defaultPrevented) return;
+    } catch (_) {
+      /* navegador barrou o ClipboardEvent — usa o caminho abaixo */
+    }
+
+    const linhas = normalizado.split('\n');
+    linhas.forEach((linha, i) => {
+      if (i > 0) document.execCommand('insertLineBreak');
+      if (linha) document.execCommand('insertText', false, linha);
+    });
   }
 
   /**
@@ -74,13 +106,31 @@
         .trim();
     };
 
+    /**
+     * Data da mensagem (DD/MM/AAAA), lida do atributo que o WhatsApp usa para
+     * montar o texto de cópia: data-pre-plain-text="[10:02, 13/08/2026] Fulano: ".
+     * É daí que sai a marcação "(hoje)", usada para a Bella se apresentar uma
+     * vez por dia — a thread do WhatsApp é contínua e, sem a data, ela nunca
+     * mais se apresentava depois da primeira vez.
+     */
+    const dataDe = (r) => {
+      const el = r.querySelector('.copyable-text[data-pre-plain-text]') ||
+        (r.closest && r.closest('.copyable-text[data-pre-plain-text]'));
+      const attr = el && el.getAttribute('data-pre-plain-text');
+      const m = attr && attr.match(/\[\d{1,2}:\d{2},\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]/);
+      return m ? m[1] : null;
+    };
+
+    const hoje = new Date().toLocaleDateString('pt-BR'); // DD/MM/AAAA
+
     const msgs = [];
     let lastIn = '';
     for (const r of rows) {
       const t = textoDe(r);
       if (!t || t.length > 4000) continue;
       const isIn = ehEntrada(r);
-      msgs.push((isIn ? 'Hóspede: ' : 'Nós: ') + t);
+      const ehHoje = dataDe(r) === hoje;
+      msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
       if (isIn) lastIn = t;
     }
 

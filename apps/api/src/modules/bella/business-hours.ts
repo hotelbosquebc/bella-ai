@@ -36,6 +36,24 @@ export function isWithinBusinessHours(now = new Date()): boolean {
 }
 
 /**
+ * Meia-noite de hoje no fuso de Brasília, como instante absoluto.
+ *
+ * Usado para saber se a Bella já falou com um contato HOJE (a apresentação se
+ * repete a cada novo dia). O servidor do Render roda em UTC, então comparar com
+ * o "dia" do servidor erraria a virada entre 21h e meia-noite. O Brasil não tem
+ * mais horário de verão desde 2019, logo o offset é -03:00 o ano todo.
+ */
+export function inicioDoDiaEmSaoPaulo(now = new Date()): Date {
+  const dia = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now); // YYYY-MM-DD
+  return new Date(`${dia}T00:00:00-03:00`);
+}
+
+/**
  * Contexto de horário para o prompt. A Bella precisa saber se PODE prometer
  * que um atendente assume agora, ou se deve informar quando o setor reabre.
  */

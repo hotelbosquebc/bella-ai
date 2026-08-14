@@ -12,7 +12,7 @@ import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesService } from '../policies/policies.service';
 import { AuditService } from '../audit/audit.service';
 import { MASTER_PROMPT, STAY_EXTRACTION_TOOL } from './prompts';
-import { isWithinBusinessHours, contextoDeHorario } from './business-hours';
+import { isWithinBusinessHours, contextoDeHorario, inicioDoDiaEmSaoPaulo } from './business-hours';
 
 /**
  * Fluxo de IA do PRD:
@@ -104,13 +104,34 @@ export class BellaOrchestratorService {
     // 8. Montar resposta
     const settings = await this.prisma.aiSettings.findUnique({ where: { hotelId: guest.hotelId } });
     const hotel = await this.prisma.hotel.findUniqueOrThrow({ where: { id: guest.hotelId } });
+    const assistantName = settings?.assistantName ?? 'Bella';
+
+    // Apresentação: uma vez por contato A CADA DIA. Quem volta a falar noutro
+    // dia deve saber de novo que está falando com uma assistente; quem já falou
+    // hoje não precisa ouvir a apresentação de novo a cada resposta.
+    // A busca é pelo hóspede (não pela conversa) para não repetir a
+    // apresentação quando ele escreve por mais de um canal no mesmo dia.
+    const jaFalouHoje = await this.prisma.message.findFirst({
+      where: {
+        sender: MessageSender.BELLA,
+        timestamp: { gte: inicioDoDiaEmSaoPaulo() },
+        conversation: { guestId: guest.id },
+      },
+      select: { id: true },
+    });
+
+    const identityRule = jaFalouHoje
+      ? `você JÁ se apresentou a este contato hoje. NÃO se apresente de novo: nada de "Olá, sou a ${assistantName}..." no começo da resposta. Responda direto ao que foi perguntado.`
+      : `esta é a sua PRIMEIRA resposta a este contato hoje. Comece se apresentando como "${assistantName}, assistente online do ${hotel.name}", numa linha só, para o hóspede saber que fala com uma assistente virtual. Depois pule uma linha e responda o que foi perguntado. Não repita a apresentação nas mensagens seguintes.`;
+
     const system = (settings?.masterPrompt ?? MASTER_PROMPT)
-      .replace('{{assistantName}}', settings?.assistantName ?? 'Bella')
-      .replace('{{hotelName}}', hotel.name)
-      .replace('{{personality}}', settings?.personality ?? 'acolhedora, educada e natural')
-      .replace('{{guestContext}}', this.memory.buildGuestContext(mem))
-      .replace('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
-      .replace('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : '')) +
+      .replaceAll('{{assistantName}}', assistantName)
+      .replaceAll('{{hotelName}}', hotel.name)
+      .replaceAll('{{personality}}', settings?.personality ?? 'acolhedora, educada e natural')
+      .replaceAll('{{identityRule}}', identityRule)
+      .replaceAll('{{guestContext}}', this.memory.buildGuestContext(mem))
+      .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
+      .replaceAll('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : '')) +
       contextoDeHorario();
 
     const history = mem.recentMessages.map((m) => ({

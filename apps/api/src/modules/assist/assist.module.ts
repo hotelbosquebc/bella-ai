@@ -43,12 +43,35 @@ export function formatarParaWhatsApp(texto: string): string {
  */
 export function contextoDeApresentacao(conversation: string): string {
   const texto = conversation || '';
-  // Já respondemos alguma vez nesta conversa? (o scraper marca com "Nós:")
-  const jaRespondemos = /(^|\n)\s*N[óo]s\s*:/.test(texto);
-  // Ou a apresentação já aparece no histórico, venha de quem vier.
-  const jaSeApresentou = /sou a bella|assistente (online|virtual)/i.test(texto);
+  const APRESENTACAO = /sou a bella|assistente (online|virtual)/i;
 
-  if (jaRespondemos || jaSeApresentou) {
+  // O scraper marca as mensagens do dia corrente com "(hoje)" — ex.: "Nós (hoje): ...".
+  // A apresentação se repete A CADA DIA: a thread do WhatsApp é contínua, então
+  // uma regra "uma vez por conversa" fazia a Bella nunca mais se apresentar.
+  const linhas = texto.split('\n');
+  const linhasDeHoje = linhas.filter((l) => /^\s*(H[óo]spede|N[óo]s)\s*\(hoje\)\s*:/i.test(l));
+
+  if (linhasDeHoje.length) {
+    const nossasDeHoje = linhasDeHoje.filter((l) => /^\s*N[óo]s\s*\(hoje\)\s*:/i.test(l));
+    const jaSeApresentouHoje = nossasDeHoje.some((l) => APRESENTACAO.test(l));
+    if (jaSeApresentouHoje) {
+      return (
+        `\n\nAPRESENTAÇÃO: você JÁ se apresentou a este contato hoje. ` +
+        `NÃO se apresente de novo, NÃO comece com "Olá, sou a Bella..." nem repita seu cargo. ` +
+        `Responda direto ao que foi perguntado, como quem continua um papo.`
+      );
+    }
+    return (
+      `\n\nAPRESENTAÇÃO: esta é a PRIMEIRA resposta a este contato HOJE (mesmo que a conversa venha de dias anteriores). ` +
+      `Comece se apresentando como "Bella, assistente online do Hotel do Bosque", numa linha só, ` +
+      `depois pule uma linha e responda o que foi perguntado.`
+    );
+  }
+
+  // Sem marcação de data (WhatsApp mudou o HTML): mantém o comportamento antigo,
+  // uma apresentação por conversa — melhor do que repetir a cada mensagem.
+  const jaRespondemos = /(^|\n)\s*N[óo]s\s*(\(hoje\))?\s*:/.test(texto);
+  if (jaRespondemos || APRESENTACAO.test(texto)) {
     return (
       `\n\nAPRESENTAÇÃO: esta conversa JÁ está em andamento e o hóspede já sabe quem você é. ` +
       `NÃO se apresente de novo, NÃO comece com "Olá, sou a Bella..." nem repita seu cargo. ` +
@@ -189,12 +212,15 @@ export class AssistController {
 
     const system =
       (settings?.masterPrompt ?? MASTER_PROMPT)
-        .replace('{{assistantName}}', settings?.assistantName ?? 'Bella')
-        .replace(/\{\{hotelName\}\}/g, hotel?.name ?? 'Hotel do Bosque')
-        .replace('{{personality}}', settings?.personality ?? 'acolhedora, educada e natural')
-        .replace('{{guestContext}}', 'Atendimento em andamento pelo WhatsApp.')
-        .replace('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
-        .replace('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
+        .replaceAll('{{assistantName}}', settings?.assistantName ?? 'Bella')
+        .replaceAll('{{hotelName}}', hotel?.name ?? 'Hotel do Bosque')
+        .replaceAll('{{personality}}', settings?.personality ?? 'acolhedora, educada e natural')
+        // A regra de apresentação deste caminho vem de contextoDeApresentacao()
+        // (abaixo), que enxerga a conversa raspada do WhatsApp.
+        .replaceAll('{{identityRule}}', 'siga a instrução de APRESENTAÇÃO indicada mais abaixo.')
+        .replaceAll('{{guestContext}}', 'Atendimento em andamento pelo WhatsApp.')
+        .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
+        .replaceAll('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
       contextoDeApresentacao(conversation) +
       contextoDeHorario() +
       reserva +
