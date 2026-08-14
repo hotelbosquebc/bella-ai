@@ -4,8 +4,44 @@
   window.__bellaPanel = true;
 
   // ---------- utilidades ----------
+
+  /**
+   * Ao recarregar a extensão, ESTE script continua vivo na aba já aberta, mas
+   * perde a ponte com o service worker ("Extension context invalidated"). Como
+   * ele reconsulta o modo de minuto em minuto, isso virava um erro por minuto
+   * até alguém dar F5 — enchendo o botão "Erros" do Chrome de ruído.
+   * Ao detectar o contexto morto paramos os timers e avisamos na tela.
+   */
+  let contextoMorto = false;
+
+  function encerrarPorContextoMorto() {
+    if (contextoMorto) return;
+    contextoMorto = true;
+    clearInterval(window.__bellaTimerModo);
+    const el = document.getElementById('bella-modo');
+    if (el) el.textContent = '⚠️ Extensão atualizada — recarregue a página (F5)';
+  }
+
   function send(type, extra) {
-    return new Promise((resolve) => chrome.runtime.sendMessage({ type, ...extra }, resolve));
+    return new Promise((resolve) => {
+      // chrome.runtime.id some quando o contexto é invalidado.
+      if (contextoMorto || !chrome.runtime || !chrome.runtime.id) {
+        encerrarPorContextoMorto();
+        return resolve(null);
+      }
+      try {
+        chrome.runtime.sendMessage({ type, ...extra }, (resposta) => {
+          if (chrome.runtime.lastError) {
+            encerrarPorContextoMorto();
+            return resolve(null);
+          }
+          resolve(resposta);
+        });
+      } catch (_) {
+        encerrarPorContextoMorto();
+        resolve(null);
+      }
+    });
   }
 
   function composeBox() {
@@ -472,7 +508,7 @@
   carregarModo().then(() => aoTrocarDeConversa());
   // O modo muda no painel a qualquer momento — reconsulta de minuto em minuto,
   // e assim a virada do horário também entra sozinha.
-  setInterval(carregarModo, 60000);
+  window.__bellaTimerModo = setInterval(carregarModo, 60000);
 
   loadQuickReplies();
 })();
