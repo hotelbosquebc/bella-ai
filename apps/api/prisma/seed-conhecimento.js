@@ -41,7 +41,7 @@ const conhecimentos = [
   {
     title: 'Estacionamento',
     content:
-      'O hotel dispõe de estacionamento rotativo (as vagas não são fixas por apartamento e estão sujeitas à disponibilidade no momento).',
+      'O estacionamento é rotativo (as vagas não são fixas). Cada apartamento tem direito a um carro, e sempre há ao menos uma vaga disponível. Veículo adicional fica sujeito à disponibilidade e tem custo extra — o valor é flutuante, então NÃO informe preço: oriente o hóspede a confirmar com a recepção.',
   },
   {
     title: 'Capacidade do apartamento',
@@ -138,29 +138,64 @@ const conhecimentos = [
       'O ÚNICO desconto que você pode informar é o de 5% para pagamento via pix no site do hotel. Qualquer outro desconto, condição especial ou percentual maior depende de autorização da gerência e você NÃO tem como concedê-lo nem prometê-lo. Se o hóspede pedir desconto além disso, não negue de forma seca nem invente um valor: diga com cordialidade que vai encaminhar para a equipe de reservas avaliar, e informe o horário de atendimento dela.',
   },
 
-  // --- Rótulo conhecido, texto original perdido: entram inativos p/ revisão ---
+  // --- Informado pelo hotel em 14/08/2026 (material do site + cartão de boas-vindas) ---
   {
     title: 'Categorias de apartamentos',
-    revisar: true,
     content:
-      'O hotel trabalha com 4 categorias (a equipe costuma dizer "temos estas 4 opções"). Só a Suíte Bosque está descrita. Falta listar as outras três e suas diferenças.',
+      'São 4 categorias: Standard, Superior, Luxo e Suíte Bosque.\n' +
+      'TODAS têm a mesma planta: sala de estar com sofá, TV LCD 32" a cabo (54 canais), telefone/interfone, mesa com cadeiras, sacada com vista, cozinha equipada (geladeira, fogão, pia e utensílios básicos), 2 dormitórios (um com cama de casal box queen size e outro com 2 camas de solteiro box), ar-condicionado frio de janela nos dois dormitórios, banheiro e pequena área de serviço com tanque.\n' +
+      'DIFERENÇAS: a Suíte Bosque é a única com DOIS banheiros (social + suíte do casal) e chuveiro com aquecimento a GÁS. Superior e Luxo têm um banheiro, chuveiro elétrico e TV na sala e no quarto de casal. A Standard tem um banheiro, chuveiro elétrico e TV apenas na sala de estar.',
   },
   {
     title: 'Limpeza dos apartamentos',
-    revisar: true,
-    content: 'Frequência e horário da arrumação, troca de enxoval e toalhas.',
+    content:
+      'A limpeza é diária, das 8h às 15h. A louça é de responsabilidade do hóspede. A limpeza NÃO é realizada quando há pets ou hóspedes dentro do apartamento no momento.',
   },
   {
     title: 'Ingressos',
-    revisar: true,
     content:
-      'Ingressos de parques e atrativos vendidos ou intermediados pelo hotel, com condições.',
+      'Todos os ingressos são vendidos diretamente na recepção do hotel. O hóspede compra com a equipe na própria recepção.',
   },
   {
     title: 'Menores de idade',
-    revisar: true,
     content:
-      'Regras para hospedagem de menores, documentação e autorização exigida.',
+      'Menores devem estar sempre acompanhados dos pais. Quando viajam com outro responsável (avós, tios, terceiros), é obrigatória a autorização de viagem assinada, no modelo oficial do governo. Sem essa autorização o menor não pode se hospedar.',
+  },
+  {
+    title: 'Distância da praia',
+    content:
+      'O hotel fica a aproximadamente 100 metros da praia — poucos minutos a pé.',
+  },
+  {
+    title: 'Entorno e transporte',
+    content:
+      'O hotel fica no centro de Balneário Camboriú, com tudo por perto (mercado, farmácia, restaurantes). O ponto do ônibus gratuito da cidade fica em frente ao hotel.',
+  },
+  {
+    title: 'Transfer do aeroporto',
+    content:
+      'O transfer é feito por uma agência parceira, pelo telefone +55 47 9634-2095. O hóspede fala diretamente com a agência.',
+  },
+  {
+    title: 'Early check-in e late check-out',
+    content:
+      'Ambos estão sujeitos à disponibilidade. Quando há disponibilidade no momento, não há custo. Mas para GARANTIR a entrada antecipada ou a saída tardia, só reservando uma diária completa adicional. Nunca prometa antecipação ou saída tardia como certa: dependem da ocupação no dia.',
+  },
+  {
+    title: 'Normas da casa',
+    content:
+      'É proibido fumar no apartamento, inclusive na sacada — multa de R$ 500.\n' +
+      'A chave deve ser deixada na recepção ao sair; a perda acarreta custo de R$ 300. O fechamento da conta é feito mediante entrega da chave, com conferência do apartamento.\n' +
+      'O hotel não empresta toalhas de praia e é proibido levar as toalhas de banho para fora; o descumprimento gera multa de R$ 200.\n' +
+      'Pessoas não hospedadas não podem entrar sem aviso prévio à recepção — caso contrário é cobrada uma diária extra.\n' +
+      'Pedimos silêncio, principalmente após as 22h.\n' +
+      'A voltagem do hotel é 220V. Há bebidas à venda na recepção. O ramal da recepção funciona 24h: basta discar 9.\n' +
+      'O hotel não se responsabiliza por objetos ou dinheiro deixados dentro dos apartamentos.',
+  },
+  {
+    title: 'Política infantil no site de reservas',
+    content:
+      'A política infantil do site é a mesma do atendimento (0 a 6 anos cortesia, 7 a 9 anos meia, a partir de 10 anos tarifa de adulto) e o próprio site já aplica o cálculo quando o hóspede informa as idades. Basta o hóspede reservar normalmente pelo link.',
   },
 ];
 
