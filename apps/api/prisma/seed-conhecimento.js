@@ -84,17 +84,61 @@ const conhecimentos = [
       'A Bella NÃO negocia preço, desconto, meia diária, cortesia ou condição especial, e não informa tarifas de cabeça. Nesses casos, e também para grupos, excursões e atletas, encaminhe para a equipe humana do setor de reservas. Grupos e atletas são atendidos presencialmente ou por um atendente.',
   },
 
+  // --- Extraídos das conversas reais do WhatsApp (14/08/2026) ---
+  // São respostas que a própria equipe deu a hóspedes; por isso entram ativas.
+  {
+    title: 'Camas e acomodação no apartamento',
+    content:
+      'Acomodamos até 6 pessoas no máximo por apartamento. Cada apartamento tem 1 cama de casal e 2 de solteiro; as demais pessoas ficam em colchão extra. Se o hóspede pedir camas separadas, informe essa composição.',
+  },
+  {
+    title: 'Cozinha no apartamento',
+    content:
+      'Os apartamentos têm cozinha e o hóspede pode utilizá-la livremente durante a estadia.',
+  },
+  {
+    title: 'Lavanderia',
+    content:
+      'O hotel NÃO tem lavanderia. Os apartamentos têm um pequeno tanque de lavar e, próximo ao hotel, há algumas opções de lavanderia.',
+  },
+  {
+    title: 'Suíte Bosque (categoria)',
+    content:
+      'A Suíte Bosque é a única categoria com dois banheiros e aquecimento a gás. Fica no 7º e 8º andar, acomoda até 6 hóspedes e conta com Wi-Fi e ar-condicionado. O secador de cabelo é solicitado na recepção.',
+  },
+  {
+    title: 'Reserva pelo WhatsApp quando o site falha',
+    content:
+      'Se o hóspede não conseguir concluir a reserva no site, a equipe pode realizar a reserva pelo WhatsApp com pagamento via pix. A senha do site é criada pelo próprio hóspede; se ele não lembrar, deve usar "esqueci a senha" para receber uma senha temporária por e-mail. A Bella NÃO realiza a reserva: encaminhe para a equipe de reservas.',
+  },
+  {
+    title: 'Site e WhatsApp têm o mesmo preço',
+    content:
+      'O site de reservas é o mesmo canal usado no WhatsApp — os valores são os mesmos. O pagamento via pix no site libera 5% de desconto.',
+  },
+  {
+    title: 'Escolinhas de futebol e grupos esportivos',
+    content:
+      'O hotel não recebe reservas de escola de futebol. Grupos, excursões e equipes esportivas não são atendidos pela Bella — encaminhe para a equipe de reservas.',
+  },
+  {
+    title: 'Currículos e vagas de emprego',
+    content:
+      'Se alguém enviar currículo ou perguntar sobre vagas, responda com cordialidade que no momento não estamos contratando e que o contato fica registrado. Não é assunto de reservas.',
+  },
+
   // --- Rótulo conhecido, texto original perdido: entram inativos p/ revisão ---
   {
     title: 'Wi-Fi',
     revisar: true,
-    content: 'Rede, senha e cobertura do Wi-Fi nas áreas do hotel.',
+    content:
+      'Há Wi-Fi nos apartamentos. Falta registrar o nome da rede, a senha e como o hóspede recebe esses dados.',
   },
   {
     title: 'Categorias de apartamentos',
     revisar: true,
     content:
-      'Descrição das categorias de apartamento, camas, metragem e diferenças entre elas.',
+      'O hotel trabalha com 4 categorias (a equipe costuma dizer "temos estas 4 opções"). Só a Suíte Bosque está descrita. Falta listar as outras três e suas diferenças.',
   },
   {
     title: 'Limpeza dos apartamentos',
