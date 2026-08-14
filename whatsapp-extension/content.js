@@ -181,6 +181,84 @@
     body.style.display = body.style.display === 'none' ? 'block' : 'none';
   };
 
+  // ---------- arrastar o painel ----------
+  // No canto inferior direito (posição padrão do CSS) o painel cobre o botão
+  // de enviar do WhatsApp. Arrastando pelo cabeçalho o atendente o tira da
+  // frente, e a posição fica guardada para as próximas vezes.
+  (function tornarArrastavel() {
+    const head = panel.querySelector('#bella-head');
+    const CHAVE = 'bella-panel-pos';
+
+    /** Mantém o painel dentro da tela (a janela pode ter mudado de tamanho). */
+    function aplicar(left, top) {
+      const maxLeft = Math.max(0, window.innerWidth - panel.offsetWidth);
+      const maxTop = Math.max(0, window.innerHeight - panel.offsetHeight);
+      const l = Math.min(Math.max(0, left), maxLeft);
+      const t = Math.min(Math.max(0, top), maxTop);
+      // O CSS posiciona por right/bottom; ao arrastar passamos a usar left/top.
+      panel.style.left = l + 'px';
+      panel.style.top = t + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+      return { left: l, top: t };
+    }
+
+    try {
+      const salvo = JSON.parse(localStorage.getItem(CHAVE) || 'null');
+      if (salvo && typeof salvo.left === 'number' && typeof salvo.top === 'number') {
+        aplicar(salvo.left, salvo.top);
+      }
+    } catch (_) {
+      /* posição inválida no storage — mantém o canto padrão */
+    }
+
+    let dx = 0;
+    let dy = 0;
+
+    head.addEventListener('pointerdown', (e) => {
+      // Clique no botão de recolher não deve iniciar arrasto.
+      if (e.target.closest('button')) return;
+      const r = panel.getBoundingClientRect();
+      dx = e.clientX - r.left;
+      dy = e.clientY - r.top;
+      head.classList.add('bella-arrastando');
+      head.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    head.addEventListener('pointermove', (e) => {
+      if (!head.classList.contains('bella-arrastando')) return;
+      aplicar(e.clientX - dx, e.clientY - dy);
+    });
+
+    const encerrar = (e) => {
+      if (!head.classList.contains('bella-arrastando')) return;
+      head.classList.remove('bella-arrastando');
+      try {
+        head.releasePointerCapture(e.pointerId);
+      } catch (_) {
+        /* ponteiro já liberado */
+      }
+      const r = panel.getBoundingClientRect();
+      try {
+        localStorage.setItem(CHAVE, JSON.stringify({ left: r.left, top: r.top }));
+      } catch (_) {
+        /* storage indisponível — a posição só não persiste */
+      }
+    };
+
+    head.addEventListener('pointerup', encerrar);
+    head.addEventListener('pointercancel', encerrar);
+
+    // Janela redimensionada: traz o painel de volta para dentro da tela.
+    window.addEventListener('resize', () => {
+      if (panel.style.left) {
+        const r = panel.getBoundingClientRect();
+        aplicar(r.left, r.top);
+      }
+    });
+  })();
+
   const statusEl = panel.querySelector('#bella-status');
   function status(msg, err) {
     statusEl.textContent = msg || '';

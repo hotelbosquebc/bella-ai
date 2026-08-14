@@ -21,6 +21,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  /* O painel é arrastado por aqui: no canto padrão ele cobria o botão de
+     enviar do WhatsApp. touch-action evita o scroll da página no arrasto. */
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+#bella-head.bella-arrastando {
+  cursor: grabbing;
 }
 #bella-head button {
   background: rgba(255, 255, 255, 0.2);
