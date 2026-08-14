@@ -61,7 +61,7 @@ const conhecimentos = [
   {
     title: 'Formas e condições de pagamento',
     content:
-      'Pagamento com 5% de desconto no pix. Parcelamento em até 10x, sendo até 3x sem juros. O sinal para garantir a reserva é de no mínimo 50% do valor total (ver Política de Formas de Pagamento).',
+      'Pagamento com 5% de desconto no pix. Parcelamento em até 10x, sendo até 3x sem juros. IMPORTANTE para a Bella: no caminho que ela conduz, o hóspede reserva no próprio site e paga ali, no momento de concluir a reserva — é o pagamento que confirma. Sinal, entrada e prazos de pagamento valem para reservas feitas pela equipe, NÃO devem ser informados pela Bella.',
   },
   {
     title: 'Secador de cabelo e ferro de passar',
@@ -107,9 +107,9 @@ const conhecimentos = [
       'A Suíte Bosque é a única categoria com dois banheiros e aquecimento a gás. Fica no 7º e 8º andar, acomoda até 6 hóspedes e conta com Wi-Fi e ar-condicionado. O secador de cabelo é solicitado na recepção.',
   },
   {
-    title: 'Reserva pelo WhatsApp quando o site falha',
+    title: 'Problemas do hóspede no site de reservas',
     content:
-      'Se o hóspede não conseguir concluir a reserva no site, a equipe pode realizar a reserva pelo WhatsApp com pagamento via pix. A senha do site é criada pelo próprio hóspede; se ele não lembrar, deve usar "esqueci a senha" para receber uma senha temporária por e-mail. A Bella NÃO realiza a reserva: encaminhe para a equipe de reservas.',
+      'A senha do site é criada pelo próprio hóspede; se não lembrar, deve usar "esqueci a senha" para receber uma senha temporária por e-mail. Se ainda assim não conseguir concluir, a equipe de reservas resolve — encaminhe para ela. A Bella NÃO realiza reservas pelo WhatsApp e não deve oferecer esse caminho por conta própria.',
   },
   {
     title: 'Site e WhatsApp têm o mesmo preço',
@@ -178,11 +178,15 @@ const respostasRapidas = [
     content:
       'Bom dia! Tudo bem? Sou do Hotel do Bosque. Para eu verificar a disponibilidade, me informa por favor o período da estadia, quantas pessoas e, se houver crianças, a idade delas.',
   },
+  // Atalho do atendente HUMANO (a Bella não informa prazo de pagamento).
+  // O prazo estava contraditório: este atalho dizia 24h, mas a mensagem
+  // automática do WhatsApp Business diz "válida por 30 minutos". Fica para
+  // revisão até o hotel definir qual vale.
   {
     shortcut: '24',
-    title: 'Pré-reserva válida por 24h',
-    content:
-      'A pré-reserva fica garantida por 24h. Após esse prazo, sem a confirmação do pagamento do sinal, ela é cancelada automaticamente e o apartamento volta à disponibilidade.',
+    title: 'Validade da pré-reserva',
+    content: REVISAR_ATALHO,
+    revisar: true,
   },
   // Estes dependem de dados que NÃO estão no repositório (dados bancários,
   // texto de voucher, fluxo do financeiro). Não invente — preencher no painel.
