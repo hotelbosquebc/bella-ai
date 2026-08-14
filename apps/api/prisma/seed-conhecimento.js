@@ -183,15 +183,15 @@ const respostasRapidas = [
     content:
       'Bom dia! Tudo bem? Sou do Hotel do Bosque. Para eu verificar a disponibilidade, me informa por favor o período da estadia, quantas pessoas e, se houver crianças, a idade delas.',
   },
-  // Atalho do atendente HUMANO (a Bella não informa prazo de pagamento).
-  // O prazo estava contraditório: este atalho dizia 24h, mas a mensagem
-  // automática do WhatsApp Business diz "válida por 30 minutos". Fica para
-  // revisão até o hotel definir qual vale.
+  // Atalho do atendente HUMANO. Vale para as reservas que a EQUIPE fecha pelo
+  // WhatsApp — a Bella não tem essa função e por isso o prazo NÃO entra como
+  // conhecimento dela (conhecimento vai para o prompt, e ela não informa prazo
+  // de pagamento). O nome do atalho é "/24" por herança: o prazo real é 30 min.
   {
     shortcut: '24',
-    title: 'Validade da pré-reserva',
-    content: REVISAR_ATALHO,
-    revisar: true,
+    title: 'Validade da pré-reserva (30 min)',
+    content:
+      'Atenção sobre sua reserva: sua solicitação é válida por 30 minutos. Após esse prazo, sem a confirmação do pagamento, a reserva é cancelada e o apartamento volta à disponibilidade.',
   },
   // Estes dependem de dados que NÃO estão no repositório (dados bancários,
   // texto de voucher, fluxo do financeiro). Não invente — preencher no painel.
