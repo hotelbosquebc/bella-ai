@@ -214,41 +214,52 @@
 
     let dx = 0;
     let dy = 0;
+    let arrastando = false;
 
-    head.addEventListener('pointerdown', (e) => {
-      // Clique no botão de recolher não deve iniciar arrasto.
-      if (e.target.closest('button')) return;
-      const r = panel.getBoundingClientRect();
-      dx = e.clientX - r.left;
-      dy = e.clientY - r.top;
-      head.classList.add('bella-arrastando');
-      head.setPointerCapture(e.pointerId);
-      e.preventDefault();
-    });
-
-    head.addEventListener('pointermove', (e) => {
-      if (!head.classList.contains('bella-arrastando')) return;
+    // Os listeners de movimento ficam no DOCUMENT e em fase de CAPTURA: o
+    // WhatsApp Web tem os próprios handlers de ponteiro (arrastar arquivo para
+    // a conversa) e uma versão anterior, presa ao cabeçalho com
+    // setPointerCapture, podia nunca receber o evento. Na captura nós vemos o
+    // evento antes da página, então o arrasto funciona de qualquer jeito.
+    function mover(e) {
+      if (!arrastando) return;
       aplicar(e.clientX - dx, e.clientY - dy);
-    });
+      e.preventDefault();
+      e.stopPropagation();
+    }
 
-    const encerrar = (e) => {
-      if (!head.classList.contains('bella-arrastando')) return;
+    function soltar() {
+      if (!arrastando) return;
+      arrastando = false;
       head.classList.remove('bella-arrastando');
-      try {
-        head.releasePointerCapture(e.pointerId);
-      } catch (_) {
-        /* ponteiro já liberado */
-      }
+      document.removeEventListener('mousemove', mover, true);
+      document.removeEventListener('mouseup', soltar, true);
       const r = panel.getBoundingClientRect();
       try {
         localStorage.setItem(CHAVE, JSON.stringify({ left: r.left, top: r.top }));
       } catch (_) {
         /* storage indisponível — a posição só não persiste */
       }
-    };
+    }
 
-    head.addEventListener('pointerup', encerrar);
-    head.addEventListener('pointercancel', encerrar);
+    head.addEventListener(
+      'mousedown',
+      (e) => {
+        // Clique no botão de recolher não deve iniciar arrasto.
+        if (e.target.closest('button')) return;
+        if (e.button !== 0) return; // só botão esquerdo
+        const r = panel.getBoundingClientRect();
+        dx = e.clientX - r.left;
+        dy = e.clientY - r.top;
+        arrastando = true;
+        head.classList.add('bella-arrastando');
+        document.addEventListener('mousemove', mover, true);
+        document.addEventListener('mouseup', soltar, true);
+        e.preventDefault();
+        e.stopPropagation();
+      },
+      true,
+    );
 
     // Janela redimensionada: traz o painel de volta para dentro da tela.
     window.addEventListener('resize', () => {
