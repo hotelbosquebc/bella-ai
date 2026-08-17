@@ -126,26 +126,57 @@
   async function carregarHistorico(minimo) {
     const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     const conta = () => document.querySelectorAll('#main .copyable-text[data-pre-plain-text]').length;
-    const scroller = [...document.querySelectorAll('#main div')].filter(
-      (d) => d.scrollHeight > d.clientHeight + 150,
-    )[0];
-    if (!scroller) return;
+    const alvo = minimo || 25;
 
-    const posicaoOriginal = scroller.scrollTop;
+    /**
+     * O WhatsApp Web NÃO sincroniza o histórico sozinho: em muitas conversas
+     * ele mostra uma mensagem só e um aviso "Clique neste aviso para carregar
+     * mensagens mais antigas do seu celular". Sem clicar, não há nada para
+     * rolar — e a Bella respondia sem contexto nenhum. Clicar traz o histórico
+     * do celular (só leitura, não envia nada).
+     */
+    const clicarCarregarAntigas = async () => {
+      const btn = [...document.querySelectorAll('#main button')].find((b) =>
+        /mensagens mais antigas|older messages|mensajes m[áa]s antiguos/i.test(b.textContent || ''),
+      );
+      if (!btn) return false;
+      const antes = conta();
+      btn.click();
+      await espera(1800);
+      return conta() > antes;
+    };
+
+    await clicarCarregarAntigas();
+
+    const acharScroller = () =>
+      [...document.querySelectorAll('#main div')].filter((d) => d.scrollHeight > d.clientHeight + 150)[0];
+
+    let posicaoOriginal = null;
     let semGanho = 0;
-    for (let i = 0; i < 8 && conta() < (minimo || 25); i++) {
+    for (let i = 0; i < 8 && conta() < alvo; i++) {
+      const scroller = acharScroller();
+      if (!scroller) {
+        // Sem barra de rolagem ainda: pode ser que o histórico só venha pelo aviso.
+        if (!(await clicarCarregarAntigas())) break;
+        continue;
+      }
+      if (posicaoOriginal === null) posicaoOriginal = scroller.scrollTop;
       const antes = conta();
       scroller.scrollTop = 0;
       await espera(700);
       if (conta() === antes) {
+        // Rolar não trouxe nada — talvez o resto esteja no celular.
+        if (await clicarCarregarAntigas()) continue;
         semGanho++;
         if (semGanho >= 2) break; // chegou ao começo da conversa
       } else {
         semGanho = 0;
       }
     }
-    // Volta para onde o atendente estava (normalmente o fim da conversa).
-    scroller.scrollTop = posicaoOriginal || scroller.scrollHeight;
+
+    // Devolve a rolagem para onde o atendente estava (normalmente o fim).
+    const scroller = acharScroller();
+    if (scroller) scroller.scrollTop = posicaoOriginal || scroller.scrollHeight;
   }
 
   function scrapeConversation() {
