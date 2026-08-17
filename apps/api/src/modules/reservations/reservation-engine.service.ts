@@ -62,7 +62,7 @@ export class ReservationEngineService {
     // hóspede monta a composição no próprio site.
     const varios = Number((stay as { apartamentos?: number }).apartamentos) > 1;
     const link = varios
-      ? this.buildBookingLink({ ...stay, adults: 0, children0_6: 0, children7_9: 0 })
+      ? this.buildSearchLink(stay.checkin!, stay.checkout!)
       : this.buildBookingLink(stay);
 
     // Registrar reserva pendente + persistir no histórico do hóspede
@@ -125,8 +125,6 @@ export class ReservationEngineService {
    * As datas já vêm em ISO (YYYY-MM-DD) da extração — é o formato desta rota.
    */
   buildBookingLink(stay: StayDetails): string {
-    const base = process.env.BOOKING_ENGINE_BASE_URL ?? 'https://sbreserva.silbeck.com.br/hotelbosque';
-    const path = process.env.BOOKING_ENGINE_PATH ?? '/pt-br/reserva/busca/';
     const params = new URLSearchParams({
       checkin: stay.checkin!,
       checkout: stay.checkout!,
@@ -134,6 +132,24 @@ export class ReservationEngineService {
       'criancas-000003': String(stay.children0_6 ?? 0),
       'criancas-000004': String(stay.children7_9 ?? 0),
     });
-    return `${base}${path}?${params.toString()}`;
+    return `${this.searchBase()}?${params.toString()}`;
+  }
+
+  /**
+   * Link só com as datas, sem ocupação. Usado quando o hóspede quer MAIS DE UM
+   * apartamento: a ocupação do link vale para um apartamento só (máximo 6
+   * pessoas), então mandar a soma de todos daria resultado errado. Sem os
+   * parâmetros de ocupação o hóspede monta os apartamentos no próprio site —
+   * melhor do que enviar "adultos=0", que o motor trataria como busca vazia.
+   */
+  buildSearchLink(checkin: string, checkout: string): string {
+    const params = new URLSearchParams({ checkin, checkout });
+    return `${this.searchBase()}?${params.toString()}`;
+  }
+
+  private searchBase(): string {
+    const base = process.env.BOOKING_ENGINE_BASE_URL ?? 'https://sbreserva.silbeck.com.br/hotelbosque';
+    const path = process.env.BOOKING_ENGINE_PATH ?? '/pt-br/reserva/busca/';
+    return `${base}${path}`;
   }
 }

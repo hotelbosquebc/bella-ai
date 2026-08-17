@@ -156,7 +156,7 @@ export class AssistController {
     // Mandar 7 pessoas num link único traria o resultado errado (o máximo é 6
     // por apartamento), então enviamos o link da busca e o hóspede monta lá.
     if (Number(stay.apartamentos) > 1) {
-      const linkBase = this.reservations.buildBookingLink({ ...stay, adults: 0, children0_6: 0, children7_9: 0 });
+      const linkBase = this.reservations.buildSearchLink(stay.checkin, stay.checkout);
       return (
         `\n\nRESERVA: o hóspede quer ${stay.apartamentos} apartamentos. ` +
         `PRIMEIRO confirme a composição que você entendeu (quantos apartamentos e quantas pessoas em cada um), ` +
