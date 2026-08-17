@@ -170,6 +170,10 @@ export class AssistController {
     return (
       `\n\nRESERVA: envie ESTE link ao hóspede, exatamente como está, para ele ver ` +
       `disponibilidade e valores e reservar pelo site:\n${link}\n` +
+      `ANTES do link escreva UMA FRASE dizendo o que ele é e que a reserva se faz ali — ` +
+      `por exemplo: "Segue o link com os valores e a disponibilidade para o seu período. ` +
+      `Por ele você já consegue concluir a sua reserva:". Nunca cole o link solto, sem essa frase: ` +
+      `o hóspede não sabe se aquilo é um orçamento, uma foto ou onde deve clicar.\n` +
       `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois — ` +
       `nunca grudado no texto nem logo após dois-pontos, senão o WhatsApp quebra o endereço.\n` +
       `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.`

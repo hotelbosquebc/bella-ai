@@ -95,6 +95,9 @@ export class ReservationEngineService {
         `IMPORTANTE: a reserva NÃO está confirmada. Apresente isto como uma COTAÇÃO. ` +
         `A reserva só se concretiza quando o hóspede finalizar e pagar pelo link. ` +
         `NÃO diga que a reserva "está confirmada"; convide-o a finalizar pelo link.\n` +
+        `ANTES do link escreva UMA FRASE dizendo o que ele é e que a reserva se faz ali ` +
+        `(ex.: "Segue o link com os valores e a disponibilidade para o seu período. ` +
+        `Por ele você já consegue concluir a sua reserva:"). Nunca cole o link solto.\n` +
         `LINK OFICIAL DE RESERVA (envie exatamente este link): ${link}`,
     };
   }
