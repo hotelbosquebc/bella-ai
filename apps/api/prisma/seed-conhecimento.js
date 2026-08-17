@@ -45,6 +45,13 @@ const conhecimentos = [
       'COBERTO? Há vagas cobertas e vagas descobertas. Como o estacionamento é rotativo, não dá para garantir qual delas o hóspede vai usar — varia conforme a ocupação do dia. Responda exatamente assim, sem prometer vaga coberta.',
   },
   {
+    title: 'Tipos de veículo aceitos no estacionamento',
+    content:
+      'ACEITAMOS: carros, caminhonetes, SUVs e veículos similares — tudo que não seja maior que uma van pequena. Se perguntarem especificamente por caminhonete ou SUV, confirme que sim, sem rodeios.\n' +
+      'VAN e MICRO-ÔNIBUS: NÃO garanta. Em alguns casos pode ser liberado, mas depende de verificação — encaminhe para o setor de reservas confirmar antes da viagem. Nunca diga que cabe nem que não cabe por conta própria.\n' +
+      'ÔNIBUS: nunca é liberado, o hotel não tem espaço. Pode informar isso diretamente, com cordialidade — não encaminhe para a equipe, pois a resposta é sempre não.',
+  },
+  {
     title: 'Capacidade do apartamento',
     content:
       'Cada apartamento acomoda no máximo 6 pessoas. O valor da diária é calculado conforme a quantidade de pessoas no apartamento.',
