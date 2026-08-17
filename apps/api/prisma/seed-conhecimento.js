@@ -45,6 +45,11 @@ const conhecimentos = [
       'COBERTO? Há vagas cobertas e vagas descobertas. Como o estacionamento é rotativo, não dá para garantir qual delas o hóspede vai usar — varia conforme a ocupação do dia. Responda exatamente assim, sem prometer vaga coberta.',
   },
   {
+    title: 'Ano Novo / Réveillon — pacote mínimo',
+    content:
+      'No período de Ano Novo trabalhamos com PACOTE de no mínimo 5 diárias. Quem quiser ficar de 1 a 5 diárias dentro desse período paga o MESMO valor total, porque o pacote é fechado — não existe diária avulsa nem valor proporcional. Explique isso de forma clara e cordial ANTES que o hóspede se surpreenda, sempre que ele pedir poucas noites no Réveillon. Acima de 5 diárias, as noites extras são cobradas normalmente. Como sempre, você NÃO informa valores: explique a regra do pacote e envie o link para ele consultar o total no site.',
+  },
+  {
     title: 'Tipos de veículo aceitos no estacionamento',
     content:
       'ACEITAMOS: carros, caminhonetes, SUVs e veículos similares — tudo que não seja maior que uma van pequena. Se perguntarem especificamente por caminhonete ou SUV, confirme que sim, sem rodeios.\n' +
