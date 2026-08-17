@@ -102,6 +102,52 @@
    * qualquer mensagem, fazendo a Bella nunca ser consultada. Aqui vamos por
    * camadas: se uma estratégia falhar, a próxima assume.
    */
+  /** Nome/título do contato da conversa aberta (usado para saber quem falou). */
+  function tituloDaConversa() {
+    const hdr = document.querySelector('#main header');
+    if (!hdr) return null;
+    const cands = [...hdr.querySelectorAll('span[title]')]
+      .map((s) => s.getAttribute('title'))
+      .filter((t) => t && !/clique para|conta comercial|online|digitando/i.test(t));
+    return cands[0] || null;
+  }
+
+  /**
+   * Carrega o histórico da conversa antes de ler.
+   *
+   * O WhatsApp Web só mantém no DOM as mensagens visíveis: ao abrir um chat,
+   * costuma haver UMA mensagem renderizada. Sem rolar para cima, a Bella recebia
+   * praticamente só a última linha e respondia sem contexto — era por isso que
+   * ela repetia perguntas já respondidas.
+   *
+   * Rolamos para o topo algumas vezes para o WhatsApp trazer o histórico e
+   * DEVOLVEMOS a rolagem ao fim, para o atendente não perder o lugar.
+   */
+  async function carregarHistorico(minimo) {
+    const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+    const conta = () => document.querySelectorAll('#main .copyable-text[data-pre-plain-text]').length;
+    const scroller = [...document.querySelectorAll('#main div')].filter(
+      (d) => d.scrollHeight > d.clientHeight + 150,
+    )[0];
+    if (!scroller) return;
+
+    const posicaoOriginal = scroller.scrollTop;
+    let semGanho = 0;
+    for (let i = 0; i < 8 && conta() < (minimo || 25); i++) {
+      const antes = conta();
+      scroller.scrollTop = 0;
+      await espera(700);
+      if (conta() === antes) {
+        semGanho++;
+        if (semGanho >= 2) break; // chegou ao começo da conversa
+      } else {
+        semGanho = 0;
+      }
+    }
+    // Volta para onde o atendente estava (normalmente o fim da conversa).
+    scroller.scrollTop = posicaoOriginal || scroller.scrollHeight;
+  }
+
   function scrapeConversation() {
     // #main é o painel da conversa aberta; evita varrer a lista de contatos
     // e o próprio painel da Bella.
@@ -158,6 +204,32 @@
     };
 
     const hoje = new Date().toLocaleDateString('pt-BR'); // DD/MM/AAAA
+
+    // Caminho preferencial: cada balão de texto tem .copyable-text com o
+    // atributo data-pre-plain-text="[10:02, 13/08/2026] Fulano: ", que traz
+    // remetente, data e hora prontos. É mais estável que as classes
+    // message-in/message-out, que esta versão do WhatsApp NÃO usa mais.
+    const baloes = [...main.querySelectorAll('.copyable-text[data-pre-plain-text]')];
+    if (baloes.length) {
+      const titulo = tituloDaConversa();
+      const msgs = [];
+      let lastIn = '';
+      for (const el of baloes) {
+        const attr = el.getAttribute('data-pre-plain-text') || '';
+        const m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
+        const remetente = m ? m[3] : '';
+        const t = (el.innerText || '').replace(/ /g, ' ').trim();
+        if (!t || t.length > 4000) continue;
+        // É do hóspede quando o remetente é o próprio contato da conversa.
+        const isIn = titulo ? remetente === titulo : !/hotel do bosque|recep|reserva/i.test(remetente);
+        const ehHoje = m && m[2] === hoje;
+        msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
+        if (isIn) lastIn = t;
+      }
+      if (msgs.length) {
+        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length };
+      }
+    }
 
     const msgs = [];
     let lastIn = '';
@@ -418,6 +490,8 @@
 
   async function sugerir(automatica) {
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
+    // Puxa o histórico antes de ler: sem isso a Bella vê só a última mensagem.
+    await carregarHistorico(25);
     const { conversation, lastMessage, lidas } = scrapeConversation();
     if (!conversation) {
       if (!automatica) {
