@@ -41,7 +41,8 @@ const conhecimentos = [
   {
     title: 'Estacionamento',
     content:
-      'O estacionamento é GRATUITO. É rotativo (as vagas não são fixas) e cada apartamento tem direito a uma vaga, já inclusa na diária — sempre há ao menos uma vaga disponível. Sempre que perguntarem se é grátis ou pago, responda claramente que é gratuito e que a vaga está inclusa na diária. Veículo ADICIONAL (segundo carro do mesmo apartamento) fica sujeito à disponibilidade e tem custo extra; o valor é flutuante, então NÃO informe preço: oriente a confirmar com a recepção.',
+      'O estacionamento é GRATUITO. É rotativo (as vagas não são fixas) e cada apartamento tem direito a uma vaga, já inclusa na diária — sempre há ao menos uma vaga disponível. Sempre que perguntarem se é grátis ou pago, responda claramente que é gratuito e que a vaga está inclusa na diária. Veículo ADICIONAL (segundo carro do mesmo apartamento) tem custo extra, está sujeito à disponibilidade e precisa ser RESERVADO COM ANTECEDÊNCIA para garantir a vaga — não basta chegar com o carro. O valor é flutuante, então NÃO informe preço: oriente o hóspede a solicitar e confirmar com a recepção antes da viagem.\n' +
+      'COBERTO? Há vagas cobertas e vagas descobertas. Como o estacionamento é rotativo, não dá para garantir qual delas o hóspede vai usar — varia conforme a ocupação do dia. Responda exatamente assim, sem prometer vaga coberta.',
   },
   {
     title: 'Capacidade do apartamento',
