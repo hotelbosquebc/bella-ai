@@ -95,13 +95,57 @@
   }
 
   /**
-   * Lê as mensagens da conversa aberta.
+   * Memoria local da conversa.
    *
-   * O WhatsApp Web troca classes e estrutura sem aviso — a versão anterior
-   * dependia só de `div.message-in`/`span.selectable-text` e parou de achar
-   * qualquer mensagem, fazendo a Bella nunca ser consultada. Aqui vamos por
-   * camadas: se uma estratégia falhar, a próxima assume.
+   * O WhatsApp Web NAO mantem o historico: em muitas conversas ele guarda uma
+   * unica mensagem e o resto fica so no celular, sem nem oferecer o aviso de
+   * carregar mensagens antigas. A Bella respondia sem ter visto o que o hospede
+   * escreveu - nem ajuste de prompt nem rolagem resolvem isso.
+   *
+   * Aqui a extensao guarda o que JA passou pela tela, por conversa, e devolve
+   * isso como contexto. Nao recupera o passado, mas a partir de agora nada do
+   * que aparece se perde. Leitura local: nada e enviado ao hospede.
    */
+  const HIST_MAX = 80;
+
+  function chaveConversa() {
+    return 'hist:' + (tituloDaConversa() || 'desconhecida');
+  }
+
+  /** '13/08/2026' + '10:02' -> '202608131002', para ordenar cronologicamente. */
+  function ordemDe(d, h) {
+    if (!d) return '999999999999';
+    const p = d.split('/');
+    const ano = p[2] && p[2].length === 2 ? '20' + p[2] : p[2];
+    return ano + p[1].padStart(2, '0') + p[0].padStart(2, '0') + (h || '00:00').replace(':', '');
+  }
+
+  function lerHistorico(chave) {
+    return new Promise(function (resolve) {
+      try { chrome.storage.local.get([chave], function (o) { resolve((o && o[chave]) || []); }); }
+      catch (_) { resolve([]); }
+    });
+  }
+
+  function gravarHistorico(chave, lista) {
+    return new Promise(function (resolve) {
+      try { var d = {}; d[chave] = lista.slice(-HIST_MAX); chrome.storage.local.set(d, resolve); }
+      catch (_) { resolve(); }
+    });
+  }
+
+  /** Junta o que esta na tela com o que ja foi visto antes, sem duplicar. */
+  async function mesclarHistorico(atuais) {
+    if (!document.querySelector('#main')) return atuais || [];
+    const chave = chaveConversa();
+    const anterior = await lerHistorico(chave);
+    const mapa = new Map();
+    anterior.concat(atuais || []).forEach(function (m) { if (m && m.linha) mapa.set(m.linha, m); });
+    const juntas = [...mapa.values()].sort(function (a, b) { return a.ord < b.ord ? -1 : a.ord > b.ord ? 1 : 0; });
+    await gravarHistorico(chave, juntas);
+    return juntas;
+  }
+
   /** Nome/título do contato da conversa aberta (usado para saber quem falou). */
   function tituloDaConversa() {
     const hdr = document.querySelector('#main header');
@@ -179,6 +223,14 @@
     if (scroller) scroller.scrollTop = posicaoOriginal || scroller.scrollHeight;
   }
 
+  /**
+   * Lê as mensagens da conversa aberta.
+   *
+   * O WhatsApp Web troca classes e estrutura sem aviso — a versão anterior
+   * dependia só de `div.message-in`/`span.selectable-text` e parou de achar
+   * qualquer mensagem, fazendo a Bella nunca ser consultada. Aqui vamos por
+   * camadas: se uma estratégia falhar, a próxima assume.
+   */
   function scrapeConversation() {
     // #main é o painel da conversa aberta; evita varrer a lista de contatos
     // e o próprio painel da Bella.
@@ -244,6 +296,7 @@
     if (baloes.length) {
       const titulo = tituloDaConversa();
       const msgs = [];
+      const estruturado = [];
       let lastIn = '';
       for (const el of baloes) {
         const attr = el.getAttribute('data-pre-plain-text') || '';
@@ -255,10 +308,11 @@
         const isIn = titulo ? remetente === titulo : !/hotel do bosque|recep|reserva/i.test(remetente);
         const ehHoje = m && m[2] === hoje;
         msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
+        estruturado.push({ linha: msgs[msgs.length - 1], ord: ordemDe(m ? m[2] : null, m ? m[1] : null) });
         if (isIn) lastIn = t;
       }
       if (msgs.length) {
-        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length };
+        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado };
       }
     }
 
@@ -523,7 +577,21 @@
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
     // Puxa o histórico antes de ler: sem isso a Bella vê só a última mensagem.
     await carregarHistorico(25);
-    const { conversation, lastMessage, lidas } = scrapeConversation();
+    const lido = scrapeConversation();
+    let { conversation, lastMessage, lidas } = lido;
+
+    // Junta com o que a extensão já viu antes nesta conversa. O WhatsApp Web
+    // descarta o histórico, então sem isso a Bella responde sem saber o que o
+    // hóspede escreveu ontem — ou até horas atrás.
+    try {
+      const juntas = await mesclarHistorico(lido.estruturado);
+      if (juntas.length > (lido.estruturado || []).length) {
+        conversation = juntas.slice(-40).map(function (m) { return m.linha; }).join(String.fromCharCode(10));
+        lidas = juntas.length;
+      }
+    } catch (_) {
+      /* storage indisponível — segue com o que está na tela */
+    }
     if (!conversation) {
       if (!automatica) {
         // Distingue "nenhuma conversa aberta" de "não consegui LER a conversa",
@@ -594,7 +662,15 @@
    */
   let ultimaConversa = '';
   async function aoTrocarDeConversa() {
-    const { conversation } = scrapeConversation();
+    const lido = scrapeConversation();
+    const { conversation } = lido;
+
+    // Grava o que apareceu na tela mesmo que ninguém peça sugestão agora: o
+    // WhatsApp Web descarta o histórico, então o que não for guardado quando
+    // passa, some.
+    if (conversation) {
+      mesclarHistorico(lido.estruturado).catch(function () {});
+    }
     if (!conversation || conversation === ultimaConversa) return;
     ultimaConversa = conversation;
     panel.querySelector('#bella-suggestion').style.display = 'none';
