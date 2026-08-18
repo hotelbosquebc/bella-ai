@@ -45,9 +45,14 @@ const conhecimentos = [
       'COBERTO? Há vagas cobertas e vagas descobertas. Como o estacionamento é rotativo, não dá para garantir qual delas o hóspede vai usar — varia conforme a ocupação do dia. Responda exatamente assim, sem prometer vaga coberta.',
   },
   {
-    title: 'Ano Novo / Réveillon — pacote mínimo',
+    title: 'Ano Novo / Réveillon — pacote mínimo de 5 diárias',
     content:
-      'No período de Ano Novo trabalhamos com PACOTE de no mínimo 5 diárias. Quem quiser ficar de 1 a 5 diárias dentro desse período paga o MESMO valor total, porque o pacote é fechado — não existe diária avulsa nem valor proporcional. Explique isso de forma clara e cordial ANTES que o hóspede se surpreenda, sempre que ele pedir poucas noites no Réveillon. Acima de 5 diárias, as noites extras são cobradas normalmente. Como sempre, você NÃO informa valores: explique a regra do pacote e envie o link para ele consultar o total no site.',
+      'QUANDO VALE: o pacote está ativo de 27/12 a 03/01, e alcança qualquer reserva que inclua o dia 31/12.\n' +
+      'A REGRA: mínimo de 5 diárias. De 1 a 5 diárias o valor TOTAL é o mesmo, porque o pacote é fechado — não existe diária avulsa nem valor proporcional. Acima de 5 diárias, as noites extras são cobradas normalmente.\n' +
+      'ATENÇÃO — o site NÃO explica isso: se o hóspede pesquisar menos de 5 diárias nesse período, o site simplesmente não mostra disponibilidade. Ele vai achar que o hotel está LOTADO, quando na verdade é a regra do pacote.\n' +
+      'Por isso, sempre que o hóspede pedir período que inclua o 31/12, AVISE ANTES de mandar o link: no Réveillon a reserva é um pacote de no mínimo 5 diárias, e a busca precisa ser feita com 5 diárias ou mais para aparecer disponibilidade.\n' +
+      'E se ele disser que "não aparece disponibilidade" ou "está lotado" para datas nesse período, verifique quantas noites ele pesquisou: quase sempre é isso. Explique a regra e oriente a refazer a busca com 5 diárias — não diga que estamos sem vagas.\n' +
+      'Como sempre, você NÃO informa valores: explique a regra e envie o link para ele consultar o total no site.',
   },
   {
     title: 'Tipos de veículo aceitos no estacionamento',
