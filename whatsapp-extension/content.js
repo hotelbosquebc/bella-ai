@@ -108,8 +108,17 @@
    */
   const HIST_MAX = 80;
 
+  /**
+   * Chave da conversa no storage.
+   *
+   * ATENCAO - bug corrigido na 1.1.6: antes isso caia em 'hist:desconhecida'
+   * quando o titulo nao era lido, e TODAS as conversas passavam a dividir o
+   * mesmo balde. O resultado foi a Bella citar, para um contato, a estadia de
+   * outro hospede. Sem identificacao segura da conversa nao se grava nada.
+   */
   function chaveConversa() {
-    return 'hist:' + (tituloDaConversa() || 'desconhecida');
+    const t = tituloDaConversa();
+    return t ? 'hist:' + t : null;
   }
 
   /** '13/08/2026' + '10:02' -> '202608131002', para ordenar cronologicamente. */
@@ -138,6 +147,7 @@
   async function mesclarHistorico(atuais) {
     if (!document.querySelector('#main')) return atuais || [];
     const chave = chaveConversa();
+    if (!chave) return atuais || [];
     const anterior = await lerHistorico(chave);
     const mapa = new Map();
     anterior.concat(atuais || []).forEach(function (m) { if (m && m.linha) mapa.set(m.linha, m); });
@@ -150,9 +160,16 @@
   function tituloDaConversa() {
     const hdr = document.querySelector('#main header');
     if (!hdr) return null;
+    const generico = /clique para|conta comercial|^online$|digitando|adicionar a lista|adicionar à lista|salvar contato/i;
+    // O span[title] sumiu em versoes recentes do WhatsApp Web; a 1a linha do
+    // cabecalho e o nome da conversa e sobreviveu as mudancas de marcacao.
+    const linhas = (hdr.innerText || '').split(String.fromCharCode(10))
+      .map((x) => x.trim())
+      .filter((x) => x && !generico.test(x));
+    if (linhas[0]) return linhas[0];
     const cands = [...hdr.querySelectorAll('span[title]')]
       .map((s) => s.getAttribute('title'))
-      .filter((t) => t && !/clique para|conta comercial|online|digitando/i.test(t));
+      .filter((t) => t && !generico.test(t));
     return cands[0] || null;
   }
 
@@ -690,6 +707,9 @@
   // O modo muda no painel a qualquer momento — reconsulta de minuto em minuto,
   // e assim a virada do horário também entra sozinha.
   window.__bellaTimerModo = setInterval(carregarModo, 60000);
+
+  // Remove o balde comum criado pelo bug da 1.1.5, que misturava conversas.
+  try { chrome.storage.local.remove('hist:desconhecida'); } catch (_) {}
 
   loadQuickReplies();
 })();
