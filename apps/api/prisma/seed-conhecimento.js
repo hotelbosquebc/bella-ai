@@ -31,7 +31,7 @@ const conhecimentos = [
   {
     title: 'Café da manhã',
     content:
-      'O café da manhã está incluso na diária e é servido no restaurante do térreo, das 7h às 10h.',
+      'O café da manhã está incluso na diária e é servido no restaurante do térreo, das 7h às 10h. É um BUFFET: frutas, pães, frios, bolos e opções vegetarianas. RESTRIÇÕES: para quem não consome lactose, as opções disponíveis são frutas e pães. Os pães contêm glúten — não há opção sem glúten, e é importante informar isso com clareza a quem perguntar, em vez de dizer apenas que "há opções". Nunca prometa preparo especial ou item fora do buffet.',
   },
   {
     title: 'Piscina',
@@ -89,7 +89,7 @@ const conhecimentos = [
   {
     title: 'Pets',
     content:
-      'O hotel é pet-friendly e aceita pets de pequeno porte, sem cobrança de diária do pet. Aplica-se taxa mínima de R$ 200 em caso de descumprimento das normas ou necessidade de limpeza adicional. Detalhes completos na Política de Pets.',
+      'O hotel é pet-friendly e aceita pets de PEQUENO PORTE, até 12 kg, sem cobrança de diária do pet. O pet PODE ficar sozinho no apartamento, mas se incomodar os demais hóspedes o tutor deve retornar imediatamente, sob pena de multa. É PROIBIDO circular nas áreas comuns do hotel: ao passar por qualquer área interna, o pet deve estar no colo. Não tem acesso ao restaurante. Taxa mínima de R$ 200 em caso de descumprimento das normas, dano ou necessidade de limpeza adicional. Detalhes completos na Política de Pets.',
   },
   {
     title: 'Atendimento em espanhol',
@@ -215,6 +215,33 @@ const conhecimentos = [
     title: 'Política infantil no site de reservas',
     content:
       'A política infantil do site é a mesma do atendimento (0 a 6 anos cortesia, 7 a 9 anos meia, a partir de 10 anos tarifa de adulto) e o próprio site já aplica o cálculo quando o hóspede informa as idades. Basta o hóspede reservar normalmente pelo link.',
+  },
+
+  // --- Respostas do hotel ao questionário (19/08/2026) ---
+  {
+    title: 'Quem pode fazer o check-in',
+    content:
+      'No check-in o TITULAR da reserva precisa estar presente. Outra pessoa só pode realizar o check-in e retirar a chave se o titular tiver cadastrado o nome dela na reserva com antecedência. Se o hóspede perguntar se um amigo ou parente pode chegar antes e pegar a chave, explique essa regra e oriente a informar o nome à equipe de reservas antes da viagem.',
+  },
+  {
+    title: 'Berço',
+    content:
+      'O hotel tem berço, sem custo. É necessário SOLICITAR COM ANTECEDÊNCIA para garantir a disponibilidade — não é certo que haverá um livre se o pedido for feito na chegada. Oriente o hóspede a pedir junto à equipe de reservas.',
+  },
+  {
+    title: 'Guarda-volumes / bagagem',
+    content:
+      'O hotel guarda as bagagens sem custo. O hóspede pode deixar as malas antes do check-in e também depois do check-out, e aproveitar o dia na cidade.',
+  },
+  {
+    title: 'Horário de chegada e atraso',
+    content:
+      'O check-in é a partir das 14h e o hóspede pode chegar em QUALQUER horário depois disso — a recepção funciona 24 horas. IMPORTANTE: se a chegada passar das 18h, ele precisa comunicar o atraso, senão a reserva pode ser caracterizada como no-show. Sempre que alguém avisar que chega tarde, à noite ou de madrugada, tranquilize e reforce esse aviso.',
+  },
+  {
+    title: 'Elevadores e acessibilidade',
+    content:
+      'O hotel tem 2 elevadores. Sobre apartamento adaptado para cadeirante ou mobilidade reduzida: o hotel possui um, mas ele está ocupado por uma reserva de longo período, SEM previsão de liberação. Se perguntarem, informe com honestidade que no momento não temos apartamento adaptado disponível — não prometa nem crie expectativa, e ofereça encaminhar à equipe de reservas para avaliar alternativas.',
   },
 ];
 
