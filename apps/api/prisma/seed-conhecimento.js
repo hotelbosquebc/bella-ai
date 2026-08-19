@@ -79,7 +79,7 @@ const conhecimentos = [
   {
     title: 'Formas e condições de pagamento',
     content:
-      'Pagamento com 5% de desconto no pix. Parcelamento em até 10x, sendo até 3x sem juros. IMPORTANTE para a Bella: no caminho que ela conduz, o hóspede reserva no próprio site e paga ali, no momento de concluir a reserva — é o pagamento que confirma. Sinal, entrada e prazos de pagamento valem para reservas feitas pela equipe, NÃO devem ser informados pela Bella.',
+      'Pagamento com 5% de desconto no pix. Parcelamento em até 10x, sendo até 3x sem juros, com valor MÍNIMO de parcela de R$ 200,00 (ou seja, o número de parcelas depende do valor total da reserva). IMPORTANTE para a Bella: no caminho que ela conduz, o hóspede reserva no próprio site e paga ali, no momento de concluir a reserva — é o pagamento que confirma. Sinal, entrada e prazos de pagamento valem para reservas feitas pela equipe e NÃO devem ser informados pela Bella.',
   },
   {
     title: 'Secador de cabelo e ferro de passar',
@@ -148,7 +148,7 @@ const conhecimentos = [
   {
     title: 'Wi-Fi',
     content:
-      'O hotel tem Wi-Fi. A senha é sempre "bosque00". Pode informá-la ao hóspede quando perguntarem.',
+      'O Wi-Fi é gratuito e a SENHA é sempre "bosque00", em todo o hotel. O NOME DA REDE muda: cada roteador tem um nome diferente, e o hóspede deve se conectar ao mais próximo do apartamento onde estiver. Por isso não informe um nome de rede específico — diga que ele verá algumas redes do hotel, deve escolher a mais próxima e usar essa mesma senha.',
   },
   {
     title: 'Descontos autorizados',
@@ -203,13 +203,7 @@ const conhecimentos = [
   {
     title: 'Normas da casa',
     content:
-      'É proibido fumar no apartamento, inclusive na sacada — multa de R$ 500.\n' +
-      'A chave deve ser deixada na recepção ao sair; a perda acarreta custo de R$ 300. O fechamento da conta é feito mediante entrega da chave, com conferência do apartamento.\n' +
-      'O hotel não empresta toalhas de praia e é proibido levar as toalhas de banho para fora; o descumprimento gera multa de R$ 200.\n' +
-      'Pessoas não hospedadas não podem entrar sem aviso prévio à recepção — caso contrário é cobrada uma diária extra.\n' +
-      'Pedimos silêncio, principalmente após as 22h.\n' +
-      'A voltagem do hotel é 220V. Há bebidas à venda na recepção. O ramal da recepção funciona 24h: basta discar 9.\n' +
-      'O hotel não se responsabiliza por objetos ou dinheiro deixados dentro dos apartamentos.',
+      'Regras da casa, que a Bella pode informar quando perguntarem: é PROIBIDO FUMAR no apartamento, inclusive na sacada. Não emprestamos toalhas de praia e não é permitido levar as toalhas de banho para fora do hotel. A chave deve ser deixada na recepção ao sair, e o fechamento da conta é feito na entrega da chave, com conferência do apartamento. Pessoas não hospedadas não podem entrar sem aviso prévio à recepção. Pedimos silêncio, principalmente após as 22h. A voltagem do hotel é 220V, há bebidas à venda na recepção e o ramal da recepção funciona 24h: basta discar 9. O hotel não se responsabiliza por objetos ou dinheiro deixados dentro dos apartamentos. SOBRE MULTAS: ao explicar qualquer uma dessas regras, diga apenas que o descumprimento PODE ACARRETAR MULTA — NUNCA informe valores de multa, mesmo que o hóspede insista. Se ele quiser saber o valor, encaminhe para a equipe.',
   },
   {
     title: 'Política infantil no site de reservas',
