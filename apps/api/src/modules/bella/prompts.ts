@@ -31,6 +31,16 @@ Antes de escrever qualquer coisa, percorra TODA a conversa e marque o que o hós
   (c) idades, se ele mencionou crianças menores de 10 anos.
 O dado vale mesmo que tenha vindo na primeira mensagem, no meio de outro assunto, em mensagens separadas, ou em resposta a um atendente humano. Uma vez dito, é seu — nunca peça de novo.
 
+ATENÇÃO — (b) muitas vezes vem DISFARÇADO no tipo de quarto ou na composição, sem o hóspede dizer um número:
+- "quarto casal", "quarta casal", "um casal", "quarto de casal" = 2 pessoas. "quarto duplo" = 2. "triplo" = 3. "quádruplo" = 4. "individual"/"single" = 1.
+- "eu e minha esposa", "eu e meu marido", "o casal e um filho" também dizem a quantidade. Conte e siga.
+- Erros de digitação são comuns no WhatsApp ("quarta" por "quarto", "pra" por "para"): entenda a intenção, não trave na palavra.
+- Perguntar "quantas pessoas?" a quem pediu um quarto de casal é o mesmo erro de repetir uma pergunta já respondida.
+
+(a) também aparece de formas variadas: "5, 6, 7 saída 8 de setembro" significa entrada 05/09 e saída 08/09 — o hóspede lista as NOITES e informa a data de saída. "de 5 a 8", "do dia 5 até 8" e "5 a 8/09" são a mesma coisa.
+
+Exemplo real, com os dois juntos: "Tem quarta casal pra 5,6,7 saída 8 de setembro?" → tem (a) 05/09 a 08/09 E (b) 2 pessoas. NÃO pergunte mais nada: envie o LINK.
+
 Agora escolha O QUE responder pelo resultado do inventário:
 
 • NÃO TENHO (a) NEM (b) → envie o bloco de abertura, exatamente neste formato:
@@ -136,7 +146,13 @@ export const STAY_EXTRACTION_TOOL = {
     properties: {
       checkin: { type: ['string', 'null'], description: 'Data de entrada, formato YYYY-MM-DD' },
       checkout: { type: ['string', 'null'], description: 'Data de saída, formato YYYY-MM-DD' },
-      adults: { type: ['integer', 'null'], description: 'Adultos (10 anos ou mais) NO TOTAL, somando todos os apartamentos' },
+      adults: {
+        type: ['integer', 'null'],
+        description:
+          'Adultos (10 anos ou mais) NO TOTAL, somando todos os apartamentos. ' +
+          'O tipo de quarto JÁ informa a quantidade, mesmo sem número: "quarto casal"/"quarta casal"/"casal" = 2; "duplo" = 2; "triplo" = 3; "quádruplo" = 4; "individual"/"single" = 1. ' +
+          '"eu e minha esposa" = 2. Preencha a partir disso em vez de deixar nulo.',
+      },
       apartamentos: {
         type: ['integer', 'null'],
         description:
