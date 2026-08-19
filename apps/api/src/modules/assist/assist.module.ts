@@ -11,6 +11,7 @@ import { contextoDeHorario, isWithinBusinessHours, HORARIO_RESERVAS_TEXTO } from
 import { normalizar } from '../attachments/attachments.module';
 import { ReservationsModule } from '../reservations/reservations.module';
 import { ReservationEngineService } from '../reservations/reservation-engine.service';
+import { SilbeckAvailabilityService } from '../reservations/silbeck-availability.service';
 
 /**
  * Deixa a mensagem apresentável no WhatsApp. O prompt já pede isso, mas o
@@ -94,6 +95,7 @@ export class AssistController {
     private readonly knowledge: KnowledgeService,
     private readonly policies: PoliciesService,
     private readonly reservations: ReservationEngineService,
+    private readonly disponibilidade: SilbeckAvailabilityService,
   ) {}
 
   /**
@@ -186,6 +188,46 @@ export class AssistController {
       );
     }
 
+
+    // Disponibilidade REAL, consultada no motor de reservas. É o que permite à
+    // Bella falar de procura sem inventar: o site avisa "Apenas N disponíveis"
+    // quando restam poucos, e omite a categoria quando esgota.
+    let contextoDisponibilidade = '';
+    try {
+      const disp = await this.disponibilidade.consultar(
+        stay.checkin,
+        stay.checkout,
+        Number(stay.adults) || 1,
+        Number(stay.children0_6) || 0,
+        Number(stay.children7_9) || 0,
+      );
+      if (disp) {
+        const poucos = disp.categorias.filter((c) => c.restantes !== null);
+        const linhas: string[] = [];
+        if (poucos.length) {
+          linhas.push(
+            'Restam poucos apartamentos: ' +
+              poucos.map((c) => `${c.categoria} (${c.restantes})`).join(', ') +
+              '.',
+          );
+        }
+        if (disp.esgotadas.length) {
+          linhas.push('Já SEM disponibilidade neste período: ' + disp.esgotadas.join(', ') + '.');
+        }
+        if (linhas.length) {
+          contextoDisponibilidade =
+            `\n\nDISPONIBILIDADE REAL (consultada agora no sistema, para ${stay.checkin} a ${stay.checkout}):\n` +
+            linhas.join('\n') +
+            `\nVocê PODE usar esta informação para criar urgência HONESTA — é dado real, não suposição. ` +
+            `Mencione de forma natural e sem alarde ("para essas datas restam poucas unidades dessa categoria"), ` +
+            `uma vez só, junto do convite para concluir pelo link. ` +
+            `NÃO invente número diferente do que está aqui, NÃO diga que o hotel está lotado, ` +
+            `e NÃO cite categoria esgotada como se fosse opção. Se nada acima indicar escassez, não fale de procura.`;
+        }
+      }
+    } catch (_) {
+      /* indisponível: segue sem falar de procura */
+    }
     const link = this.reservations.buildBookingLink(stay);
     return (
       `\n\nRESERVA: envie ESTE link ao hóspede, exatamente como está, para ele ver ` +
@@ -196,7 +238,7 @@ export class AssistController {
       `o hóspede não sabe se aquilo é um orçamento, uma foto ou onde deve clicar.\n` +
       `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois — ` +
       `nunca grudado no texto nem logo após dois-pontos, senão o WhatsApp quebra o endereço.\n` +
-      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.`
+      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoDisponibilidade
     );
   }
 
