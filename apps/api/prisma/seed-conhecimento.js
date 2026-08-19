@@ -162,7 +162,8 @@ const conhecimentos = [
     content:
       'São 4 categorias: Standard, Superior, Luxo e Suíte Bosque.\n' +
       'TODAS têm a mesma planta: sala de estar com sofá, TV LCD 32" a cabo (54 canais), telefone/interfone, mesa com cadeiras, sacada com vista, cozinha equipada (geladeira, fogão, pia e utensílios básicos), 2 dormitórios (um com cama de casal box queen size e outro com 2 camas de solteiro box), ar-condicionado frio de janela nos dois dormitórios, banheiro e pequena área de serviço com tanque.\n' +
-      'DIFERENÇAS: a Suíte Bosque é a única com DOIS banheiros (social + suíte do casal) e chuveiro com aquecimento a GÁS. Superior e Luxo têm um banheiro, chuveiro elétrico e TV na sala e no quarto de casal. A Standard tem um banheiro, chuveiro elétrico e TV apenas na sala de estar.',
+      'DIFERENÇAS: a Suíte Bosque é a única com DOIS banheiros (social + suíte do casal) e chuveiro com aquecimento a GÁS. Superior e Luxo têm um banheiro, chuveiro elétrico e TV na sala e no quarto de casal. A Standard tem um banheiro, chuveiro elétrico e TV apenas na sala de estar.\n' +
+      'LUXO x SUPERIOR: a planta é a mesma; o que muda é o ANDAR e detalhes de mobiliário. A Luxo foi a última das duas a passar por reforma, então está mais atualizada. Se o hóspede perguntar a diferença, responda exatamente isso — não invente vista, metragem nem comodidade que não esteja listada aqui.',
   },
   {
     title: 'Limpeza dos apartamentos',
