@@ -138,6 +138,26 @@ export class AssistController {
     const stay: any = extraction.toolInput ?? {};
     if (stay.intent !== 'booking') return '';
 
+    // Trava contra data inventada.
+    //
+    // Caso real: a hospede escreveu apenas "valor para 5 adultos, seria 1
+    // diaria" e a sugestao saiu com "entrada de 5 a 6 de setembro" - data que
+    // nunca existiu na conversa. Um contexto contaminado (ou uma inferencia do
+    // modelo) virava link com o periodo errado. Antes de aceitar a data
+    // extraida, exigimos que a conversa realmente mencione alguma data.
+    const temNumeroDeData = /\b\d{1,2}\s*(?:\/|-|\s+de\s+)\s*(?:\d{1,2}|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)/i;
+    const temDataRelativa = /\b(hoje|amanh[ãa]|fim de semana|final de semana|feriado|natal|ano novo|r[ée]veillon|carnaval|p[áa]scoa)\b/i;
+    const temDiaDaSemana = /\b(segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo)\b/i;
+    const mencionaData =
+      temNumeroDeData.test(conversation) ||
+      temDataRelativa.test(conversation) ||
+      temDiaDaSemana.test(conversation);
+
+    if (!mencionaData && (stay.checkin || stay.checkout)) {
+      stay.checkin = null;
+      stay.checkout = null;
+    }
+
     const faltam = ['checkin', 'checkout', 'adults'].filter((c) => !stay[c]);
     if (faltam.length) {
       const rotulos: Record<string, string> = {
