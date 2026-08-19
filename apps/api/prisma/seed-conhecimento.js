@@ -89,7 +89,7 @@ const conhecimentos = [
   {
     title: 'Pets',
     content:
-      'O hotel é pet-friendly e aceita pets de PEQUENO PORTE, até 12 kg, sem cobrança de diária do pet. O pet PODE ficar sozinho no apartamento, mas se incomodar os demais hóspedes o tutor deve retornar imediatamente, sob pena de multa. É PROIBIDO circular nas áreas comuns do hotel: ao passar por qualquer área interna, o pet deve estar no colo. Não tem acesso ao restaurante. Taxa mínima de R$ 200 em caso de descumprimento das normas, dano ou necessidade de limpeza adicional. Detalhes completos na Política de Pets.',
+      'O hotel é pet-friendly e aceita pets de PEQUENO PORTE, até 12 kg, sem cobrança de diária do pet. O pet PODE ficar sozinho no apartamento, mas se incomodar os demais hóspedes o tutor deve retornar imediatamente. É PROIBIDO circular nas áreas comuns do hotel: ao passar por qualquer área interna, o pet deve estar no colo. Não tem acesso ao restaurante. Em caso de descumprimento das normas, dano ou necessidade de limpeza adicional, há cobrança de taxa — informe que existe, mas NÃO cite valor; quem informa valores é a equipe.',
   },
   {
     title: 'Atendimento em espanhol',
@@ -237,6 +237,11 @@ const conhecimentos = [
     content:
       'O hotel tem 2 elevadores. Sobre apartamento adaptado para cadeirante ou mobilidade reduzida: o hotel possui um, mas ele está ocupado por uma reserva de longo período, SEM previsão de liberação. Se perguntarem, informe com honestidade que no momento não temos apartamento adaptado disponível — não prometa nem crie expectativa, e ofereça encaminhar à equipe de reservas para avaliar alternativas.',
   },
+  {
+    title: 'Cancelamento: reserva direta x operadora/OTA',
+    content:
+      'A Bella PODE informar as regras de cancelamento, porque são fixas — mas ANTES precisa saber ONDE a reserva foi feita, e essa pergunta vem primeiro. RESERVA DIRETA com o hotel (site oficial, WhatsApp ou recepção): valem as nossas faixas de multa por antecedência, conforme a Política de Cancelamento. RESERVA POR OPERADORA OU OTA (Booking, Expedia, Decolar, CVC, Airbnb, agências, sites de terceiros): as nossas regras NÃO se aplicam — valem as condições que o próprio hóspede contratou com aquela empresa, e é com ela que o cancelamento deve ser solicitado. Nunca informe as nossas faixas a quem reservou por terceiros: isso cria expectativa errada e vira reclamação. Se ele não souber dizer por onde reservou, pergunte com cordialidade antes de responder. Cancelamentos e alterações em si NUNCA são autorizados por você: explique a regra e encaminhe à equipe.',
+  },
 ];
 
 /* ------------------------------------------------------------------ *
@@ -245,36 +250,15 @@ const conhecimentos = [
 const REVISAR_ATALHO =
   '[REVISAR] O texto original deste atalho se perdeu com o banco. Reescreva em /quick-replies antes de usar.';
 
+// Os atalhos do painel foram DESATIVADOS a pedido do hotel (19/08/2026): a
+// recepcao ja usa os atalhos nativos do WhatsApp, digitando "/". Manter dois
+// conjuntos concorrentes so criaria divergencia de texto.
+//
+// A lista abaixo existe para APAGAR os que este seed criou. Nao removemos
+// tudo: um atalho cadastrado a mao no painel deve sobreviver.
+const ATALHOS_A_REMOVER = ['24', 'banco', 'bomdia', 'confirmacao', 'confirmar', 'endereco', 'financeiro', 'ingressos'];
+
 const respostasRapidas = [
-  {
-    shortcut: 'endereco',
-    title: 'Endereço',
-    content:
-      'Nosso endereço é Av. Brasil, 22 — Balneário Camboriú/SC, CEP 88330-040. Qualquer dúvida para chegar, é só chamar!',
-  },
-  {
-    shortcut: 'bomdia',
-    title: 'Bom dia',
-    content:
-      'Bom dia! Tudo bem? Sou do Hotel do Bosque. Para eu verificar a disponibilidade, me informa por favor o período da estadia, quantas pessoas e, se houver crianças, a idade delas.',
-  },
-  // Atalho do atendente HUMANO. Vale para as reservas que a EQUIPE fecha pelo
-  // WhatsApp — a Bella não tem essa função e por isso o prazo NÃO entra como
-  // conhecimento dela (conhecimento vai para o prompt, e ela não informa prazo
-  // de pagamento). O nome do atalho é "/24" por herança: o prazo real é 30 min.
-  {
-    shortcut: '24',
-    title: 'Validade da pré-reserva (30 min)',
-    content:
-      'Atenção sobre sua reserva: sua solicitação é válida por 30 minutos. Após esse prazo, sem a confirmação do pagamento, a reserva é cancelada e o apartamento volta à disponibilidade.',
-  },
-  // Estes dependem de dados que NÃO estão no repositório (dados bancários,
-  // texto de voucher, fluxo do financeiro). Não invente — preencher no painel.
-  { shortcut: 'banco', title: 'Dados bancários / PIX', content: REVISAR_ATALHO, revisar: true },
-  { shortcut: 'financeiro', title: 'Encaminhado ao financeiro', content: REVISAR_ATALHO, revisar: true },
-  { shortcut: 'confirmacao', title: 'Confirmação de reserva', content: REVISAR_ATALHO, revisar: true },
-  { shortcut: 'confirmar', title: 'Pedido de confirmação', content: REVISAR_ATALHO, revisar: true },
-  { shortcut: 'ingressos', title: 'Ingressos', content: REVISAR_ATALHO, revisar: true },
 ];
 
 async function main() {
@@ -317,42 +301,31 @@ async function main() {
     else inativos += 1;
   }
 
-  let atalhos = 0;
-  let atalhosRevisar = 0;
+  // Remove os atalhos que este seed criou (o hotel usa os atalhos nativos do
+  // WhatsApp). Idempotente: se ja foram apagados, deleteMany nao faz nada.
+  const removidos = await prisma.quickReply.deleteMany({
+    where: { hotelId: hotel.id, shortcut: { in: ATALHOS_A_REMOVER } },
+  });
 
   for (const r of respostasRapidas) {
     const existing = await prisma.quickReply.findFirst({
       where: { hotelId: hotel.id, shortcut: r.shortcut },
     });
-
     if (existing) {
-      // Se já tem texto real escrito no painel, não sobrescreve com o placeholder.
-      if (r.revisar && existing.content !== REVISAR_ATALHO) {
-        continue;
-      }
       await prisma.quickReply.update({
         where: { id: existing.id },
         data: { title: r.title, content: r.content },
       });
     } else {
       await prisma.quickReply.create({
-        data: {
-          hotelId: hotel.id,
-          shortcut: r.shortcut,
-          title: r.title,
-          content: r.content,
-        },
+        data: { hotelId: hotel.id, shortcut: r.shortcut, title: r.title, content: r.content },
       });
     }
-
-    atalhos += 1;
-    if (r.revisar) atalhosRevisar += 1;
   }
 
   console.log(
-    `Treinamento da Bella restaurado: ${ativos} conhecimentos ativos, ` +
-      `${inativos} aguardando revisão (inativos), ${atalhos} respostas rápidas ` +
-      `(${atalhosRevisar} com texto a preencher em /quick-replies).`,
+    `Treinamento da Bella: ${ativos} conhecimentos ativos, ${inativos} aguardando revisão. ` +
+      `Atalhos do painel removidos: ${removidos.count} (a recepção usa os atalhos nativos do WhatsApp).`,
   );
 }
 
