@@ -160,6 +160,27 @@ export class AssistController {
       stay.checkout = null;
     }
 
+
+    // Trava contra quantidade de pessoas inventada.
+    //
+    // Caso real: o hospede escreveu "gostaria de ver disponibilidade pra
+    // 16/01/2027 ate 20/01/2027" - so as datas - e a sugestao saiu "para 2
+    // pessoas" com o link pronto. O 2 nunca foi dito por ninguem. Mesmo erro da
+    // data inventada, so que na ocupacao: o modelo preenche o campo com um
+    // padrao plausivel e o link sai com gente a mais ou a menos.
+    const temNumeroDePessoas = /\b\d+\s*(pessoa|adulto|h[óo]spede|crian|beb[êe]|gente)/i;
+    const temPessoasPorExtenso = /\b(um|uma|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez)\s+(pessoa|adulto|h[óo]spede|crian)/i;
+    const temTipoDeQuarto = /\b(casal|duplo|dupla|triplo|tripla|qu[áa]druplo|individual|single|solteiro)\b/i;
+    const temComposicao = /\b(somos|seremos|s[ãa]o)\s+\d+|\bsozinh[oa]\b|\beu e (a |o |minha |meu )/i;
+    const mencionaPessoas =
+      temNumeroDePessoas.test(conversation) ||
+      temPessoasPorExtenso.test(conversation) ||
+      temTipoDeQuarto.test(conversation) ||
+      temComposicao.test(conversation);
+
+    if (!mencionaPessoas && stay.adults) {
+      stay.adults = null;
+    }
     const faltam = ['checkin', 'checkout', 'adults'].filter((c) => !stay[c]);
     if (faltam.length) {
       const rotulos: Record<string, string> = {
