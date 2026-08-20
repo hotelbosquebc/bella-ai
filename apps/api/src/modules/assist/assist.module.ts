@@ -46,40 +46,36 @@ export function contextoDeApresentacao(conversation: string): string {
   const texto = conversation || '';
   const APRESENTACAO = /sou a bella|assistente (online|virtual)/i;
 
-  // O scraper marca as mensagens do dia corrente com "(hoje)" — ex.: "Nós (hoje): ...".
-  // A apresentação se repete A CADA DIA: a thread do WhatsApp é contínua, então
-  // uma regra "uma vez por conversa" fazia a Bella nunca mais se apresentar.
-  const linhas = texto.split('\n');
-  const linhasDeHoje = linhas.filter((l) => /^\s*(H[óo]spede|N[óo]s)\s*\(hoje\)\s*:/i.test(l));
+  // A apresentação se repete A CADA DIA, por regra do hotel. O scraper marca as
+  // mensagens do dia corrente com "(hoje)" — ex.: "Nós (hoje): ...".
+  //
+  // A pergunta certa é UMA só: já nos apresentamos HOJE? Se sim, não repete. Em
+  // qualquer outro caso — inclusive quando não há NENHUMA mensagem de hoje, que
+  // é justamente o primeiro contato do dia — ela se apresenta.
+  //
+  // A versão anterior tinha um caminho alternativo que, ao não encontrar marcas
+  // de "(hoje)", concluía "conversa em andamento, não se apresente". Numa
+  // conversa cuja última mensagem era de ontem isso zerava a apresentação do
+  // dia — exatamente o contrário da regra.
+  const jaSeApresentouHoje = texto
+    .split('\n')
+    .filter((l) => /^\s*N[óo]s\s*\(hoje\)\s*:/i.test(l))
+    .some((l) => APRESENTACAO.test(l));
 
-  if (linhasDeHoje.length) {
-    const nossasDeHoje = linhasDeHoje.filter((l) => /^\s*N[óo]s\s*\(hoje\)\s*:/i.test(l));
-    const jaSeApresentouHoje = nossasDeHoje.some((l) => APRESENTACAO.test(l));
-    if (jaSeApresentouHoje) {
-      return (
-        `\n\nAPRESENTAÇÃO: você JÁ se apresentou a este contato hoje. ` +
-        `NÃO se apresente de novo, NÃO comece com "Olá, sou a Bella..." nem repita seu cargo. ` +
-        `Responda direto ao que foi perguntado, como quem continua um papo.`
-      );
-    }
+  if (jaSeApresentouHoje) {
     return (
-      `\n\nAPRESENTAÇÃO: esta é a PRIMEIRA resposta a este contato HOJE (mesmo que a conversa venha de dias anteriores). ` +
-      `Comece se apresentando como "Bella, assistente online do Hotel do Bosque", numa linha só, ` +
-      `depois pule uma linha e responda o que foi perguntado.`
-    );
-  }
-
-  // Sem marcação de data (WhatsApp mudou o HTML): mantém o comportamento antigo,
-  // uma apresentação por conversa — melhor do que repetir a cada mensagem.
-  const jaRespondemos = /(^|\n)\s*N[óo]s\s*(\(hoje\))?\s*:/.test(texto);
-  if (jaRespondemos || APRESENTACAO.test(texto)) {
-    return (
-      `\n\nAPRESENTAÇÃO: esta conversa JÁ está em andamento e o hóspede já sabe quem você é. ` +
+      `\n\nAPRESENTAÇÃO: você JÁ se apresentou a este contato hoje. ` +
       `NÃO se apresente de novo, NÃO comece com "Olá, sou a Bella..." nem repita seu cargo. ` +
       `Responda direto ao que foi perguntado, como quem continua um papo.`
     );
   }
-  return `\n\nAPRESENTAÇÃO: esta é a PRIMEIRA resposta desta conversa — apresente-se uma única vez, de forma breve.`;
+
+  return (
+    `\n\nAPRESENTAÇÃO: esta é a PRIMEIRA resposta a este contato HOJE — mesmo que a conversa venha ` +
+    `de ontem ou de dias anteriores, e mesmo que a equipe já tenha respondido antes. ` +
+    `Comece OBRIGATORIAMENTE com "Olá! Sou a Bella, assistente online do Hotel do Bosque." numa linha, ` +
+    `pule uma linha e então responda o que foi perguntado. Não pule essa linha por achar que a conversa já está em andamento.`
+  );
 }
 
 /**
