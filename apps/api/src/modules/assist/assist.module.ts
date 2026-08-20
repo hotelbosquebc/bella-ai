@@ -205,24 +205,37 @@ export class AssistController {
       );
     }
 
-    // Mais de um apartamento: o link carrega a ocupação de UM apartamento só.
-    // Mandar 7 pessoas num link único traria o resultado errado (o máximo é 6
-    // por apartamento), então enviamos o link da busca e o hóspede monta lá.
+    // Mais de um apartamento: a busca do site carrega a ocupação de UM
+    // apartamento — a quantidade é escolhida depois, no campo "Nº apartamentos"
+    // de cada categoria. Com composições diferentes (um casal, outro casal com
+    // duas crianças, etc.) um único link não representa o pedido, e mandar um
+    // link "de um apartamento" faz parecer que ignoramos o resto.
     if (Number(stay.apartamentos) > 1) {
       const linkBase = this.reservations.buildSearchLink(stay.checkin, stay.checkout);
+      const muitos = Number(stay.apartamentos) >= 4;
       return (
-        `\n\nRESERVA: o hóspede quer ${stay.apartamentos} apartamentos. ` +
-        `PRIMEIRO confirme a composição que você entendeu (quantos apartamentos e quantas pessoas em cada um), ` +
-        `depois envie ESTE link para ele escolher os apartamentos e reservar no site:\n${linkBase}\n` +
-        `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois.\n` +
-        `NÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` + ofertaAtendimento
+        `\n\nRESERVA DE ${stay.apartamentos} APARTAMENTOS: ` +
+        `PRIMEIRO confirme a composição que você entendeu, apartamento por apartamento, com as idades das crianças. ` +
+        `Isso mostra ao hóspede que o pedido inteiro foi lido.\n` +
+        `ATENÇÃO: o link abre a busca com as DATAS, mas a ocupação vale para UM apartamento por vez. ` +
+        `NÃO apresente o link como se fosse o orçamento fechado do pedido todo — foi assim que já pareceu que ` +
+        `só um apartamento havia sido cotado. Explique que, na página, ele escolhe a categoria e ajusta ` +
+        `os hóspedes e o campo "Nº apartamentos" para cada composição.\n` +
+        `Link para enviar:\n${linkBase}\n` +
+        (muitos
+          ? `COMO SÃO VÁRIOS APARTAMENTOS, recomende de forma proativa que a nossa equipe monte o orçamento ` +
+            `completo — é mais rápido e evita erro na distribuição das crianças. ` +
+            (isWithinBusinessHours()
+              ? `O setor está atendendo agora: ofereça encaminhar imediatamente ao especialista em reservas.`
+              : `O setor NÃO está atendendo agora: informe o horário e ofereça a recepção 24h por telefone, sem prometer atendimento imediato.`)
+          : `Se ele preferir não montar sozinho, ofereça encaminhar à equipe de reservas (respeitando o horário do setor).`) +
+        `\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.`
       );
     }
 
-
-    // Disponibilidade REAL, consultada no motor de reservas. É o que permite à
-    // Bella falar de procura sem inventar: o site avisa "Apenas N disponíveis"
-    // quando restam poucos, e omite a categoria quando esgota.
+    // Disponibilidade REAL, consultada no motor de reservas. Só faz sentido para
+    // UM apartamento: com vários, a ocupação somada não representa nenhuma busca
+    // válida (e passaria de 6 pessoas, o que o site recusaria).
     let contextoDisponibilidade = '';
     try {
       const disp = await this.disponibilidade.consultar(
@@ -232,11 +245,11 @@ export class AssistController {
         Number(stay.children0_6) || 0,
         Number(stay.children7_9) || 0,
       );
+
       if (disp && disp.semDisponibilidade) {
         // Basta UM dia lotado no meio do período para o site não devolver nada.
-        // Mandar o link aqui seria pior que não responder: o hóspede clica,
-        // bate no aviso de indisponível e volta perguntando o que houve — foi
-        // exatamente o que aconteceu em 22 a 29/11, travado pelo dia 28.
+        // Mandar o link aqui seria pior que não responder: o hóspede clica, bate
+        // no aviso de indisponível e volta perguntando o que houve.
         const dias = disp.diasIndisponiveis.length
           ? ` O(s) dia(s) sem disponibilidade nesse intervalo: ${disp.diasIndisponiveis.join(', ')}.`
           : '';
@@ -251,14 +264,13 @@ export class AssistController {
           ofertaAtendimento
         );
       }
+
       if (disp) {
         const poucos = disp.categorias.filter((c) => c.restantes !== null);
         const linhas: string[] = [];
         if (poucos.length) {
           linhas.push(
-            'Restam poucos apartamentos: ' +
-              poucos.map((c) => `${c.categoria} (${c.restantes})`).join(', ') +
-              '.',
+            'Restam poucos apartamentos: ' + poucos.map((c) => `${c.categoria} (${c.restantes})`).join(', ') + '.',
           );
         }
         if (disp.esgotadas.length) {
@@ -278,6 +290,7 @@ export class AssistController {
     } catch (_) {
       /* indisponível: segue sem falar de procura */
     }
+
     const link = this.reservations.buildBookingLink(stay);
     return (
       `\n\nRESERVA: envie ESTE link ao hóspede, exatamente como está, para ele ver ` +
