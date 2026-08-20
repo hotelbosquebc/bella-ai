@@ -177,6 +177,20 @@ export class AssistController {
     if (!mencionaPessoas && stay.adults) {
       stay.adults = null;
     }
+
+    // Oferta de atendimento humano — SÓ dentro do horário do setor de reservas.
+    // A Bella não fecha reserva, mas a equipe fecha, com pagamento via pix. Quem
+    // trava na hora de pagar sozinho converte quando aparece essa porta. Fora do
+    // expediente a oferta some: prometer especialista às 22h de domingo cria
+    // expectativa que ninguém atende.
+    const ofertaAtendimento = isWithinBusinessHours()
+      ? `\n\nOFERTA DE ATENDIMENTO HUMANO (o setor de reservas está atendendo AGORA): ` +
+        `logo DEPOIS do link, acrescente UMA frase curta oferecendo que, se ele preferir fazer a reserva ` +
+        `por aqui mesmo pelo WhatsApp com pagamento via pix, basta pedir que você encaminha para o nosso ` +
+        `especialista em reservas. Diga de forma natural, sem insistir e sem repetir em toda mensagem. ` +
+        `NÃO prometa valor, desconto, prazo nem condição: só ofereça o encaminhamento. ` +
+        `Se ele aceitar, encaminhe para a equipe.`
+      : '';
     const faltam = ['checkin', 'checkout', 'adults'].filter((c) => !stay[c]);
     if (faltam.length) {
       const rotulos: Record<string, string> = {
@@ -201,7 +215,7 @@ export class AssistController {
         `PRIMEIRO confirme a composição que você entendeu (quantos apartamentos e quantas pessoas em cada um), ` +
         `depois envie ESTE link para ele escolher os apartamentos e reservar no site:\n${linkBase}\n` +
         `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois.\n` +
-        `NÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.`
+        `NÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` + ofertaAtendimento
       );
     }
 
@@ -255,7 +269,7 @@ export class AssistController {
       `o hóspede não sabe se aquilo é um orçamento, uma foto ou onde deve clicar.\n` +
       `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois — ` +
       `nunca grudado no texto nem logo após dois-pontos, senão o WhatsApp quebra o endereço.\n` +
-      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoDisponibilidade
+      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoDisponibilidade + ofertaAtendimento
     );
   }
 
