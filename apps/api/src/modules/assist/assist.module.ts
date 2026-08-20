@@ -232,6 +232,25 @@ export class AssistController {
         Number(stay.children0_6) || 0,
         Number(stay.children7_9) || 0,
       );
+      if (disp && disp.semDisponibilidade) {
+        // Basta UM dia lotado no meio do período para o site não devolver nada.
+        // Mandar o link aqui seria pior que não responder: o hóspede clica,
+        // bate no aviso de indisponível e volta perguntando o que houve — foi
+        // exatamente o que aconteceu em 22 a 29/11, travado pelo dia 28.
+        const dias = disp.diasIndisponiveis.length
+          ? ` O(s) dia(s) sem disponibilidade nesse intervalo: ${disp.diasIndisponiveis.join(', ')}.`
+          : '';
+        return (
+          `\n\nSEM DISPONIBILIDADE (consultado agora no sistema, para ${stay.checkin} a ${stay.checkout}): ` +
+          `NÃO envie o link e NÃO diga que seguem os valores — para este período o site não oferece nenhum apartamento.` +
+          dias +
+          `\nInforme com clareza e cordialidade que para essas datas não temos disponibilidade. ` +
+          `Se houver dia(s) citado(s) acima, diga QUAL dia está lotado: muitas vezes o hóspede consegue ajustar ` +
+          `a entrada ou a saída em um dia e resolver. Convide-o a informar outras datas que você verifica de novo. ` +
+          `NÃO invente datas alternativas nem diga que "temos vaga" em outro período sem ter consultado.` +
+          ofertaAtendimento
+        );
+      }
       if (disp) {
         const poucos = disp.categorias.filter((c) => c.restantes !== null);
         const linhas: string[] = [];

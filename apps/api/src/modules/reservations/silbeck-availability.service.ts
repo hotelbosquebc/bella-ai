@@ -10,6 +10,10 @@ export interface Disponibilidade {
   categorias: CategoriaDisponivel[];
   /** Categorias que NÃO apareceram na busca — sem disponibilidade no período. */
   esgotadas: string[];
+  /** O período inteiro está indisponível: o site não oferece nenhum apartamento. */
+  semDisponibilidade: boolean;
+  /** Dias lotados dentro/perto do período, em DD/MM/AAAA. É o que trava a busca. */
+  diasIndisponiveis: string[];
   consultadoEm: number;
 }
 
@@ -184,10 +188,28 @@ export class SilbeckAvailabilityService {
       categorias.push({ categoria: marcos[i].nome, restantes: aviso ? Number(aviso[1]) : null });
     }
 
+    // Quando NENHUM apartamento serve para o período, o site troca a listagem
+    // por um aviso e um calendário com as datas próximas. Basta um dia lotado no
+    // meio do período para a busca inteira não retornar nada — foi o caso de
+    // 22 a 29/11, travado pelo dia 28. Sem detectar isso, a Bella mandava o link
+    // dizendo "seguem os valores" e o hóspede batia no aviso de indisponível.
+    const semDisponibilidade = /n[ãa]o h[áa] disponibilidade/i.test(corpo);
+
+    // Os dias lotados vêm marcados no calendário de datas próximas.
+    const diasIndisponiveis = [
+      ...new Set(
+        [...corpo.matchAll(/data-tiposelecao="indisponivel"[^>]*data-data="(\d{2}\/\d{2}\/\d{4})"/g)].map(
+          (m) => m[1],
+        ),
+      ),
+    ];
+
     const presentes = new Set(categorias.map((c) => c.categoria));
     return {
       categorias,
-      esgotadas: CATEGORIAS.filter((c) => !presentes.has(c)),
+      esgotadas: semDisponibilidade ? [] : CATEGORIAS.filter((c) => !presentes.has(c)),
+      semDisponibilidade,
+      diasIndisponiveis,
       consultadoEm: Date.now(),
     };
   }
