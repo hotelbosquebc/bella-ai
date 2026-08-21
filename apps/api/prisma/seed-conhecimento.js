@@ -117,7 +117,7 @@ const conhecimentos = [
   {
     title: 'Suíte Bosque (categoria)',
     content:
-      'A Suíte Bosque é a única categoria com dois banheiros e aquecimento a gás. Fica no 7º e 8º andar, acomoda até 6 hóspedes e conta com Wi-Fi e ar-condicionado. O secador de cabelo é solicitado na recepção.',
+      'A Suíte Bosque fica no 7º e no 8º andar — são os andares MAIS ALTOS do hotel. Se o hóspede falar em "último andar", "andar de cima", "lá em cima" ou "vista melhor", é dela que ele está falando: confirme que a Suíte Bosque fica no 7º e 8º andar. É a única categoria com DOIS banheiros (social e o da suíte do casal) e com chuveiro de aquecimento a GÁS. Acomoda até 6 hóspedes, com Wi-Fi e ar-condicionado. O secador de cabelo é solicitado na recepção. Não prometa andar específico entre o 7º e o 8º, nem número de apartamento: isso é definido pela recepção conforme a ocupação.',
   },
   {
     title: 'Problemas do hóspede no site de reservas',
@@ -241,6 +241,11 @@ const conhecimentos = [
     title: 'Hóspede que já reservou: confirmação, alteração ou cancelamento',
     content:
       'Quando o hóspede JÁ TEM uma reserva e traz um problema ou dúvida sobre ela — não recebeu a confirmação por e-mail, quer confirmar se a reserva entrou, já pagou e quer saber se caiu, quer alterar datas, incluir alguém ou cancelar — você NÃO tem acesso ao sistema de reservas e NÃO consegue consultar, confirmar nem alterar nada. Mas não encaminhe de mãos vazias: PRIMEIRO peça, com cordialidade, o NOME COMPLETO de quem fez a reserva ou o NÚMERO DA RESERVA, explicando que é para a equipe localizar. Um dos dois basta, não exija os dois. Depois diga que vai repassar ao nosso atendimento especializado. Colher esse dado antes de transferir evita que a equipe tenha que pedir de novo e resolve muito mais rápido. Respeite o horário: se o setor de reservas estiver atendendo, diga que está encaminhando agora; se estiver fora do horário, informe quando reabre e ofereça a recepção 24h pelo telefone (47) 3367-0211, sem prometer retorno imediato. NUNCA diga que a reserva está confirmada, que o pagamento foi identificado ou que "está tudo certo" — você não tem como saber, e afirmar isso gera hóspede chegando sem reserva. Não prometa prazo de resposta nem envio de e-mail.',
+  },
+  {
+    title: 'Andares das categorias',
+    content:
+      'ANDARES DE CADA CATEGORIA — responda com isto quando perguntarem sobre andar, altura ou vista. Apartamento Standard: 1º e 2º andar. Apartamento Superior: 5º e 6º andar. Suíte Bosque: 7º e 8º andar, os mais altos do hotel. Apartamento Luxo: o andar não está registrado aqui — NÃO invente; diga que confirma com a recepção. "Último andar", "andar mais alto" ou "lá em cima" = Suíte Bosque. Nunca prometa um andar específico dentro da categoria nem um número de apartamento: a distribuição é feita pela recepção conforme a ocupação do dia.',
   },
 ];
 
