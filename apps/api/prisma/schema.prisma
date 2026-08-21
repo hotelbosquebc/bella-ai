@@ -322,3 +322,25 @@ model QuickReply {
   @@index([hotelId])
   @@map("quick_replies")
 }
+
+/// O que a Bella sugeriu x o que o atendente realmente enviou.
+///
+/// E o material de treino mais honesto que existe: quando o humano reescreve a
+/// sugestao antes de mandar, a diferenca aponta exatamente onde ela erra - sem
+/// depender de alguem notar o erro e avisar. Guardamos apenas os dois textos e
+/// uma etiqueta da conversa em HASH: nada de telefone ou nome do hospede.
+model SuggestionFeedback {
+  id        String   @id @default(uuid())
+  hotelId   String
+  /// hash curto da conversa: agrupa sem identificar o hospede
+  conversa  String?
+  /// igual, editada ou descartada
+  acao      String
+  sugestao  String
+  enviado   String
+  modelo    String?
+  createdAt DateTime @default(now())
+
+  @@index([hotelId, createdAt])
+  @@map("suggestion_feedback")
+}

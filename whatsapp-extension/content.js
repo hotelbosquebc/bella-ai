@@ -598,6 +598,77 @@
     });
   }
 
+
+  /* ---------- aprendizado: sugerido x enviado ---------- */
+
+  /**
+   * Guarda o que a Bella sugeriu e compara com o que o atendente realmente
+   * mandou. E o retorno mais honesto que existe: quando o humano reescreve
+   * antes de enviar, a diferenca aponta onde ela erra - sem depender de alguem
+   * notar e avisar.
+   *
+   * Nada e enviado ao hospede por causa disso. Vai para a nossa API apenas o
+   * par de textos e uma etiqueta da conversa, que o servidor guarda em hash.
+   */
+  let sugestaoPendente = null; // { texto, inserida, modelo }
+  let ultimaNossaConhecida = null;
+
+  function normalizarTexto(t) {
+    return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  /** Quanto do texto sugerido sobreviveu ao que foi enviado (0 a 1). */
+  function semelhanca(a, b) {
+    const A = new Set(normalizarTexto(a).split(' ').filter(Boolean));
+    const B = new Set(normalizarTexto(b).split(' ').filter(Boolean));
+    if (!A.size || !B.size) return 0;
+    let comuns = 0;
+    A.forEach((p) => { if (B.has(p)) comuns++; });
+    return comuns / Math.max(A.size, B.size);
+  }
+
+  function registrarEnvio(textoEnviado) {
+    if (!sugestaoPendente || !textoEnviado) return;
+    const sug = sugestaoPendente.texto;
+    const sim = semelhanca(sug, textoEnviado);
+
+    // Igual: praticamente o mesmo texto. Editada: aproveitou parte.
+    // Descartada: escreveu outra coisa (ou nem inseriu a sugestao).
+    let acao = 'descartada';
+    if (sim >= 0.95) acao = 'igual';
+    else if (sim >= 0.35 || sugestaoPendente.inserida) acao = 'editada';
+
+    send('FEEDBACK', {
+      conversa: tituloDaConversa(),
+      acao: acao,
+      sugestao: sug,
+      enviado: textoEnviado,
+      modelo: sugestaoPendente.modelo,
+    });
+    sugestaoPendente = null;
+  }
+
+  /** Ultima mensagem NOSSA da conversa aberta. */
+  function ultimaNossa() {
+    const lido = scrapeConversation();
+    const linhas = (lido.conversation || '').split(String.fromCharCode(10));
+    for (let i = linhas.length - 1; i >= 0; i--) {
+      const m = linhas[i].match(/^\s*N[óo]s\s*(?:\(hoje\))?\s*:\s*([\s\S]+)$/i);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  /** Chamado quando o DOM muda: detecta que uma mensagem nossa foi enviada. */
+  function verificarEnvio() {
+    const atual = ultimaNossa();
+    if (!atual) return;
+    if (ultimaNossaConhecida === null) { ultimaNossaConhecida = atual; return; }
+    if (atual !== ultimaNossaConhecida) {
+      ultimaNossaConhecida = atual;
+      registrarEnvio(atual);
+    }
+  }
   // ---------- sugerir resposta ----------
   let sugerindo = false;
 
@@ -652,6 +723,10 @@
       status(automatica ? 'Sugestão pronta — revise antes de enviar.' : '');
       panel.querySelector('#bella-suggestion').style.display = 'block';
       panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
+      // Guarda para comparar depois com o que o atendente realmente enviar.
+      sugestaoPendente = r.data.suggestion
+        ? { texto: r.data.suggestion, inserida: false, modelo: r.data.model }
+        : null;
       mostrarAnexos(r.data.attachments);
     } finally {
       sugerindo = false;
@@ -662,7 +737,12 @@
 
   panel.querySelector('#bella-insert').onclick = () => {
     const t = panel.querySelector('#bella-sugtext').value;
-    if (t) insertText(t);
+    if (t) {
+      insertText(t);
+      // O atendente pode editar depois de inserir; a comparacao final e no envio.
+      if (sugestaoPendente) sugestaoPendente.inserida = true;
+      else sugestaoPendente = { texto: t, inserida: true, modelo: null };
+    }
   };
 
   // ---------- modo de operação (ligada / desligada / automática) ----------
@@ -701,6 +781,9 @@
     }
     if (!conversation || conversation === ultimaConversa) return;
     ultimaConversa = conversation;
+    // Conversa nova: descarta rastreamento da anterior para nao cruzar dados.
+    sugestaoPendente = null;
+    ultimaNossaConhecida = null;
     panel.querySelector('#bella-suggestion').style.display = 'none';
     panel.querySelector('#bella-sugtext').value = '';
     mostrarAnexos([]);
@@ -711,6 +794,7 @@
   let debounce;
   new MutationObserver(() => {
     clearTimeout(debounce);
+    verificarEnvio();
     debounce = setTimeout(aoTrocarDeConversa, 1200);
   }).observe(document.body, { childList: true, subtree: true });
 

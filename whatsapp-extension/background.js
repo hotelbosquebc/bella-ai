@@ -68,6 +68,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg.type === 'QUICK_REPLIES') {
         const list = await authed(`/api/quick-replies?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: list });
+      } else if (msg.type === 'FEEDBACK') {
+        // O que a Bella sugeriu x o que o atendente realmente enviou.
+        // Se falhar, nao atrapalha o atendimento: e so material de treino.
+        await authed('/api/assist/feedback', {
+          method: 'POST',
+          body: JSON.stringify({
+            hotelId: HOTEL_ID,
+            conversa: msg.conversa,
+            acao: msg.acao,
+            sugestao: msg.sugestao,
+            enviado: msg.enviado,
+            modelo: msg.modelo,
+          }),
+        });
+        sendResponse({ ok: true });
       } else if (msg.type === 'SUGGEST') {
         const out = await authed(`/api/assist/suggest`, {
           method: 'POST',

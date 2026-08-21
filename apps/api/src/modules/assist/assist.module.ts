@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Module, Post, Query } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BellaModule } from '../bella/bella.module';
 import { ModelRouterService } from '../bella/model-router.service';
@@ -393,6 +394,85 @@ ${url}`;
     );
   }
 
+
+  /**
+   * Registra o que a Bella sugeriu x o que o atendente realmente enviou.
+   *
+   * É o retorno mais honesto que temos: quando o humano reescreve antes de
+   * mandar, a diferença mostra onde ela erra — sem depender de alguém notar e
+   * avisar. Guardamos só os dois textos; a conversa entra como HASH, então dá
+   * para agrupar por contato sem armazenar telefone nem nome.
+   */
+  @Post('feedback')
+  async feedback(
+    @Body()
+    body: {
+      hotelId?: string;
+      conversa?: string;
+      acao?: string;
+      sugestao?: string;
+      enviado?: string;
+      modelo?: string;
+    },
+  ) {
+    const sugestao = (body.sugestao || '').trim();
+    const enviado = (body.enviado || '').trim();
+    if (!sugestao || !enviado) return { ok: false, motivo: 'textos vazios' };
+
+    const acoesValidas = ['igual', 'editada', 'descartada'];
+    const acao = acoesValidas.includes(body.acao || '') ? body.acao! : 'editada';
+
+    // Hash curto e estável da conversa: agrupa sem identificar o hóspede.
+    const conversa = body.conversa
+      ? createHash('sha256').update(body.conversa).digest('hex').slice(0, 12)
+      : null;
+
+    await this.prisma.suggestionFeedback.create({
+      data: {
+        hotelId: body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque',
+        conversa,
+        acao,
+        sugestao: sugestao.slice(0, 4000),
+        enviado: enviado.slice(0, 4000),
+        modelo: body.modelo || null,
+      },
+    });
+    return { ok: true };
+  }
+
+  /**
+   * O que aprender com o uso: casos em que o atendente NÃO enviou o que a Bella
+   * escreveu. É a lista que vira correção de regra.
+   */
+  @Get('feedback')
+  async listarFeedback(@Query('hotelId') hotelId?: string, @Query('dias') dias?: string) {
+    const id = hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    const desde = new Date(Date.now() - (Number(dias) || 7) * 86400000);
+    const todos = await this.prisma.suggestionFeedback.findMany({
+      where: { hotelId: id, createdAt: { gte: desde } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const porAcao = todos.reduce((acc: Record<string, number>, f) => {
+      acc[f.acao] = (acc[f.acao] || 0) + 1;
+      return acc;
+    }, {});
+    return {
+      periodoDias: Number(dias) || 7,
+      total: todos.length,
+      porAcao,
+      /** só o que divergiu: é onde está o aprendizado */
+      divergencias: todos
+        .filter((f) => f.acao !== 'igual')
+        .map((f) => ({
+          quando: f.createdAt,
+          acao: f.acao,
+          conversa: f.conversa,
+          sugerido: f.sugestao,
+          enviado: f.enviado,
+        })),
+    };
+  }
   /**
    * A Bella deve agir agora? A extensão do WhatsApp Web consulta isto ao abrir
    * cada conversa para decidir se sugere sozinha ou fica só no botão manual.
