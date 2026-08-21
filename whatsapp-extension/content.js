@@ -648,15 +648,23 @@
     sugestaoPendente = null;
   }
 
-  /** Ultima mensagem NOSSA da conversa aberta. */
+  /**
+   * Ultima mensagem NOSSA da conversa aberta.
+   *
+   * Le apenas o ULTIMO balao, sem remontar a conversa: esta funcao roda a cada
+   * ciclo do observador e, varrendo tudo, chegou a travar o WhatsApp Web.
+   */
   function ultimaNossa() {
-    const lido = scrapeConversation();
-    const linhas = (lido.conversation || '').split(String.fromCharCode(10));
-    for (let i = linhas.length - 1; i >= 0; i--) {
-      const m = linhas[i].match(/^\s*N[óo]s\s*(?:\(hoje\))?\s*:\s*([\s\S]+)$/i);
-      if (m) return m[1];
-    }
-    return null;
+    const baloes = document.querySelectorAll('#main .copyable-text[data-pre-plain-text]');
+    if (!baloes.length) return null;
+    const el = baloes[baloes.length - 1];
+    const attr = el.getAttribute('data-pre-plain-text') || '';
+    const m = attr.match(/]s*(.*?):s*$/);
+    const remetente = m ? m[1] : '';
+    const titulo = tituloDaConversa();
+    const nossa = titulo ? remetente !== titulo : /hotel do bosque|recep|reserva/i.test(remetente);
+    if (!nossa) return null;
+    return (el.innerText || '').trim() || null;
   }
 
   /** Chamado quando o DOM muda: detecta que uma mensagem nossa foi enviada. */
@@ -794,8 +802,10 @@
   let debounce;
   new MutationObserver(() => {
     clearTimeout(debounce);
-    verificarEnvio();
-    debounce = setTimeout(aoTrocarDeConversa, 1200);
+    debounce = setTimeout(function () {
+      verificarEnvio();
+      aoTrocarDeConversa();
+    }, 1200);
   }).observe(document.body, { childList: true, subtree: true });
 
   carregarModo().then(() => aoTrocarDeConversa());
