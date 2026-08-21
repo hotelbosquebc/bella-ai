@@ -209,9 +209,18 @@ export const STAY_EXTRACTION_TOOL = {
         items: {
           type: 'object',
           properties: {
-            adultos: { type: 'integer', description: 'Adultos (10 anos ou mais) NESTE apartamento' },
+            adultos: { type: 'integer', description: 'Pessoas deste apartamento cuja idade NAO foi citada e que o hospede chamou de adulto. Se a idade foi dita, ela vai em "idades" e NAO aqui.' },
             criancas0_6: { type: 'integer', description: 'Crianças de 0 a 6 anos NESTE apartamento' },
             criancas7_9: { type: 'integer', description: 'Crianças de 7 a 9 anos NESTE apartamento' },
+            idades: {
+              type: 'array',
+              items: { type: 'integer' },
+              description:
+                'TODAS as idades citadas para as pessoas DESTE apartamento, como números crus, sem classificar. ' +
+                'Ex.: "1 adulto e 1 menor de 11 anos" -> adultos=1 e idades=[11]. ' +
+                '"2 adultos, menores de 6 e 17 anos" -> adultos=2 e idades=[6,17]. ' +
+                'NÃO decida aqui se é criança ou adulto: só liste as idades. Quem classifica é o sistema.',
+            },
             rotulo: {
               type: 'string',
               description: 'Como o hóspede descreveu este apartamento, curto. Ex.: "casal + pet", "3 adultos"',

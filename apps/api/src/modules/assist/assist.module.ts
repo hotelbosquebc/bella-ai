@@ -212,19 +212,50 @@ export class AssistController {
     // so - ou o link sem ocupacao - faz parecer que metade do pedido foi
     // ignorada. Como a busca aceita a ocupacao de um apartamento, geramos um
     // link por composicao, cada um ja com a gente certa dentro.
+    /**
+     * Classifica as pessoas de UM apartamento a partir das idades cruas.
+     *
+     * A conta NAO fica com o modelo. Caso real: "1 adulto e 1 menor de 11 anos"
+     * virou 1 adulto no link, e "menores de 6 e 17 anos" virou duas criancas -
+     * quando 11 e 17 ja contam como ADULTO pela politica do hotel. Aqui a regra
+     * e aplicada sempre igual: 10 anos ou mais e adulto, 7 a 9 e meia, 0 a 6 e
+     * cortesia. O rotulo mostrado ao hospede sai DESTES mesmos numeros, entao
+     * texto e link nunca divergem.
+     */
+    const classificarApartamento = (a: any) => {
+      const idades: number[] = Array.isArray(a?.idades) ? a.idades.map(Number).filter((n: number) => !isNaN(n)) : [];
+      const adultos = (Number(a?.adultos) || 0) + idades.filter((i) => i >= 10).length;
+      const criancas0_6 = (Number(a?.criancas0_6) || 0) + idades.filter((i) => i >= 0 && i <= 6).length;
+      const criancas7_9 = (Number(a?.criancas7_9) || 0) + idades.filter((i) => i >= 7 && i <= 9).length;
+
+      const partes: string[] = [];
+      if (adultos) partes.push(`${adultos} ${adultos === 1 ? 'adulto' : 'adultos'}`);
+      const criancas = criancas0_6 + criancas7_9;
+      if (criancas) {
+        const menores = idades.filter((i) => i < 10).sort((x, y) => x - y);
+        partes.push(
+          menores.length
+            ? `${criancas} ${criancas === 1 ? 'criança' : 'crianças'} (${menores.join(' e ')} anos)`
+            : `${criancas} ${criancas === 1 ? 'criança' : 'crianças'}`,
+        );
+      }
+      return { adultos: Math.max(1, adultos), criancas0_6, criancas7_9, descricao: partes.join(' e ') };
+    };
+
     const detalhe: any[] = Array.isArray(stay.apartamentos_detalhe) ? stay.apartamentos_detalhe : [];
 
     if (detalhe.length > 1) {
       const linhas = detalhe.map((a: any, i: number) => {
+        const c = classificarApartamento(a);
         const url = this.reservations.buildBookingLink({
           checkin: stay.checkin,
           checkout: stay.checkout,
-          adults: Number(a.adultos) || 1,
-          children0_6: Number(a.criancas0_6) || 0,
-          children7_9: Number(a.criancas7_9) || 0,
+          adults: c.adultos,
+          children0_6: c.criancas0_6,
+          children7_9: c.criancas7_9,
         } as any);
-        const rotulo = a.rotulo ? ` (${a.rotulo})` : '';
-        return `Apartamento ${i + 1}${rotulo}:\n${url}`;
+        return `Apartamento ${i + 1} — ${c.descricao}:
+${url}`;
       });
 
       const muitos = detalhe.length >= 4;
