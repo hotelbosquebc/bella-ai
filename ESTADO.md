@@ -1,9 +1,88 @@
 # ESTADO — Bella AI (retomada de conversa)
 
-> Documento de continuidade. Leia antes de continuar. Última atualização: sessão de jul/2026.
+> Documento de continuidade. Leia antes de continuar. Última atualização: 21/08/2026.
 
 ## O que é
 **Bella AI** — plataforma SaaS omnichannel de atendimento/reservas/CRM para hotelaria. 1º cliente: **Hotel do Bosque, Balneário Camboriú** (RS Hotelaria LTDA). Dono trabalha em português, autorizou execução autônoma. A Bella é uma "funcionária virtual" (especialista em reservas) que atende, tira dúvidas e gera links de reserva — sem inventar, com guardrails anti-prejuízo.
+
+## 📌 SESSÃO DE 21/08/2026 — o que mudou (leia primeiro)
+
+Dia inteiro de correções guiadas por casos reais (prints de conversas). O padrão
+que mais se repetiu: **texto pronto vence regra escrita longe**. Sempre que o
+prompt tinha um bloco fechado ("envie exatamente assim") e a ressalva vinha
+depois, o modelo seguia o bloco. A solução foi mover a decisão para dentro do
+bloco, não reforçar a ressalva.
+
+### Travas determinísticas (não dependem de o modelo obedecer)
+Ficam em `assist.module.ts`, dentro de `bookingContext()`:
+- **Data inventada:** só aceita `checkin/checkout` se a conversa mencionar data
+  (número, relativa ou dia da semana). Caso real: hóspede falou só "5 adultos,
+  1 diária" e saiu "entrada de 5 a 6 de setembro".
+- **Ocupação inventada:** só aceita `adults` se a conversa mencionar pessoas
+  (número, por extenso, tipo de quarto ou composição). Caso real: só datas e
+  saiu "para 2 pessoas".
+- **Réveillon:** se a estadia inclui 31/12 e tem menos de 5 diárias, o checkout é
+  estendido para 5 ANTES de montar o link — senão o site não mostra nada e o
+  hóspede acha que está lotado.
+- **Vários apartamentos:** um LINK POR APARTAMENTO, com a ocupação de cada um
+  (`apartamentos_detalhe` na extração). Pet não conta como pessoa.
+
+### Disponibilidade real (`silbeck-availability.service.ts`)
+A Bella consulta o motor antes de responder. A página de busca NÃO traz os
+resultados no HTML — a sequência é: GET `/pt-br/reserva/` (cria sessão + token
+`sbClientRef`) → POST `/api/hotel/busca-disponibilidades` (datas em DD/MM/AAAA,
+campos `data_inicio`/`data_fim`/`categorias_hospede[...]`) → GET da página de
+busca → GET `/api/hotel/listagem`. Cache de 10 min. Com isso ela:
+- fala de escassez REAL ("Apenas N disponíveis"), nunca inventada;
+- detecta período lotado e diz QUAL dia trava a busca, em vez de mandar link
+  que não mostra nada.
+
+### Aprendizado contínuo (novo)
+Tabela `suggestion_feedback` + `POST/GET /api/assist/feedback`. A extensão compara
+o que a Bella sugeriu com o que o atendente realmente enviou e classifica em
+`igual`/`editada`/`descartada`. **É o material de treino para a autonomia.**
+Revisar com `GET /api/assist/feedback?dias=7` — devolve só as divergências.
+Conversa gravada em hash: sem telefone nem nome.
+
+### Extensão — versão 1.2.2
+Histórico da 1.1.x: leitura de contexto (o WhatsApp Web guarda UMA mensagem e o
+resto fica no celular — clicamos o aviso "carregar mensagens antigas"), memória
+local por conversa, painel arrastável, anexo como DOCUMENTO (foto o WhatsApp
+comprime e as regras ficavam ilegíveis).
+⚠️ **Lição cara:** a 1.2.0 travou o WhatsApp Web em produção — eu tinha posto
+trabalho pesado dentro do `MutationObserver`, fora do debounce. **Nada dentro
+daquele observador pode ser caro.**
+⚠️ Desinstalar a extensão APAGA o login (storage). Atualizar preserva.
+
+### Base de conhecimento: 41 itens, todos ativos
+Nenhum `[REVISAR]` restante. Entraram no dia: 4 categorias com andares
+(Standard 1º-2º, Superior 5º-6º, Suíte Bosque 7º-8º; **Luxo pendente**),
+estacionamento completo (gratuito, 1 vaga inclusa, 2º carro com reserva prévia,
+coberto/descoberto, veículos aceitos), Réveillon, café buffet (pães TÊM glúten),
+pets até 12 kg, check-in (titular ou nome cadastrado), berço, guarda-volumes,
+elevadores (adaptado ocupado sem previsão), pós-reserva, cancelamento
+direto x OTA, Wi-Fi (senha `bosque00`, nome varia por roteador).
+**Atalhos do painel REMOVIDOS** a pedido do dono — a recepção usa os nativos do
+WhatsApp ("/").
+
+### Regras de conduta que o dono definiu
+- Ela NÃO reserva: tira dúvidas e manda o link; o pagamento no site confirma.
+  Não fala de sinal, prazo nem validade de pré-reserva (isso é do fluxo humano).
+- Apresenta-se como "Bella, assistente online do Hotel do Bosque" na primeira
+  resposta de CADA DIA.
+- Responde no idioma do hóspede (blocos de abertura prontos em PT/ES/EN).
+- Vende: reduz atrito, fala em benefício, fecha com um passo. Escassez SÓ com o
+  dado da consulta real.
+- Na dúvida, encaminha para humano com telefone e horário do setor.
+- Multas: informa que existem, sem valores (exceto faixas de cancelamento).
+
+### Pendências
+1. **Modo da Bella:** trocar para 🟢 **Ligada** no painel (estava "Automática",
+   que não sugere durante o expediente — foi o que fez o dono mandar orçamento à mão).
+2. **Andar do Apartamento Luxo** — único dado de categoria faltando.
+3. **Relatório de feedback** depois de alguns dias de uso.
+4. Considerar publicar a extensão como não listada na Chrome Web Store (US$ 5
+   uma vez) — hoje cada PC atualiza na mão e um ficar para trás já causou bug.
 
 ## Onde fica o código
 - Repo: **C:\Users\BOSQUE\Documents\GitHub\bella-ai** (a sessão roda no dir do GitHub Desktop, NÃO é onde fica o código).
@@ -14,7 +93,7 @@
 - **Painel:** https://bella-ai-web.vercel.app (Vercel, projeto bella-ai-web, conta GitHub hotelbosquebc)
 - **API:** https://bella-api-nh3h.onrender.com (Render, workspace "My Workspace", serviço srv-d8velvn7f7vs73866b3g)
 - **Banco:** PostgreSQL gerenciado pelo Render (bella-db, região Virginia, plano free — ⚠️ expira ~30 dias, migrar depois)
-- **Login painel:** admin@hoteldobosque.com.br / senha em `ADMIN_PASSWORD` (Render env) = **@V271212t\*** (admin123 foi desativada)
+- **Login painel:** admin@hoteldobosque.com.br — a senha NÃO fica aqui. Ela é a variável `ADMIN_PASSWORD` no Render (bella-api → Environment), que o seed reaplica no admin a cada deploy. Para trocar: edite a variável e faça "Manual Deploy → Deploy latest commit". O mesmo login vale para o painel e para a extensão.
 - **IA:** Google Gemini (GRATUITO). `AI_PROVIDER=gemini`, `GOOGLE_API_KEY` no Render. Modelo **gemini-2.5-flash** (com `thinkingConfig.thinkingBudget=0`, senão trunca). Retry em 503/429.
 
 ## Contas (IMPORTANTE — causa de muita confusão)
