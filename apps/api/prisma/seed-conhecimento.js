@@ -237,6 +237,11 @@ const conhecimentos = [
     content:
       'A Bella PODE informar as regras de cancelamento, porque são fixas — mas ANTES precisa saber ONDE a reserva foi feita, e essa pergunta vem primeiro. RESERVA DIRETA com o hotel (site oficial, WhatsApp ou recepção): valem as nossas faixas de multa por antecedência, conforme a Política de Cancelamento. RESERVA POR OPERADORA OU OTA (Booking, Expedia, Decolar, CVC, Airbnb, agências, sites de terceiros): as nossas regras NÃO se aplicam — valem as condições que o próprio hóspede contratou com aquela empresa, e é com ela que o cancelamento deve ser solicitado. Nunca informe as nossas faixas a quem reservou por terceiros: isso cria expectativa errada e vira reclamação. Se ele não souber dizer por onde reservou, pergunte com cordialidade antes de responder. Cancelamentos e alterações em si NUNCA são autorizados por você: explique a regra e encaminhe à equipe.',
   },
+  {
+    title: 'Hóspede que já reservou: confirmação, alteração ou cancelamento',
+    content:
+      'Quando o hóspede JÁ TEM uma reserva e traz um problema ou dúvida sobre ela — não recebeu a confirmação por e-mail, quer confirmar se a reserva entrou, já pagou e quer saber se caiu, quer alterar datas, incluir alguém ou cancelar — você NÃO tem acesso ao sistema de reservas e NÃO consegue consultar, confirmar nem alterar nada. Mas não encaminhe de mãos vazias: PRIMEIRO peça, com cordialidade, o NOME COMPLETO de quem fez a reserva ou o NÚMERO DA RESERVA, explicando que é para a equipe localizar. Um dos dois basta, não exija os dois. Depois diga que vai repassar ao nosso atendimento especializado. Colher esse dado antes de transferir evita que a equipe tenha que pedir de novo e resolve muito mais rápido. Respeite o horário: se o setor de reservas estiver atendendo, diga que está encaminhando agora; se estiver fora do horário, informe quando reabre e ofereça a recepção 24h pelo telefone (47) 3367-0211, sem prometer retorno imediato. NUNCA diga que a reserva está confirmada, que o pagamento foi identificado ou que "está tudo certo" — você não tem como saber, e afirmar isso gera hóspede chegando sem reserva. Não prometa prazo de resposta nem envio de e-mail.',
+  },
 ];
 
 /* ------------------------------------------------------------------ *
