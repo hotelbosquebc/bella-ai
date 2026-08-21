@@ -183,6 +183,36 @@ export class AssistController {
     // trava na hora de pagar sozinho converte quando aparece essa porta. Fora do
     // expediente a oferta some: prometer especialista às 22h de domingo cria
     // expectativa que ninguém atende.
+    // Reveillon: o pacote e de 5 diarias no minimo. Se o hospede pedir menos e o
+    // periodo incluir o 31/12, o site NAO mostra disponibilidade - ele conclui
+    // que estamos lotados e desiste. Esticamos a busca para 5 diarias para que
+    // ele veja os valores, e a Bella explica a regra com naturalidade.
+    let contextoReveillon = '';
+    if (stay.checkin && stay.checkout) {
+      const entrada = new Date(stay.checkin + 'T12:00:00');
+      const saida = new Date(stay.checkout + 'T12:00:00');
+      const noites = Math.round((saida.getTime() - entrada.getTime()) / 86400000);
+
+      // A virada esta dentro da estadia? (a noite de 31/12 e a que conta)
+      const virada = new Date(`${entrada.getFullYear() + (entrada.getMonth() === 0 ? -1 : 0)}-12-31T12:00:00`);
+      const pegaVirada = entrada <= virada && virada < saida;
+
+      if (pegaVirada && noites > 0 && noites < 5) {
+        const novaSaida = new Date(entrada.getTime() + 5 * 86400000);
+        const iso = novaSaida.toISOString().slice(0, 10);
+        const original = `${stay.checkin} a ${stay.checkout}`;
+        stay.checkout = iso;
+        contextoReveillon =
+          `\n\nPACOTE DE RÉVEILLON: o hóspede pediu ${noites} diária(s) (${original}), mas a virada de ano é ` +
+          `pacote fechado de 5 diárias — com menos que isso o site nem mostra disponibilidade. ` +
+          `O link abaixo JÁ FOI AJUSTADO para as 5 diárias (até ${iso}), para ele conseguir ver os valores.\n` +
+          `Explique isso de forma leve e acolhedora, como uma característica da temporada e não como uma negativa: ` +
+          `no Réveillon a estadia é um pacote de 5 diárias, e por isso o link mostra o período completo. ` +
+          `Diga que o valor total é o mesmo de 1 a 5 diárias, então ele pode aproveitar os dias extras sem custo ` +
+          `adicional — é um ganho, e vale apresentar assim. Nada de "não é possível" ou "infelizmente".`;
+      }
+    }
+
     const ofertaAtendimento = isWithinBusinessHours()
       ? `\n\nOFERTA DE ATENDIMENTO HUMANO (o setor de reservas está atendendo AGORA): ` +
         `logo DEPOIS do link, acrescente UMA frase curta oferecendo que, se ele preferir fazer a reserva ` +
@@ -359,7 +389,7 @@ ${url}`;
       `o hóspede não sabe se aquilo é um orçamento, uma foto ou onde deve clicar.\n` +
       `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois — ` +
       `nunca grudado no texto nem logo após dois-pontos, senão o WhatsApp quebra o endereço.\n` +
-      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoDisponibilidade + ofertaAtendimento
+      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoDisponibilidade + contextoReveillon + ofertaAtendimento
     );
   }
 

@@ -47,12 +47,7 @@ const conhecimentos = [
   {
     title: 'Ano Novo / Réveillon — pacote mínimo de 5 diárias',
     content:
-      'QUANDO VALE: o pacote está ativo de 27/12 a 03/01, e alcança qualquer reserva que inclua o dia 31/12.\n' +
-      'A REGRA: mínimo de 5 diárias. De 1 a 5 diárias o valor TOTAL é o mesmo, porque o pacote é fechado — não existe diária avulsa nem valor proporcional. Acima de 5 diárias, as noites extras são cobradas normalmente.\n' +
-      'ATENÇÃO — o site NÃO explica isso: se o hóspede pesquisar menos de 5 diárias nesse período, o site simplesmente não mostra disponibilidade. Ele vai achar que o hotel está LOTADO, quando na verdade é a regra do pacote.\n' +
-      'Por isso, sempre que o hóspede pedir período que inclua o 31/12, AVISE ANTES de mandar o link: no Réveillon a reserva é um pacote de no mínimo 5 diárias, e a busca precisa ser feita com 5 diárias ou mais para aparecer disponibilidade.\n' +
-      'E se ele disser que "não aparece disponibilidade" ou "está lotado" para datas nesse período, verifique quantas noites ele pesquisou: quase sempre é isso. Explique a regra e oriente a refazer a busca com 5 diárias — não diga que estamos sem vagas.\n' +
-      'Como sempre, você NÃO informa valores: explique a regra e envie o link para ele consultar o total no site.',
+      'QUANDO VALE: o pacote está ativo de 27/12 a 03/01 e alcança qualquer reserva que inclua a virada (31/12). A REGRA: é um pacote fechado de 5 diárias, e de 1 a 5 diárias o valor TOTAL é o mesmo. Acima de 5, as noites extras entram normalmente. COMO FALAR (importante): apresente como característica da temporada e como VANTAGEM, nunca como negativa. Quem pediria 2 ou 3 diárias leva 5 pelo mesmo valor — são dias extras sem custo adicional para aproveitar a cidade na melhor época. Nada de "infelizmente", "não é possível" ou "só aceitamos": diga com leveza que no Réveillon a estadia é um pacote de 5 diárias e que o total já contempla o período completo. ATENÇÃO — o site não explica isso: pesquisando menos de 5 diárias nesse período ele simplesmente não mostra disponibilidade, e o hóspede acha que estamos lotados. Por isso o link enviado já vai com as 5 diárias, para ele ver os valores. Se ele disser que "não aparece disponibilidade" nessas datas, verifique quantas noites pesquisou: quase sempre é isso — explique a regra e oriente a refazer com 5 diárias, sem dizer que estamos sem vagas. Como sempre, você NÃO informa valores: explica a regra e envia o link.',
   },
   {
     title: 'Tipos de veículo aceitos no estacionamento',
