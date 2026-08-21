@@ -512,31 +512,42 @@
   // ---------- anexos (regras de pets, catálogo de ingressos) ----------
 
   /**
-   * Coloca o arquivo no campo de anexo do WhatsApp Web. Texto é fácil de
-   * inserir; arquivo não. Duas estratégias, porque o WhatsApp muda de tempos
-   * em tempos e uma delas costuma sobreviver:
-   *   1) input[type=file] escondido — funciona para qualquer arquivo (PDF inclusive)
-   *   2) colar como imagem na caixa de texto — só serve para imagem
-   * Em ambas quem confirma o envio é o atendente.
+   * Coloca o arquivo no campo de anexo do WhatsApp Web.
+   *
+   * IMPORTANTE — por que preferimos o campo de DOCUMENTO:
+   * o WhatsApp COMPRIME o que entra como "foto". As regras para pets e o
+   * catalogo de ingressos sao folhas cheias de texto miudo, e chegavam
+   * ilegiveis do outro lado. Enviado como documento, o arquivo vai intacto e o
+   * hospede consegue ampliar. Por isso ordenamos os campos: primeiro os que
+   * aceitam qualquer coisa (documento), depois os de midia.
+   *
+   * Em ambas as estrategias quem confirma o envio e o atendente.
    */
   function inserirArquivo(file) {
     const dt = new DataTransfer();
     dt.items.add(file);
 
-    const inputs = [...document.querySelectorAll('input[type="file"]')].filter((i) => {
+    const candidatos = [...document.querySelectorAll('input[type="file"]')].filter((i) => {
       const aceita = (i.accept || '').toLowerCase();
       return !aceita || aceita.includes('*') || aceita.includes(file.type) || aceita.includes(file.type.split('/')[0]);
     });
-    for (const input of inputs) {
+
+    // Campo de documento primeiro; o de imagem/video fica como reserva.
+    const ehMidia = (i) => /image|video/.test((i.accept || '').toLowerCase());
+    candidatos.sort((a, b) => Number(ehMidia(a)) - Number(ehMidia(b)));
+
+    for (const input of candidatos) {
       try {
         input.files = dt.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        return 'input';
+        return ehMidia(input) ? 'input-midia' : 'input-documento';
       } catch (_) {
-        /* tenta o próximo */
+        /* tenta o proximo */
       }
     }
 
+    // Ultimo recurso: colar na caixa de texto. So funciona para imagem, e aqui
+    // o WhatsApp trata como foto - ou seja, comprime.
     if (file.type.startsWith('image/')) {
       const box = composeBox();
       if (box) {
