@@ -61,6 +61,16 @@ No topo do painel da extensão aparece o modo atual. Ele é definido no **painel
 
 Em **todos** os modos o envio continua manual. "Automática" significa que o texto já vem pronto — não que ela responde ao hóspede sozinha.
 
+## Reinstalou a extensão? Refaça o login
+
+Ao **remover** a extensão, o Chrome apaga junto tudo o que ela guardava — inclusive o e-mail, a senha e o token de acesso. A instalação nova começa em branco, e o painel mostra:
+
+> Configure a extensão (clique no ícone da Bella).
+
+Não é erro: é só refazer o **Passo 3** (Configurar o login). Depois disso os atalhos e o modo voltam a carregar.
+
+> Isso não acontece ao apenas **atualizar** (substituir os arquivos e clicar em 🔄) — aí o login é preservado. Só some quando a extensão é removida.
+
 ## Como atualizar depois
 
 A pasta instalada é uma **cópia**: mudanças feitas no repositório não chegam sozinhas a ela.

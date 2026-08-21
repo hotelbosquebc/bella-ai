@@ -41,6 +41,18 @@ async function authed(path, options = {}) {
   return res.json();
 }
 
+/**
+ * Clique no icone da barra abre as opcoes.
+ *
+ * O icone anunciava "Bella - abrir configuracoes" mas nao tinha handler: nao
+ * acontecia nada. E o painel, quando falta login, manda justamente "clique no
+ * icone da Bella" - orientacao que nao levava a lugar nenhum. Aparece logo apos
+ * instalar ou reinstalar, que e quando o storage vem vazio.
+ */
+chrome.action.onClicked.addListener(() => {
+  chrome.runtime.openOptionsPage();
+});
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     try {
