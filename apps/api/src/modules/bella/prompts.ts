@@ -199,6 +199,27 @@ export const STAY_EXTRACTION_TOOL = {
           'O tipo de quarto JÁ informa a quantidade, mesmo sem número: "quarto casal"/"quarta casal"/"casal" = 2; "duplo" = 2; "triplo" = 3; "quádruplo" = 4; "individual"/"single" = 1. ' +
           '"eu e minha esposa" = 2. Preencha a partir disso em vez de deixar nulo.',
       },
+      apartamentos_detalhe: {
+        type: ['array', 'null'],
+        description:
+          'Um item por APARTAMENTO pedido, na ordem em que o hóspede listou. Preencha SEMPRE que ele pedir mais de um apartamento, ' +
+          'mesmo que as composições sejam iguais — é o que permite gerar um orçamento separado para cada um. ' +
+          'Converta a descrição em números: "1 casal" = 2 adultos; "3 adultos" = 3 adultos; "casal + 1 criança de 8" = 2 adultos e 1 criança de 7 a 9. ' +
+          'PET NÃO É PESSOA: "1 casal + 1 pet" = 2 adultos. Criança de 10 anos ou mais conta como ADULTO.',
+        items: {
+          type: 'object',
+          properties: {
+            adultos: { type: 'integer', description: 'Adultos (10 anos ou mais) NESTE apartamento' },
+            criancas0_6: { type: 'integer', description: 'Crianças de 0 a 6 anos NESTE apartamento' },
+            criancas7_9: { type: 'integer', description: 'Crianças de 7 a 9 anos NESTE apartamento' },
+            rotulo: {
+              type: 'string',
+              description: 'Como o hóspede descreveu este apartamento, curto. Ex.: "casal + pet", "3 adultos"',
+            },
+          },
+          required: ['adultos'],
+        },
+      },
       apartamentos: {
         type: ['integer', 'null'],
         description:

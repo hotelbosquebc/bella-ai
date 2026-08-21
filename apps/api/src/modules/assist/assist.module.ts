@@ -205,31 +205,58 @@ export class AssistController {
       );
     }
 
-    // Mais de um apartamento: a busca do site carrega a ocupação de UM
-    // apartamento — a quantidade é escolhida depois, no campo "Nº apartamentos"
-    // de cada categoria. Com composições diferentes (um casal, outro casal com
-    // duas crianças, etc.) um único link não representa o pedido, e mandar um
-    // link "de um apartamento" faz parecer que ignoramos o resto.
+    // Mais de um apartamento: UM LINK PARA CADA.
+    //
+    // Caso real: o hospede pediu "1 apartamento para 1 casal + 1 pet" e
+    // "1 apartamento para 3 adultos", pedindo valores SEPARADOS. Enviar um link
+    // so - ou o link sem ocupacao - faz parecer que metade do pedido foi
+    // ignorada. Como a busca aceita a ocupacao de um apartamento, geramos um
+    // link por composicao, cada um ja com a gente certa dentro.
+    const detalhe: any[] = Array.isArray(stay.apartamentos_detalhe) ? stay.apartamentos_detalhe : [];
+
+    if (detalhe.length > 1) {
+      const linhas = detalhe.map((a: any, i: number) => {
+        const url = this.reservations.buildBookingLink({
+          checkin: stay.checkin,
+          checkout: stay.checkout,
+          adults: Number(a.adultos) || 1,
+          children0_6: Number(a.criancas0_6) || 0,
+          children7_9: Number(a.criancas7_9) || 0,
+        } as any);
+        const rotulo = a.rotulo ? ` (${a.rotulo})` : '';
+        return `Apartamento ${i + 1}${rotulo}:\n${url}`;
+      });
+
+      const muitos = detalhe.length >= 4;
+      return (
+        `\n\nRESERVA DE ${detalhe.length} APARTAMENTOS — UM LINK PARA CADA.\n` +
+        `Primeiro confirme, em uma linha, a composição que você entendeu de cada apartamento. ` +
+        `Depois envie os links ABAIXO, na mesma ordem, cada um identificado e SOZINHO em sua linha, ` +
+        `com uma linha em branco antes e depois. Cada link já vem com a ocupação daquele apartamento, ` +
+        `então o hóspede vê o valor separado de cada um — que foi o que ele pediu.\n` +
+        `NÃO junte tudo num link só e NÃO envie um link sem ocupação.\n\n` +
+        linhas.join('\n\n') +
+        `\n\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` +
+        (muitos
+          ? `\nComo são vários apartamentos, ofereça também que a nossa equipe monte o orçamento completo, ` +
+            (isWithinBusinessHours()
+              ? `encaminhando agora ao especialista em reservas.`
+              : `informando o horário do setor — sem prometer atendimento imediato.`)
+          : '')
+      );
+    }
+
+    // Sabemos que são vários, mas não conseguimos separar as composições.
     if (Number(stay.apartamentos) > 1) {
       const linkBase = this.reservations.buildSearchLink(stay.checkin, stay.checkout);
-      const muitos = Number(stay.apartamentos) >= 4;
       return (
-        `\n\nRESERVA DE ${stay.apartamentos} APARTAMENTOS: ` +
-        `PRIMEIRO confirme a composição que você entendeu, apartamento por apartamento, com as idades das crianças. ` +
-        `Isso mostra ao hóspede que o pedido inteiro foi lido.\n` +
-        `ATENÇÃO: o link abre a busca com as DATAS, mas a ocupação vale para UM apartamento por vez. ` +
-        `NÃO apresente o link como se fosse o orçamento fechado do pedido todo — foi assim que já pareceu que ` +
-        `só um apartamento havia sido cotado. Explique que, na página, ele escolhe a categoria e ajusta ` +
-        `os hóspedes e o campo "Nº apartamentos" para cada composição.\n` +
-        `Link para enviar:\n${linkBase}\n` +
-        (muitos
-          ? `COMO SÃO VÁRIOS APARTAMENTOS, recomende de forma proativa que a nossa equipe monte o orçamento ` +
-            `completo — é mais rápido e evita erro na distribuição das crianças. ` +
-            (isWithinBusinessHours()
-              ? `O setor está atendendo agora: ofereça encaminhar imediatamente ao especialista em reservas.`
-              : `O setor NÃO está atendendo agora: informe o horário e ofereça a recepção 24h por telefone, sem prometer atendimento imediato.`)
-          : `Se ele preferir não montar sozinho, ofereça encaminhar à equipe de reservas (respeitando o horário do setor).`) +
-        `\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.`
+        `\n\nRESERVA DE ${stay.apartamentos} APARTAMENTOS (composição de cada um não ficou clara): ` +
+        `confirme com o hóspede quantas pessoas ficam em CADA apartamento — com isso você consegue ` +
+        `enviar um orçamento separado para cada um. Se ele já tiver dito e você não separou, releia a conversa.\n` +
+        `Se preferir adiantar, este link abre a busca pelas datas, e na página ele ajusta os hóspedes ` +
+        `e o campo "Nº apartamentos":\n${linkBase}\n` +
+        `NÃO apresente esse link como orçamento fechado do pedido todo.` +
+        ofertaAtendimento
       );
     }
 
