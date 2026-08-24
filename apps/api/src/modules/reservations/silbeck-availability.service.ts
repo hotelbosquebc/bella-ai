@@ -76,6 +76,88 @@ export class SilbeckAvailabilityService {
     }
   }
 
+
+  /**
+   * Diz em QUAL passo a consulta falha. Existe porque a producao respondeu
+   * "nao alcancou" em 318ms - rapido demais para timeout, cheiro de bloqueio -
+   * e o try/catch nao contava onde. Sem isso a correcao vira chute.
+   */
+  async diagnosticar(checkin: string, checkout: string, adultos: number) {
+    const passos: any[] = [];
+    const marcar = (nome: string, extra: any) => passos.push({ passo: nome, ...extra });
+    let cookies = '';
+
+    try {
+      const t0 = Date.now();
+      const inicial = await fetch(`${BASE}/${HOTEL}/pt-br/reserva/`, { headers: { 'User-Agent': UA } });
+      const corpo = await inicial.text();
+      cookies = this.acumularCookies(cookies, inicial);
+      const ref = this.extrairRef(corpo);
+      marcar('GET /reserva/', {
+        status: inicial.status,
+        ms: Date.now() - t0,
+        bytes: corpo.length,
+        achouToken: Boolean(ref),
+        cookies: cookies ? cookies.split('; ').length : 0,
+        amostra: corpo.slice(0, 200).replace(/\s+/g, ' '),
+      });
+      if (!ref) return { falhouEm: 'token', passos };
+
+      const cabecalhos: Record<string, string> = {
+        'User-Agent': UA,
+        ChaveHotel: HOTEL,
+        RequestLang: 'pt-br',
+        'X-Client-Ref': ref,
+        'X-Requested-With': 'XMLHttpRequest',
+      };
+      const formulario =
+        `data_inicio=${encodeURIComponent(this.paraFormularioBR(checkin))}` +
+        `&data_fim=${encodeURIComponent(this.paraFormularioBR(checkout))}` +
+        `&categorias_hospede%5B000001%5D=${adultos}` +
+        `&categorias_hospede%5B000003%5D=0&categorias_hospede%5B000004%5D=0&codigo_promocional=`;
+
+      const t1 = Date.now();
+      const busca = await fetch(`${BASE}/api/hotel/busca-disponibilidades`, {
+        method: 'POST',
+        headers: { ...cabecalhos, 'Content-Type': 'application/x-www-form-urlencoded', Cookie: cookies },
+        body: new URLSearchParams({ urlHotel: HOTEL, formulario, acao: 'consultaDisponibilidade' }).toString(),
+      });
+      const textoBusca = await busca.text();
+      cookies = this.acumularCookies(cookies, busca);
+      marcar('POST /busca-disponibilidades', {
+        status: busca.status,
+        ms: Date.now() - t1,
+        resposta: textoBusca.slice(0, 200),
+      });
+
+      const t2 = Date.now();
+      const pagina = await fetch(
+        `${BASE}/${HOTEL}/pt-br/reserva/busca/?checkin=${checkin}&checkout=${checkout}&adultos-000001=${adultos}`,
+        { headers: { ...cabecalhos, Cookie: cookies } },
+      );
+      const textoPagina = await pagina.text();
+      cookies = this.acumularCookies(cookies, pagina);
+      const ref2 = this.extrairRef(textoPagina) || ref;
+      marcar('GET /reserva/busca/', { status: pagina.status, ms: Date.now() - t2, bytes: textoPagina.length });
+
+      const t3 = Date.now();
+      const listagem = await fetch(`${BASE}/api/hotel/listagem`, {
+        headers: { ...cabecalhos, 'X-Client-Ref': ref2, Cookie: cookies },
+      });
+      const textoListagem = await listagem.text();
+      marcar('GET /listagem', {
+        status: listagem.status,
+        ms: Date.now() - t3,
+        bytes: textoListagem.length,
+        amostra: textoListagem.slice(0, 200),
+      });
+
+      return { falhouEm: null, passos };
+    } catch (e) {
+      marcar('excecao', { erro: e instanceof Error ? e.message : String(e) });
+      return { falhouEm: 'excecao', passos };
+    }
+  }
   /** Junta os cookies de uma resposta ao que já tínhamos. */
   private acumularCookies(atual: string, res: Response): string {
     const novos: string[] = (res.headers as any).getSetCookie?.() ?? [];

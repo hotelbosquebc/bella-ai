@@ -499,11 +499,13 @@ ${url}`;
     const inicio = Date.now();
     try {
       const r = await this.disponibilidade.consultar(checkin, checkout, Number(adultos) || 2);
+      const detalhe = r ? null : await this.disponibilidade.diagnosticar(checkin, checkout, Number(adultos) || 2);
       return {
         ok: true,
         alcancouOSilbeck: r !== null,
         ms: Date.now() - inicio,
         resultado: r,
+        detalhe,
       };
     } catch (e) {
       return {
