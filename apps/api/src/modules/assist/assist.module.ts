@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Module, Post, Query } from '@nestjs/common';
 import { createHash } from 'crypto';
+import { Public } from '../auth/public.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BellaModule } from '../bella/bella.module';
 import { ModelRouterService } from '../bella/model-router.service';
@@ -472,6 +473,45 @@ ${url}`;
           enviado: f.enviado,
         })),
     };
+  }
+
+  /**
+   * Diagnóstico: a produção consegue mesmo consultar o Silbeck?
+   *
+   * A consulta de disponibilidade vive dentro de um try/catch que, ao falhar,
+   * segue sem falar de procura — o que é seguro, mas SILENCIOSO. Se o Render não
+   * alcançar o site (bloqueio de IP, timeout), a trava de "sem disponibilidade"
+   * simplesmente não roda e o link sai como se houvesse vaga. Este endpoint
+   * responde se a consulta funciona AQUI, no servidor, e não só na máquina do dev.
+   *
+   * Só devolve disponibilidade, que é informação pública do site do hotel.
+   */
+  @Public()
+  @Get('diagnostico-disponibilidade')
+  async diagnosticoDisponibilidade(
+    @Query('checkin') checkin: string,
+    @Query('checkout') checkout: string,
+    @Query('adultos') adultos?: string,
+  ) {
+    if (!checkin || !checkout) {
+      return { ok: false, erro: 'informe checkin e checkout (AAAA-MM-DD)' };
+    }
+    const inicio = Date.now();
+    try {
+      const r = await this.disponibilidade.consultar(checkin, checkout, Number(adultos) || 2);
+      return {
+        ok: true,
+        alcancouOSilbeck: r !== null,
+        ms: Date.now() - inicio,
+        resultado: r,
+      };
+    } catch (e) {
+      return {
+        ok: false,
+        ms: Date.now() - inicio,
+        erro: e instanceof Error ? e.message : String(e),
+      };
+    }
   }
   /**
    * A Bella deve agir agora? A extensão do WhatsApp Web consulta isto ao abrir
