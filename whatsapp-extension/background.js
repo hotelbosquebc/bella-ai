@@ -49,6 +49,72 @@ async function authed(path, options = {}) {
  * icone da Bella" - orientacao que nao levava a lugar nenhum. Aparece logo apos
  * instalar ou reinstalar, que e quando o storage vem vazio.
  */
+
+/**
+ * Consulta a disponibilidade no Silbeck A PARTIR DO NAVEGADOR do atendente.
+ *
+ * POR QUE AQUI E NAO NO SERVIDOR
+ * O site e protegido por Cloudflare. Do Render (datacenter) a primeira chamada
+ * volta 403 "Just a moment..." e a consulta nunca acontece - descoberto com o
+ * endpoint de diagnostico. Do navegador do hotel o acesso parte de um IP
+ * residencial comum e passa normalmente, como quando alguem abre o site.
+ *
+ * Somente leitura da busca publica: nao cria reserva nem segura apartamento.
+ */
+const SILBECK = 'https://sbreserva.silbeck.com.br';
+const SILBECK_HOTEL = 'hotelbosque';
+
+function dataBR(iso) {
+  const p = String(iso).split('-');
+  return p[2] + '/' + p[1] + '/' + p[0];
+}
+
+async function consultarDisponibilidadeSilbeck({ checkin, checkout, adultos, criancas0a6, criancas7a9 }) {
+  const inicial = await fetch(SILBECK + '/' + SILBECK_HOTEL + '/pt-br/reserva/', { credentials: 'include' });
+  const html = await inicial.text();
+  const ref = (html.match(/sbClientRef\s*=\s*'([a-f0-9]+)'/i) || [])[1];
+  if (!ref) return { erro: 'token nao encontrado (status ' + inicial.status + ')' };
+
+  const cabecalhos = {
+    ChaveHotel: SILBECK_HOTEL,
+    RequestLang: 'pt-br',
+    'X-Client-Ref': ref,
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+
+  const formulario =
+    'data_inicio=' + encodeURIComponent(dataBR(checkin)) +
+    '&data_fim=' + encodeURIComponent(dataBR(checkout)) +
+    '&categorias_hospede%5B000001%5D=' + (adultos || 1) +
+    '&categorias_hospede%5B000003%5D=' + (criancas0a6 || 0) +
+    '&categorias_hospede%5B000004%5D=' + (criancas7a9 || 0) +
+    '&codigo_promocional=';
+
+  const busca = await fetch(SILBECK + '/api/hotel/busca-disponibilidades', {
+    method: 'POST',
+    credentials: 'include',
+    headers: Object.assign({ 'Content-Type': 'application/x-www-form-urlencoded' }, cabecalhos),
+    body: new URLSearchParams({ urlHotel: SILBECK_HOTEL, formulario: formulario, acao: 'consultaDisponibilidade' }).toString(),
+  });
+  const respBusca = await busca.json().catch(() => ({}));
+  if (respBusca && respBusca.erro) return { erro: respBusca.erro };
+
+  // A sessao so passa a apontar para esta busca depois de visitar a pagina.
+  const pagina = await fetch(
+    SILBECK + '/' + SILBECK_HOTEL + '/pt-br/reserva/busca/?checkin=' + checkin + '&checkout=' + checkout + '&adultos-000001=' + (adultos || 1),
+    { credentials: 'include' },
+  );
+  const htmlPagina = await pagina.text();
+  const ref2 = (htmlPagina.match(/sbClientRef\s*=\s*'([a-f0-9]+)'/i) || [])[1] || ref;
+
+  const listagem = await fetch(SILBECK + '/api/hotel/listagem', {
+    credentials: 'include',
+    headers: Object.assign({}, cabecalhos, { 'X-Client-Ref': ref2 }),
+  });
+  const dados = await listagem.json().catch(() => ({}));
+  return { html: (dados && dados.html) || '' };
+}
+
 chrome.action.onClicked.addListener(() => {
   chrome.runtime.openOptionsPage();
 });
@@ -80,6 +146,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg.type === 'QUICK_REPLIES') {
         const list = await authed(`/api/quick-replies?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: list });
+      } else if (msg.type === 'DISPONIBILIDADE') {
+        // Consulta feita daqui porque o servidor e barrado pelo Cloudflare.
+        const r = await consultarDisponibilidadeSilbeck(msg);
+        sendResponse({ ok: !r.erro, data: r });
       } else if (msg.type === 'FEEDBACK') {
         // O que a Bella sugeriu x o que o atendente realmente enviou.
         // Se falhar, nao atrapalha o atendimento: e so material de treino.
@@ -98,7 +168,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg.type === 'SUGGEST') {
         const out = await authed(`/api/assist/suggest`, {
           method: 'POST',
-          body: JSON.stringify({ hotelId: HOTEL_ID, conversation: msg.conversation, lastMessage: msg.lastMessage }),
+          body: JSON.stringify({
+            hotelId: HOTEL_ID,
+            conversation: msg.conversation,
+            lastMessage: msg.lastMessage,
+            disponibilidadeHtml: msg.disponibilidadeHtml,
+          }),
         });
         sendResponse({ ok: true, data: out });
       } else {

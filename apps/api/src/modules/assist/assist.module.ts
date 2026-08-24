@@ -124,7 +124,20 @@ export class AssistController {
    * quando estiverem completas, monta o link do motor oficial. Se faltar algo,
    * instrui a pedir APENAS o que falta (sem prometer verificar valores).
    */
-  private async bookingContext(conversation: string): Promise<string> {
+  /**
+   * Extracao guardada por 2 minutos.
+   *
+   * A resposta pode precisar de duas passagens: a primeira descobre as datas, a
+   * extensao consulta a disponibilidade no Silbeck (o servidor e barrado pelo
+   * Cloudflare) e chama de novo. Sem este cache, a mesma conversa pagaria duas
+   * chamadas de IA so para extrair os mesmos dados.
+   */
+  private readonly extracaoCache = new Map<string, { stay: any; ts: number }>();
+
+  private async extrair(conversation: string): Promise<any> {
+    const chave = createHash('sha256').update(conversation).digest('hex').slice(0, 16);
+    const guardado = this.extracaoCache.get(chave);
+    if (guardado && Date.now() - guardado.ts < 120000) return guardado.stay;
     const today = new Date().toISOString().slice(0, 10);
     const extraction = await this.ai.complete({
       task: 'booking_extraction',
@@ -135,7 +148,13 @@ export class AssistController {
       temperature: 0,
       tools: [STAY_EXTRACTION_TOOL],
     });
-    const stay: any = extraction.toolInput ?? {};
+    const extraido: any = extraction.toolInput ?? {};
+    this.extracaoCache.set(chave, { stay: extraido, ts: Date.now() });
+    return extraido;
+  }
+
+  private async bookingContext(conversation: string, htmlDisponibilidade?: string): Promise<string> {
+    const stay: any = await this.extrair(conversation);
     if (stay.intent !== 'booking') return '';
 
     // Trava contra data inventada.
@@ -290,6 +309,37 @@ export class AssistController {
 ${url}`;
       });
 
+      const totalPessoas = detalhe.reduce(
+        (s: number, a: any) =>
+          s + (Number(a.adultos) || 0) + (Number(a.criancas0_6) || 0) + (Number(a.criancas7_9) || 0),
+        0,
+      );
+
+      // Cabe tudo num apartamento so? Entao NAO decida por ele.
+      //
+      // Caso real: "4 pessoas, 2 casais". Isso tanto pode ser dois apartamentos
+      // quanto um unico com as quatro pessoas - o limite e 6 por apartamento. A
+      // Bella escolheu "dois duplos" sozinha, e a opcao mais barata nem foi
+      // apresentada. Quando couber junto, oferecemos as DUAS possibilidades e
+      // quem escolhe e o hospede.
+      let opcaoJuntos = '';
+      if (totalPessoas > 1 && totalPessoas <= 6) {
+        const juntos = this.reservations.buildBookingLink({
+          checkin: stay.checkin,
+          checkout: stay.checkout,
+          adults: detalhe.reduce((s: number, a: any) => s + (Number(a.adultos) || 0), 0),
+          children0_6: detalhe.reduce((s: number, a: any) => s + (Number(a.criancas0_6) || 0), 0),
+          children7_9: detalhe.reduce((s: number, a: any) => s + (Number(a.criancas7_9) || 0), 0),
+        } as any);
+        opcaoJuntos =
+          `\n\nATENÇÃO — O HÓSPEDE NÃO DEIXOU CLARO se quer apartamentos SEPARADOS ou TODOS JUNTOS. ` +
+          `As ${totalPessoas} pessoas cabem em um único apartamento (o limite é 6). NÃO escolha por ele: ` +
+          `apresente as DUAS opções, de forma curta, e deixe ele decidir.\n` +
+          `Opção "todos no mesmo apartamento" — link:\n${juntos}\n` +
+          `Diga algo no espírito de: "posso montar de duas formas — em apartamentos separados ou todos juntos ` +
+          `num só; veja as duas e me diga qual prefere". Ofereça primeiro a que ele parece querer, mas mostre ambas.`;
+      }
+
       const muitos = detalhe.length >= 4;
       return (
         `\n\nRESERVA DE ${detalhe.length} APARTAMENTOS — UM LINK PARA CADA.\n` +
@@ -299,7 +349,7 @@ ${url}`;
         `então o hóspede vê o valor separado de cada um — que foi o que ele pediu.\n` +
         `NÃO junte tudo num link só e NÃO envie um link sem ocupação.\n\n` +
         linhas.join('\n\n') +
-        `\n\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` +
+        `\n\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` + opcaoJuntos +
         (muitos
           ? `\nComo são vários apartamentos, ofereça também que a nossa equipe monte o orçamento completo, ` +
             (isWithinBusinessHours()
@@ -328,13 +378,18 @@ ${url}`;
     // válida (e passaria de 6 pessoas, o que o site recusaria).
     let contextoDisponibilidade = '';
     try {
-      const disp = await this.disponibilidade.consultar(
-        stay.checkin,
-        stay.checkout,
-        Number(stay.adults) || 1,
-        Number(stay.children0_6) || 0,
-        Number(stay.children7_9) || 0,
-      );
+      // O html vem da extensao (navegador do atendente). Se nao veio, tentamos
+      // do servidor - hoje bloqueado pelo Cloudflare, entao normalmente volta
+      // null e a resposta sai sem falar de disponibilidade.
+      const disp = htmlDisponibilidade
+        ? this.disponibilidade.interpretar(htmlDisponibilidade)
+        : await this.disponibilidade.consultar(
+            stay.checkin,
+            stay.checkout,
+            Number(stay.adults) || 1,
+            Number(stay.children0_6) || 0,
+            Number(stay.children7_9) || 0,
+          );
 
       if (disp && disp.semDisponibilidade) {
         // Basta UM dia lotado no meio do período para o site não devolver nada.
@@ -542,7 +597,7 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
     const focus = body.lastMessage || conversation;
@@ -559,7 +614,7 @@ ${url}`;
       this.prisma.hotel.findUnique({ where: { id: hotelId } }),
       this.policies.findRelevant(hotelId, focus),
       this.knowledge.getKnowledgeContext(hotelId),
-      this.bookingContext(conversation),
+      this.bookingContext(conversation, body.disponibilidadeHtml),
       this.anexosRelevantes(focus, hotelId),
     ]);
 
@@ -590,7 +645,24 @@ ${url}`;
       temperature: settings?.temperature ?? 0.7,
     });
 
-    return { suggestion: formatarParaWhatsApp(draft.text), model: draft.model, attachments: anexos };
+    // Se ha datas mas ninguem consultou a disponibilidade, pedimos que a
+    // extensao consulte e chame de novo. O servidor nao consegue: o Cloudflare
+    // do Silbeck bloqueia o IP do Render (403 "Just a moment").
+    let precisaDisponibilidade = null;
+    if (!body.disponibilidadeHtml) {
+      const s: any = await this.extrair(conversation);
+      if (s && s.intent === 'booking' && s.checkin && s.checkout) {
+        precisaDisponibilidade = {
+          checkin: s.checkin,
+          checkout: s.checkout,
+          adultos: Number(s.adults) || 1,
+          criancas0a6: Number(s.children0_6) || 0,
+          criancas7a9: Number(s.children7_9) || 0,
+        };
+      }
+    }
+
+    return { suggestion: formatarParaWhatsApp(draft.text), model: draft.model, attachments: anexos, precisaDisponibilidade };
   }
 }
 

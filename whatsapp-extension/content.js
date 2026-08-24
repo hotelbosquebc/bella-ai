@@ -720,6 +720,24 @@
     );
     try {
       const r = await send('SUGGEST', { conversation, lastMessage });
+
+      // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
+      // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
+      // navegador do hotel, a consulta passa normalmente.
+      if (r && r.ok && r.data && r.data.precisaDisponibilidade) {
+        status('Consultando disponibilidade real…');
+        const d = await send('DISPONIBILIDADE', r.data.precisaDisponibilidade);
+        if (d && d.ok && d.data && d.data.html) {
+          const r2 = await send('SUGGEST', {
+            conversation: conversation,
+            lastMessage: lastMessage,
+            disponibilidadeHtml: d.data.html,
+          });
+          if (r2 && r2.ok && r2.data && r2.data.suggestion) {
+            r.data = r2.data;
+          }
+        }
+      }
       if (!r || !r.ok) {
         status(r ? r.error : 'Falha ao sugerir.', true);
         return;
