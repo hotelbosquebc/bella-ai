@@ -155,10 +155,10 @@ const conhecimentos = [
   {
     title: 'Categorias de apartamentos',
     content:
-      'São 4 categorias: Standard, Superior, Luxo e Suíte Bosque.\n' +
-      'TODAS têm a mesma planta: sala de estar com sofá, TV LCD 32" a cabo (54 canais), telefone/interfone, mesa com cadeiras, sacada com vista, cozinha equipada (geladeira, fogão, pia e utensílios básicos), 2 dormitórios (um com cama de casal box queen size e outro com 2 camas de solteiro box), ar-condicionado frio de janela nos dois dormitórios, banheiro e pequena área de serviço com tanque.\n' +
-      'DIFERENÇAS: a Suíte Bosque é a única com DOIS banheiros (social + suíte do casal) e chuveiro com aquecimento a GÁS. Superior e Luxo têm um banheiro, chuveiro elétrico e TV na sala e no quarto de casal. A Standard tem um banheiro, chuveiro elétrico e TV apenas na sala de estar.\n' +
-      'LUXO x SUPERIOR: a planta é a mesma; o que muda é o ANDAR e detalhes de mobiliário. A Luxo foi a última das duas a passar por reforma, então está mais atualizada. Se o hóspede perguntar a diferença, responda exatamente isso — não invente vista, metragem nem comodidade que não esteja listada aqui.',
+      'São 4 categorias, do andar mais baixo para o mais alto: Standard (1º e 2º), Luxo (3º e 4º), Superior (5º e 6º) e Suíte Bosque (7º e 8º).\n' +
+      'TODAS têm a mesma planta: sala de estar com sofá, TV LCD 32" a cabo (54 canais), telefone/interfone, mesa com cadeiras, sacada com vista, cozinha equipada (geladeira, fogão, pia e utensílios básicos, incluindo jogo de panelas e talheres), 2 dormitórios (um com cama de casal box queen size e outro com 2 camas de solteiro box), ar-condicionado frio de janela nos dois dormitórios, banheiro e pequena área de serviço com tanque.\n' +
+      'DIFERENÇAS: a Suíte Bosque é a única com DOIS banheiros (social + suíte do casal) e chuveiro com aquecimento a GÁS. Standard, Luxo e Superior têm um banheiro e chuveiro ELÉTRICO. A Standard tem TV apenas na sala; Luxo e Superior têm TV também no quarto de casal.\n' +
+      'LUXO x SUPERIOR — cuidado, é pergunta frequente: a planta é a mesma e a diferença NÃO é o andar. O Luxo fica MAIS BAIXO (3º e 4º) que o Superior (5º e 6º). O que distingue o Luxo é o MOBILIÁRIO: foi a última das duas a passar por reforma, então está mais atualizada. Nunca diga que o Luxo fica em andar mais alto, e não invente vista, metragem ou comodidade que não esteja listada aqui.',
   },
   {
     title: 'Limpeza dos apartamentos',
@@ -245,7 +245,7 @@ const conhecimentos = [
   {
     title: 'Andares das categorias',
     content:
-      'ANDARES DE CADA CATEGORIA — responda com isto quando perguntarem sobre andar, altura ou vista. Apartamento Standard: 1º e 2º andar. Apartamento Superior: 5º e 6º andar. Suíte Bosque: 7º e 8º andar, os mais altos do hotel. Apartamento Luxo: o andar não está registrado aqui — NÃO invente; diga que confirma com a recepção. "Último andar", "andar mais alto" ou "lá em cima" = Suíte Bosque. Nunca prometa um andar específico dentro da categoria nem um número de apartamento: a distribuição é feita pela recepção conforme a ocupação do dia.',
+      'MAPA COMPLETO DOS ANDARES (informe exatamente assim quando perguntarem sobre andar, altura ou vista): 1º e 2º andar = Apartamento Standard. 3º e 4º andar = Apartamento Luxo. 5º e 6º andar = Apartamento Superior. 7º e 8º andar = Suíte Bosque. ATENÇÃO - erro comum: o LUXO NÃO fica mais alto que o Superior; ele fica ABAIXO (3º-4º contra 5º-6º). Nunca deduza o andar pelo nome da categoria nem associe "mais caro" ou "melhor" a "mais alto" - a ordem dos andares não segue a ordem das categorias. "Último andar", "andar mais alto" ou "lá em cima" = Suíte Bosque. Nunca prometa um andar específico dentro da categoria nem um número de apartamento: a distribuição é da recepção, conforme a ocupação do dia.',
   },
 ];
 
