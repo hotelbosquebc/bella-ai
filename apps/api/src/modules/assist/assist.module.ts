@@ -157,6 +157,18 @@ export class AssistController {
     const stay: any = await this.extrair(conversation);
     if (stay.intent !== 'booking') return '';
 
+    // As travas abaixo olham SOMENTE o que o HÓSPEDE escreveu.
+    //
+    // Caso real: hóspede perguntou só "qual valor da diária" e recebeu um link
+    // com 03 a 04/09 para 1 adulto e 1 criança - nada disso foi dito. A trava de
+    // data existia, mas eu a aplicava sobre a conversa INTEIRA, e a nossa própria
+    // mensagem automática contém "Segunda a sexta-feira". Um nome de dia da
+    // semana no NOSSO texto validava uma data que o hóspede nunca deu.
+    const falasDoHospede = (conversation || '')
+      .split(/\r?\n/)
+      .filter((l) => /^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(l))
+      .join('\n');
+
     // Trava contra data inventada.
     //
     // Caso real: a hospede escreveu apenas "valor para 5 adultos, seria 1
@@ -168,9 +180,9 @@ export class AssistController {
     const temDataRelativa = /\b(hoje|amanh[ãa]|fim de semana|final de semana|feriado|natal|ano novo|r[ée]veillon|carnaval|p[áa]scoa)\b/i;
     const temDiaDaSemana = /\b(segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo)\b/i;
     const mencionaData =
-      temNumeroDeData.test(conversation) ||
-      temDataRelativa.test(conversation) ||
-      temDiaDaSemana.test(conversation);
+      temNumeroDeData.test(falasDoHospede) ||
+      temDataRelativa.test(falasDoHospede) ||
+      temDiaDaSemana.test(falasDoHospede);
 
     if (!mencionaData && (stay.checkin || stay.checkout)) {
       stay.checkin = null;
@@ -190,10 +202,10 @@ export class AssistController {
     const temTipoDeQuarto = /\b(casal|duplo|dupla|triplo|tripla|qu[áa]druplo|individual|single|solteiro)\b/i;
     const temComposicao = /\b(somos|seremos|s[ãa]o)\s+\d+|\bsozinh[oa]\b|\beu e (a |o |minha |meu )/i;
     const mencionaPessoas =
-      temNumeroDePessoas.test(conversation) ||
-      temPessoasPorExtenso.test(conversation) ||
-      temTipoDeQuarto.test(conversation) ||
-      temComposicao.test(conversation);
+      temNumeroDePessoas.test(falasDoHospede) ||
+      temPessoasPorExtenso.test(falasDoHospede) ||
+      temTipoDeQuarto.test(falasDoHospede) ||
+      temComposicao.test(falasDoHospede);
 
     if (!mencionaPessoas && stay.adults) {
       stay.adults = null;
