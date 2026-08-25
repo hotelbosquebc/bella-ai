@@ -306,6 +306,37 @@ export class AssistController {
     };
 
     const detalhe: any[] = Array.isArray(stay.apartamentos_detalhe) ? stay.apartamentos_detalhe : [];
+    // Grupo e ocupacao impossivel — antes de montar qualquer link.
+    //
+    // Caso real: pedido para 30 pessoas gerou um link com "adultos=30" num
+    // unico apartamento. O limite e 6 por apartamento, entao esse link nao
+    // significa nada: o site nao teria como atender.
+    //
+    // Regra do hotel: acima de 15 pessoas e GRUPO e quem atende e a equipe.
+    const totalNoPedido =
+      (Number(stay.adults) || 0) + (Number(stay.children0_6) || 0) + (Number(stay.children7_9) || 0);
+
+    if (totalNoPedido > 15) {
+      return (
+        `\n\nGRUPO (${totalNoPedido} pessoas): acima de 15 pessoas o atendimento é feito pela nossa equipe. ` +
+        `NÃO envie link e NÃO tente montar orçamento. Confirme com cordialidade o que entendeu ` +
+        `(período e número de pessoas), diga que para grupos desse tamanho quem monta a proposta é a ` +
+        `equipe de reservas — que consegue condições e organização que o site não oferece — e encaminhe.` +
+        (isWithinBusinessHours()
+          ? ` O setor está atendendo agora: diga que já está encaminhando ao especialista.`
+          : ` O setor NÃO está atendendo agora: informe o horário de atendimento e ofereça a recepção 24h pelo telefone, sem prometer retorno imediato.`)
+      );
+    }
+
+    if (totalNoPedido > 6 && !(detalhe.length > 1)) {
+      return (
+        `\n\nOCUPAÇÃO ACIMA DO LIMITE (${totalNoPedido} pessoas): cada apartamento acomoda no MÁXIMO 6 pessoas, ` +
+        `então isso não cabe num apartamento só e um link único não serve. NÃO envie link agora. ` +
+        `Confirme o total e pergunte como ele prefere dividir — quantas pessoas em cada apartamento — ` +
+        `para você montar um orçamento por apartamento. Se preferir, ofereça que a equipe de reservas monte a divisão.`
+      );
+    }
+
 
     if (detalhe.length > 1) {
       const linhas = detalhe.map((a: any, i: number) => {
