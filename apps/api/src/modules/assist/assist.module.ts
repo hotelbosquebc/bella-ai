@@ -155,7 +155,15 @@ export class AssistController {
 
   private async bookingContext(conversation: string, htmlDisponibilidade?: string): Promise<string> {
     const stay: any = await this.extrair(conversation);
-    if (stay.intent !== 'booking') return '';
+    // Tem dados de estadia? Entao e orcamento, qualquer que seja o rotulo.
+    //
+    // Caso real: "preciso saber o valor total das diarias para check in sexta
+    // (28/08) e check out segunda. Para casal". O extrator classificou como
+    // 'question' (ele pediu um VALOR), o link nunca foi montado e a Bella
+    // improvisou mandando o endereco generico do site - sem datas, sem pessoas.
+    // Perguntar o preco de um periodo E pedir orcamento.
+    const temDadosDeEstadia = Boolean(stay.checkin && stay.checkout && stay.adults);
+    if (stay.intent !== 'booking' && !temDadosDeEstadia) return '';
 
     // As travas abaixo olham SOMENTE o que o HÓSPEDE escreveu.
     //
