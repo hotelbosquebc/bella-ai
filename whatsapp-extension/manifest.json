@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Bella — Assistente do Hotel do Bosque",
   "description": "Co-piloto de atendimento no WhatsApp Web: atalhos e sugestões da Bella. O envio é sempre manual.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "permissions": [
     "storage"
   ],

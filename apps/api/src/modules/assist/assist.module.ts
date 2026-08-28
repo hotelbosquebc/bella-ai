@@ -502,6 +502,25 @@ ${url}`;
   }
 
 
+
+  /**
+   * Transcreve um audio recebido no WhatsApp.
+   *
+   * A extensao le apenas .copyable-text, que so existe em mensagem de TEXTO -
+   * entao audio chegava invisivel para a Bella e ela parecia ignorar o hospede.
+   * O servidor ja sabia transcrever (era usado no canal oficial da Meta); aqui
+   * so abrimos esse caminho para a extensao, que captura o audio no navegador.
+   */
+  @Post('transcrever')
+  async transcrever(@Body() body: { base64?: string; mimeType?: string }) {
+    if (!body.base64) return { ok: false, erro: 'audio vazio' };
+    try {
+      const texto = await this.ai.transcribeAudio(body.base64, body.mimeType || 'audio/ogg');
+      return { ok: Boolean(texto), texto: texto || '' };
+    } catch (e) {
+      return { ok: false, erro: e instanceof Error ? e.message : String(e) };
+    }
+  }
   /**
    * Registra o que a Bella sugeriu x o que o atendente realmente enviou.
    *

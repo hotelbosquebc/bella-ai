@@ -309,25 +309,45 @@
     // atributo data-pre-plain-text="[10:02, 13/08/2026] Fulano: ", que traz
     // remetente, data e hora prontos. É mais estável que as classes
     // message-in/message-out, que esta versão do WhatsApp NÃO usa mais.
-    const baloes = [...main.querySelectorAll('.copyable-text[data-pre-plain-text]')];
-    if (baloes.length) {
+    // Percorremos os BALOES da conversa, nao so os textos: mensagem de voz nao
+    // tem .copyable-text e, se olhassemos so por ela, o audio sumiria da
+    // conversa - foi por isso que a Bella parecia ignorar quem mandava audio.
+    const linhasDaConversa = [...main.querySelectorAll('div[role="row"]')];
+    const temTexto = main.querySelector('.copyable-text[data-pre-plain-text]');
+    if (temTexto || linhasDaConversa.length) {
       const titulo = tituloDaConversa();
       const msgs = [];
       const estruturado = [];
       let lastIn = '';
-      for (const el of baloes) {
-        const attr = el.getAttribute('data-pre-plain-text') || '';
-        const m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
-        const remetente = m ? m[3] : '';
-        const t = (el.innerText || '').replace(/ /g, ' ').trim();
+
+      for (const row of linhasDaConversa) {
+        const el = row.querySelector('.copyable-text[data-pre-plain-text]');
+
+        let t = null;
+        let m = null;
+        let isIn = null;
+
+        if (el) {
+          const attr = el.getAttribute('data-pre-plain-text') || '';
+          m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
+          const remetente = m ? m[3] : '';
+          t = (el.innerText || '').replace(/ /g, ' ').trim();
+          isIn = titulo ? remetente === titulo : !/hotel do bosque|recep|reserva/i.test(remetente);
+        } else if (audiosLidos.has(row)) {
+          t = audiosLidos.get(row);
+          // Sem data-pre-plain-text no audio: quem envia e identificado pelo
+          // data-id, que comeca com "true_" nas mensagens proprias.
+          const id = row.getAttribute('data-id') || '';
+          isIn = id ? !id.startsWith('true_') : !row.querySelector('[data-icon^="msg-"]');
+        }
+
         if (!t || t.length > 4000) continue;
-        // É do hóspede quando o remetente é o próprio contato da conversa.
-        const isIn = titulo ? remetente === titulo : !/hotel do bosque|recep|reserva/i.test(remetente);
         const ehHoje = m && m[2] === hoje;
         msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
         estruturado.push({ linha: msgs[msgs.length - 1], ord: ordemDe(m ? m[2] : null, m ? m[1] : null) });
         if (isIn) lastIn = t;
       }
+
       if (msgs.length) {
         return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado };
       }
@@ -599,6 +619,78 @@
   }
 
 
+
+  /* ---------- audios ---------- */
+
+  /**
+   * A Bella lia apenas .copyable-text, que so existe em mensagem de TEXTO.
+   * Audio chegava invisivel para ela: nem sabia que o hospede tinha falado, e
+   * parecia estar ignorando. Aqui detectamos o balao de audio, capturamos o
+   * arquivo e mandamos transcrever no servidor (que ja sabia fazer isso).
+   *
+   * Cache por src: o mesmo audio nao e transcrito duas vezes.
+   */
+  const transcricoes = new Map();
+
+  /** O balao e uma mensagem de voz? */
+  function ehAudio(row) {
+    if (row.querySelector('audio')) return true;
+    const icones = [...row.querySelectorAll('[data-icon]')].map((e) => e.getAttribute('data-icon') || '');
+    if (icones.some((ic) => /ptt|audio|mic/i.test(ic))) return true;
+    const rotulos = [...row.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') || '');
+    return rotulos.some((r) => /mensagem de voz|voice message|reproduzir|play/i.test(r));
+  }
+
+  /** Converte o audio do balao em base64, se o WhatsApp ja tiver carregado. */
+  async function audioEmBase64(row) {
+    const el = row.querySelector('audio');
+    const src = el && el.src;
+    if (!src) return null;
+    try {
+      const resp = await fetch(src);
+      const buf = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 8192) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+      }
+      return { base64: btoa(bin), mimeType: resp.headers.get('Content-Type') || 'audio/ogg', src: src };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /** Texto do audio: transcricao quando possivel, marcador quando nao. */
+  async function textoDoAudio(row) {
+    const dados = await audioEmBase64(row);
+    if (!dados) return '[áudio recebido — não foi possível abrir o arquivo]';
+    if (transcricoes.has(dados.src)) return transcricoes.get(dados.src);
+
+    const r = await send('TRANSCREVER', { base64: dados.base64, mimeType: dados.mimeType });
+    const texto = r && r.ok && r.data && r.data.texto
+      ? '[áudio transcrito] ' + r.data.texto
+      : '[áudio recebido — não foi possível transcrever]';
+    transcricoes.set(dados.src, texto);
+    return texto;
+  }
+
+  /**
+   * Guarda o texto dos audios que estao na tela, indexado pelo balao, para que
+   * o leitor da conversa possa inclui-los na ordem certa.
+   */
+  const audiosLidos = new Map();
+
+  async function incluirAudios() {
+    const main = document.querySelector('#main');
+    if (!main) return;
+    const rows = [...main.querySelectorAll('div[role="row"]')];
+    for (const row of rows) {
+      if (row.querySelector('.copyable-text[data-pre-plain-text]')) continue; // e texto
+      if (!ehAudio(row)) continue;
+      if (audiosLidos.has(row)) continue;
+      audiosLidos.set(row, await textoDoAudio(row));
+    }
+  }
   /* ---------- aprendizado: sugerido x enviado ---------- */
 
   /**
@@ -684,6 +776,9 @@
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
     // Puxa o histórico antes de ler: sem isso a Bella vê só a última mensagem.
     await carregarHistorico(25);
+    // Traz os audios para a conversa antes de ler: sem isso a Bella nao ve
+    // que o hospede mandou voz e responde como se nada tivesse chegado.
+    await incluirAudios();
     const lido = scrapeConversation();
     let { conversation, lastMessage, lidas } = lido;
 

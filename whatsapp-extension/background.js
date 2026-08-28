@@ -146,6 +146,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       } else if (msg.type === 'QUICK_REPLIES') {
         const list = await authed(`/api/quick-replies?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: list });
+      } else if (msg.type === 'TRANSCREVER') {
+        // Audio do WhatsApp -> texto. O servidor ja tinha essa capacidade;
+        // faltava a extensao capturar o arquivo e mandar.
+        const t = await authed('/api/assist/transcrever', {
+          method: 'POST',
+          body: JSON.stringify({ base64: msg.base64, mimeType: msg.mimeType }),
+        });
+        sendResponse({ ok: true, data: t });
       } else if (msg.type === 'DISPONIBILIDADE') {
         // Consulta feita daqui porque o servidor e barrado pelo Cloudflare.
         const r = await consultarDisponibilidadeSilbeck(msg);
