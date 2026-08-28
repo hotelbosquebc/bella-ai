@@ -632,16 +632,32 @@
    */
   const transcricoes = new Map();
 
-  /** O balao e uma mensagem de voz? */
+  /**
+   * O balao e uma mensagem de voz?
+   *
+   * Marcacao real do WhatsApp Web (inspecionada em 22/08/2026): NAO existe
+   * elemento <audio> no balao - ele so e criado quando alguem aperta play. O que
+   * sempre esta la e o icone data-icon="ptt-status" e os rotulos "Mensagem de
+   * voz" / "Reproduzir mensagem de voz".
+   */
   function ehAudio(row) {
-    if (row.querySelector('audio')) return true;
     const icones = [...row.querySelectorAll('[data-icon]')].map((e) => e.getAttribute('data-icon') || '');
     if (icones.some((ic) => /ptt|audio|mic/i.test(ic))) return true;
     const rotulos = [...row.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') || '');
-    return rotulos.some((r) => /mensagem de voz|voice message|reproduzir|play/i.test(r));
+    if (rotulos.some((r) => /mensagem de voz|recado de voz|voice message|reproduzir/i.test(r))) return true;
+    return Boolean(row.querySelector('audio'));
   }
 
-  /** Converte o audio do balao em base64, se o WhatsApp ja tiver carregado. */
+  /** Duracao que aparece no player ("0:07"), quando houver. */
+  function duracaoDoAudio(row) {
+    const m = (row.innerText || '').match(/\b(\d{1,2}:\d{2})\b/);
+    return m ? m[1] : null;
+  }
+
+  /**
+   * Converte o audio em base64 - so funciona se o WhatsApp JA tiver carregado o
+   * arquivo (ou seja, se alguem tocou o audio nesta sessao).
+   */
   async function audioEmBase64(row) {
     const el = row.querySelector('audio');
     const src = el && el.src;
@@ -660,16 +676,28 @@
     }
   }
 
-  /** Texto do audio: transcricao quando possivel, marcador quando nao. */
+  /**
+   * Texto do audio para a conversa.
+   *
+   * Se o arquivo estiver carregado, transcreve. Se nao estiver - o caso comum,
+   * porque o WhatsApp so baixa ao tocar - devolve um marcador com a duracao. O
+   * importante e que a Bella SAIBA que houve um audio: antes ele era invisivel e
+   * ela respondia como se o hospede nao tivesse falado nada.
+   */
   async function textoDoAudio(row) {
+    const dur = duracaoDoAudio(row);
     const dados = await audioEmBase64(row);
-    if (!dados) return '[áudio recebido — não foi possível abrir o arquivo]';
+
+    if (!dados) {
+      return '[mensagem de voz' + (dur ? ' de ' + dur : '') + ' — conteúdo não disponível]';
+    }
     if (transcricoes.has(dados.src)) return transcricoes.get(dados.src);
 
     const r = await send('TRANSCREVER', { base64: dados.base64, mimeType: dados.mimeType });
-    const texto = r && r.ok && r.data && r.data.texto
-      ? '[áudio transcrito] ' + r.data.texto
-      : '[áudio recebido — não foi possível transcrever]';
+    const texto =
+      r && r.ok && r.data && r.data.texto
+        ? '[áudio transcrito] ' + r.data.texto
+        : '[mensagem de voz' + (dur ? ' de ' + dur : '') + ' — não foi possível transcrever]';
     transcricoes.set(dados.src, texto);
     return texto;
   }
