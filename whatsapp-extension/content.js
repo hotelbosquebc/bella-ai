@@ -719,6 +719,47 @@
       audiosLidos.set(row, await textoDoAudio(row));
     }
   }
+
+  /**
+   * Escuta junto com o atendente.
+   *
+   * O WhatsApp so baixa a mensagem de voz quando alguem aperta play - por isso
+   * nao ha <audio> no balao ate esse momento. Em vez de forcar a reproducao (o
+   * que faria barulho no computador de quem atende), pegamos carona: quando o
+   * atendente toca o audio para ouvir, o arquivo passa a existir e nos o
+   * capturamos ali mesmo e mandamos transcrever.
+   *
+   * Ou seja: o atendente ouve, a Bella ouve junto. Nada e reproduzido sozinho.
+   */
+  document.addEventListener(
+    'play',
+    async function (e) {
+      const el = e.target;
+      if (!el || el.tagName !== 'AUDIO' || !el.src) return;
+      const row = el.closest('div[role="row"]');
+      if (!row) return;
+
+      const jaTemTexto = audiosLidos.get(row);
+      if (jaTemTexto && jaTemTexto.indexOf('[áudio transcrito]') === 0) return;
+
+      status('Ouvindo o áudio junto com você…');
+      const dados = await audioEmBase64(row);
+      if (!dados) {
+        status('');
+        return;
+      }
+      const r = await send('TRANSCREVER', { base64: dados.base64, mimeType: dados.mimeType });
+      if (r && r.ok && r.data && r.data.texto) {
+        const texto = '[áudio transcrito] ' + r.data.texto;
+        transcricoes.set(dados.src, texto);
+        audiosLidos.set(row, texto);
+        status('Áudio entendido — clique em Sugerir para a Bella responder.');
+      } else {
+        status('Não consegui transcrever este áudio.', true);
+      }
+    },
+    true,
+  );
   /* ---------- aprendizado: sugerido x enviado ---------- */
 
   /**
