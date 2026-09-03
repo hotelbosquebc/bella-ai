@@ -69,7 +69,25 @@ function dataBR(iso) {
   return p[2] + '/' + p[1] + '/' + p[0];
 }
 
-async function consultarDisponibilidadeSilbeck({ checkin, checkout, adultos, criancas0a6, criancas7a9 }) {
+/**
+ * Cache da consulta ao Silbeck (10 min).
+ *
+ * Sao 4 chamadas HTTP em sequencia; repetir isso a cada clique em Sugerir na
+ * MESMA conversa e puro tempo de espera para o atendente.
+ */
+const cacheDisponibilidade = new Map();
+const TTL_DISPONIBILIDADE = 10 * 60 * 1000;
+
+async function consultarDisponibilidadeSilbeck(params) {
+  const chave = JSON.stringify(params);
+  const guardado = cacheDisponibilidade.get(chave);
+  if (guardado && Date.now() - guardado.ts < TTL_DISPONIBILIDADE) return guardado.valor;
+  const valor = await consultarDisponibilidadeSilbeckSemCache(params);
+  if (valor && valor.html) cacheDisponibilidade.set(chave, { valor: valor, ts: Date.now() });
+  return valor;
+}
+
+async function consultarDisponibilidadeSilbeckSemCache({ checkin, checkout, adultos, criancas0a6, criancas7a9 }) {
   const inicial = await fetch(SILBECK + '/' + SILBECK_HOTEL + '/pt-br/reserva/', { credentials: 'include' });
   const html = await inicial.text();
   const ref = (html.match(/sbClientRef\s*=\s*'([a-f0-9]+)'/i) || [])[1];
@@ -194,3 +212,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   })();
   return true; // resposta assíncrona
 });
+
+/**
+ * Mantem a API acordada durante o expediente.
+ *
+ * O plano free do Render hiberna o servico depois de ~15 min sem uso, e o
+ * proximo pedido paga o tempo de subir tudo de novo - dezenas de segundos. Como
+ * a recepcao usa a Bella em rajadas, essa espera caia justamente em quem
+ * atendia. Um ping leve a cada 10 min enquanto o WhatsApp Web estiver aberto
+ * resolve, sem custo.
+ */
+setInterval(async () => {
+  try {
+    const { apiUrl } = await getCfg();
+    await fetch(`${apiUrl}/api/health`, { method: "GET" });
+  } catch (_) {
+    /* sem rede: tenta de novo no proximo ciclo */
+  }
+}, 10 * 60 * 1000);
