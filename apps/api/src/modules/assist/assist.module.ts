@@ -172,10 +172,25 @@ export class AssistController {
     // data existia, mas eu a aplicava sobre a conversa INTEIRA, e a nossa própria
     // mensagem automática contém "Segunda a sexta-feira". Um nome de dia da
     // semana no NOSSO texto validava uma data que o hóspede nunca deu.
-    const falasDoHospede = (conversation || '')
-      .split(/\r?\n/)
-      .filter((l) => /^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(l))
-      .join('\n');
+    // Mensagem de varias linhas: so a PRIMEIRA leva o prefixo "Hospede:".
+    //
+    // Caso real: "31 de dezembro / 03 de janeiro / 4 adultos - 2 quartos" chega
+    // como um balao de tres linhas. Filtrando apenas linhas que COMECAM com
+    // "Hospede:", eu jogava fora "4 adultos" - e a trava concluia que ele nao
+    // informou a quantidade, fazendo a Bella perguntar algo que estava escrito.
+    // Agora seguimos o autor: uma linha sem prefixo pertence a quem falou antes.
+    const falasDoHospede = (function () {
+      const saida = [];
+      let doHospede = false;
+      for (const linha of (conversation || '').split(/\r?\n/)) {
+        const inicioHospede = /^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(linha);
+        const inicioNosso = /^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(linha);
+        if (inicioHospede) doHospede = true;
+        else if (inicioNosso) doHospede = false;
+        if (doHospede) saida.push(linha);
+      }
+      return saida.join('\n');
+    })();
 
     // Trava contra data inventada.
     //
