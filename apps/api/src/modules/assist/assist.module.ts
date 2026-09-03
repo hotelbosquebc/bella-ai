@@ -667,10 +667,35 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
     const focus = body.lastMessage || conversation;
+
+    // Pede a disponibilidade ANTES de escrever qualquer coisa.
+    //
+    // Antes eu gerava a resposta, descobria que precisava consultar, e gerava
+    // TUDO DE NOVO com o dado em maos - duas chamadas de IA por sugestao, e o
+    // atendente esperando o dobro. Agora a primeira passagem so extrai as datas
+    // (que ficam em cache) e devolve o pedido; o texto e escrito uma vez so, ja
+    // com a disponibilidade real.
+    if (!body.disponibilidadeHtml && !body.pularDisponibilidade) {
+      const s: any = await this.extrair(conversation);
+      if (s && s.checkin && s.checkout) {
+        return {
+          suggestion: '',
+          model: 'aguardando-disponibilidade',
+          attachments: [],
+          precisaDisponibilidade: {
+            checkin: s.checkin,
+            checkout: s.checkout,
+            adultos: Number(s.adults) || 1,
+            criancas0a6: Number(s.children0_6) || 0,
+            criancas7a9: Number(s.children7_9) || 0,
+          },
+        };
+      }
+    }
 
     // Desligada é desligada: não basta a extensão esconder o botão — o servidor
     // também recusa, senão uma aba antiga em cache continuaria sugerindo.
@@ -718,21 +743,7 @@ ${url}`;
     // Se ha datas mas ninguem consultou a disponibilidade, pedimos que a
     // extensao consulte e chame de novo. O servidor nao consegue: o Cloudflare
     // do Silbeck bloqueia o IP do Render (403 "Just a moment").
-    let precisaDisponibilidade = null;
-    if (!body.disponibilidadeHtml) {
-      const s: any = await this.extrair(conversation);
-      if (s && s.intent === 'booking' && s.checkin && s.checkout) {
-        precisaDisponibilidade = {
-          checkin: s.checkin,
-          checkout: s.checkout,
-          adultos: Number(s.adults) || 1,
-          criancas0a6: Number(s.children0_6) || 0,
-          criancas7a9: Number(s.children7_9) || 0,
-        };
-      }
-    }
-
-    return { suggestion: formatarParaWhatsApp(draft.text), model: draft.model, attachments: anexos, precisaDisponibilidade };
+    return { suggestion: formatarParaWhatsApp(draft.text), model: draft.model, attachments: anexos };
   }
 }
 

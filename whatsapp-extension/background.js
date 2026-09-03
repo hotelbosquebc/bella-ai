@@ -181,6 +181,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             conversation: msg.conversation,
             lastMessage: msg.lastMessage,
             disponibilidadeHtml: msg.disponibilidadeHtml,
+            pularDisponibilidade: msg.pularDisponibilidade,
           }),
         });
         sendResponse({ ok: true, data: out });

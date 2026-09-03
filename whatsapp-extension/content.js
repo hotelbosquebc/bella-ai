@@ -839,12 +839,21 @@
     }
   }
   // ---------- sugerir resposta ----------
+  const historicoCarregado = new Set();
   let sugerindo = false;
 
   async function sugerir(automatica) {
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
     // Puxa o histórico antes de ler: sem isso a Bella vê só a última mensagem.
-    await carregarHistorico(25);
+    // Rolar o historico e caro (varias rolagens de ~700ms) e so precisa ser
+    // feito UMA vez por conversa: depois disso a memoria local ja guarda tudo.
+    // Antes rodava a cada clique em Sugerir e sozinho respondia por boa parte
+    // da demora.
+    const chaveHist = tituloDaConversa();
+    if (chaveHist && !historicoCarregado.has(chaveHist)) {
+      historicoCarregado.add(chaveHist);
+      await carregarHistorico(25);
+    }
     // Traz os audios para a conversa antes de ler: sem isso a Bella nao ve
     // que o hospede mandou voz e responde como se nada tivesse chegado.
     await incluirAudios();
@@ -888,19 +897,20 @@
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
       // navegador do hotel, a consulta passa normalmente.
+      // O servidor devolve o pedido de disponibilidade ANTES de escrever, para
+      // nao gerar o texto duas vezes. Consultamos e pedimos a resposta final.
       if (r && r.ok && r.data && r.data.precisaDisponibilidade) {
         status('Consultando disponibilidade real…');
         const d = await send('DISPONIBILIDADE', r.data.precisaDisponibilidade);
-        if (d && d.ok && d.data && d.data.html) {
-          const r2 = await send('SUGGEST', {
-            conversation: conversation,
-            lastMessage: lastMessage,
-            disponibilidadeHtml: d.data.html,
-          });
-          if (r2 && r2.ok && r2.data && r2.data.suggestion) {
-            r.data = r2.data;
-          }
-        }
+        const html = d && d.ok && d.data ? d.data.html : null;
+        const r2 = await send('SUGGEST', {
+          conversation: conversation,
+          lastMessage: lastMessage,
+          disponibilidadeHtml: html || undefined,
+          // Se a consulta falhou, escreve mesmo assim - sem falar de procura.
+          pularDisponibilidade: html ? undefined : true,
+        });
+        if (r2 && r2.ok && r2.data) r.data = r2.data;
       }
       if (!r || !r.ok) {
         status(r ? r.error : 'Falha ao sugerir.', true);
