@@ -36,6 +36,43 @@ export function formatarParaWhatsApp(texto: string): string {
     .trim();
 }
 
+
+/**
+ * Garante que os links da resposta sejam os NOSSOS.
+ *
+ * Caso real (04/09/2026): a Bella enviou
+ * "/hotelbosque/resultado?checkin=2023-09-08&adultos=2&criancas=0" - endereco
+ * inventado, com caminho que nao existe, parametros errados e ano 2023. O
+ * modelo escreveu uma URL de memoria em vez de usar a que o servidor montou.
+ * Instrucao no prompt nao basta: aqui a troca e feita no codigo.
+ *
+ * - Havendo UM link oficial, qualquer endereco do motor vira ele.
+ * - Havendo VARIOS (um por apartamento), so os oficiais sobrevivem; um link
+ *   inventado no meio deles e removido.
+ * - Nao havendo nenhum, todo link do motor sai da mensagem: se nao montamos um
+ *   link, e porque ainda falta dado - mandar qualquer coisa e pior que nada.
+ */
+export function corrigirLinks(texto: string, oficiais: string[]): string {
+  const doMotor = /https?:\/\/(?:www\.)?sbreserva\.silbeck\.com\.br\/\S*/gi;
+  const achados = texto.match(doMotor);
+  if (!achados) return texto;
+
+  if (oficiais.length === 1) {
+    return texto.replace(doMotor, oficiais[0]);
+  }
+
+  if (oficiais.length > 1) {
+    const validos = new Set(oficiais);
+    return texto.replace(doMotor, (url) => (validos.has(url) ? url : ''));
+  }
+
+  // Sem link oficial: remove o endereco e a linha que ficaria orfa.
+  return texto
+    .replace(doMotor, '')
+    .split('\n')
+    .filter((l, i, arr) => !(l.trim() === '' && arr[i - 1] !== undefined && arr[i - 1].trim() === ''))
+    .join('\n');
+}
 /**
  * A Bella deve se apresentar nesta mensagem?
  *
@@ -758,7 +795,11 @@ ${url}`;
     // Se ha datas mas ninguem consultou a disponibilidade, pedimos que a
     // extensao consulte e chame de novo. O servidor nao consegue: o Cloudflare
     // do Silbeck bloqueia o IP do Render (403 "Just a moment").
-    return { suggestion: formatarParaWhatsApp(draft.text), model: draft.model, attachments: anexos };
+    // Troca qualquer endereco inventado pelo link oficial que montamos.
+    const oficiais = (reserva.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
+    const textoFinal = corrigirLinks(draft.text, oficiais);
+
+    return { suggestion: formatarParaWhatsApp(textoFinal), model: draft.model, attachments: anexos };
   }
 }
 
