@@ -53,6 +53,31 @@ export class ModelRouterService {
     return 'mock';
   }
 
+  /**
+   * Modelos em ordem de preferencia, com alternativa.
+   *
+   * MEDIDO em 04/09/2026: os aliases "-latest" do nivel gratuito estavam
+   * saturados - gemini-flash-latest devolvia 503/429 em 5 de 5 tentativas, e
+   * flash-lite-latest 400/503. Como o codigo so repetia no MESMO modelo, cada
+   * sugestao pagava 3 tentativas com espera na extracao E outras 3 na escrita.
+   * Era essa a demora que o hotel sentia.
+   *
+   * gemini-2.5-flash e gemini-2.5-flash-lite responderam 200 em ~0,6s. Em vez de
+   * cravar um nome (o Google aposenta modelos), tentamos a lista em ordem: se um
+   * estiver congestionado, o proximo assume na hora.
+   */
+  private modelosPara(task: AiTask): string[] {
+    const env = process.env;
+    const lista = (v?: string) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null);
+
+    if (task === 'booking_extraction') {
+      return (
+        lista(env.GEMINI_MODEL_FAST) ?? ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-lite-latest']
+      );
+    }
+    return lista(env.GEMINI_MODEL_PRECISE) ?? ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
+  }
+
   /** Modelo por tarefa, configurável por env conforme o provedor */
   private modelFor(task: AiTask): string {
     const env = process.env;
@@ -74,11 +99,29 @@ export class ModelRouterService {
   }
 
   async complete(req: CompletionRequest): Promise<CompletionResult> {
+    // Gemini: tenta a lista de modelos em ordem. Se o primeiro estiver
+    // congestionado (503/429 no nivel gratuito), o proximo assume - antes
+    // insistiamos no mesmo modelo saturado e so acumulavamos espera.
+    if (this.provider === 'gemini') {
+      const modelos = this.modelosPara(req.task);
+      let ultimoErro: unknown = null;
+      for (const modelo of modelos) {
+        try {
+          return await this.completeGemini(req, modelo);
+        } catch (err) {
+          ultimoErro = err;
+          this.logger.warn(`Modelo ${modelo} indisponivel: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+      this.logger.error(
+        `Todos os modelos falharam: ${ultimoErro instanceof Error ? ultimoErro.message : ultimoErro}`,
+      );
+      return this.completeMock(req);
+    }
+
     const model = this.modelFor(req.task);
     try {
       switch (this.provider) {
-        case 'gemini':
-          return await this.completeGemini(req, model);
         case 'ollama':
           return await this.completeOllama(req, model);
         case 'anthropic':
@@ -134,7 +177,7 @@ export class ModelRouterService {
     }
     const key = process.env.GOOGLE_API_KEY!;
     // Usa o mesmo alias vigente do provedor (gemini-2.5-flash foi descontinuado)
-    const model = process.env.GEMINI_MODEL_AUDIO ?? process.env.GEMINI_MODEL_PRECISE ?? 'gemini-flash-latest';
+    const model = process.env.GEMINI_MODEL_AUDIO ?? 'gemini-2.5-flash';
     const buildBody = (withThinking: boolean) => ({
       contents: [
         {
