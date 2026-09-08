@@ -820,7 +820,7 @@
     if (!baloes.length) return null;
     const el = baloes[baloes.length - 1];
     const attr = el.getAttribute('data-pre-plain-text') || '';
-    const m = attr.match(/]s*(.*?):s*$/);
+    const m = attr.match(/\]\s*(.*?):\s*$/);
     const remetente = m ? m[1] : '';
     const titulo = tituloDaConversa();
     const nossa = titulo ? remetente !== titulo : /hotel do bosque|recep|reserva/i.test(remetente);

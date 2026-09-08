@@ -94,6 +94,42 @@ export function apenasFalasDoHospede(conversation: string): string {
 }
 
 /**
+ * Os assuntos que a Bella responde, e com que frequencia.
+ *
+ * Nao guardamos "qual resposta ela usou" - cada sugestao e escrita na hora, nao
+ * escolhida de uma lista. O que da para medir e o ASSUNTO: reconhecemos o tema
+ * pelo vocabulario da propria sugestao. Uma mensagem pode tocar dois assuntos
+ * (cafe e estacionamento na mesma resposta) e conta nos dois: a pergunta e o
+ * que ela mais fala, nao uma classificacao exclusiva.
+ */
+export const TEMAS: { tema: string; padrao: RegExp }[] = [
+  { tema: 'Orçamento com link', padrao: /sbreserva|link (abaixo|para reserva)|realizar a reserva|finalizar a reserva/i },
+  { tema: 'Disponibilidade', padrao: /disponibilidade|dispon[íi]vel|esgotad|sem vaga|lotad/i },
+  { tema: 'Café da manhã', padrao: /caf[ée] da manh[ãa]|buffet|desjejum/i },
+  { tema: 'Estacionamento', padrao: /estacionamento|vaga|garagem|carro/i },
+  { tema: 'Categorias e andares', padrao: /standard|luxo|superior|su[íi]te bosque|andar/i },
+  { tema: 'Check-in e check-out', padrao: /check ?-? ?in|check ?-? ?out|hor[áa]rio de entrada|14h|12h/i },
+  { tema: 'Crianças e berço', padrao: /crian[çc]a|ber[çc]o|menor de idade|pol[íi]tica infantil/i },
+  { tema: 'Pets', padrao: /\bpet\b|animal de estima[çc][ãa]o|cachorro|c[ãa]o\b|12 ?kg/i },
+  { tema: 'Pacote de Ano Novo', padrao: /ano novo|r[ée]veillon|virada|5 di[áa]rias/i },
+  { tema: 'Pagamento e desconto', padrao: /\bpix\b|parcel|cart[ãa]o|desconto|forma de pagamento/i },
+  { tema: 'Cancelamento e multa', padrao: /cancelamento|cancelar|multa|no ?-? ?show/i },
+  { tema: 'Wi-Fi', padrao: /wi ?-? ?fi|internet|senha da rede|bosque00/i },
+  { tema: 'Localização e praia', padrao: /praia|centro|localiza|pertinho|quadra|[ôo]nibus gratuito/i },
+  { tema: 'Transfer e aeroporto', padrao: /transfer|aeroporto|navegantes|traslado/i },
+  { tema: 'Estrutura do hotel', padrao: /elevador|guarda ?-? ?volumes|academia|piscina|recep[çc][ãa]o 24/i },
+  { tema: 'Ingressos e passeios', padrao: /ingresso|beto carrero|unipraias|passeio|parque/i },
+  { tema: 'Grupos (passa p/ humano)', padrao: /grupo|atendente|nossa equipe vai|encaminh/i },
+  { tema: 'Apresentação', padrao: /sou a bella|assistente (online|virtual)/i },
+];
+
+/** Em que assuntos esta sugestao toca. */
+export function temasDaSugestao(texto: string): string[] {
+  const t = texto || '';
+  return TEMAS.filter((x) => x.padrao.test(t)).map((x) => x.tema);
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -713,6 +749,56 @@ ${url}`;
           sugerido: f.sugestao,
           enviado: f.enviado,
         })),
+    };
+  }
+
+  /**
+   * O que a Bella mais responde.
+   *
+   * Ela nao escolhe respostas de uma lista - escreve cada uma na hora. Entao o
+   * que da para contar e o ASSUNTO, reconhecido pelo vocabulario da propria
+   * sugestao. Junto vai o aproveitamento: em quantos casos o atendente enviou
+   * o texto como veio. Assunto muito frequente com aproveitamento baixo e
+   * exatamente onde vale mexer na base de conhecimento.
+   */
+  @Get('temas')
+  async temas(@Query('hotelId') hotelId?: string, @Query('dias') dias?: string) {
+    const id = hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    const periodo = Number(dias) || 30;
+    const desde = new Date(Date.now() - periodo * 86400000);
+    const todos = await this.prisma.suggestionFeedback.findMany({
+      where: { hotelId: id, createdAt: { gte: desde } },
+      orderBy: { createdAt: 'desc' },
+      take: 2000,
+    });
+
+    const contagem = new Map<string, { total: number; igual: number }>();
+    let semTema = 0;
+    for (const f of todos) {
+      const temas = temasDaSugestao(f.sugestao);
+      if (!temas.length) semTema++;
+      for (const t of temas) {
+        const atual = contagem.get(t) || { total: 0, igual: 0 };
+        atual.total++;
+        if (f.acao === 'igual') atual.igual++;
+        contagem.set(t, atual);
+      }
+    }
+
+    const assuntos = [...contagem.entries()]
+      .map(([tema, v]) => ({
+        tema,
+        vezes: v.total,
+        enviadaSemEditar: v.igual,
+        aproveitamento: v.total ? Math.round((v.igual / v.total) * 100) : 0,
+      }))
+      .sort((a, b) => b.vezes - a.vezes);
+
+    return {
+      periodoDias: periodo,
+      sugestoes: todos.length,
+      semAssuntoReconhecido: semTema,
+      assuntos,
     };
   }
 

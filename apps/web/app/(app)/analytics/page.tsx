@@ -11,9 +11,16 @@ type Overview = {
   lossReasons: { reason: string; count: number }[];
 };
 
+type Temas = {
+  periodoDias: number;
+  sugestoes: number;
+  assuntos: { tema: string; vezes: number; enviadaSemEditar: number; aproveitamento: number }[];
+};
+
 export default function AnalyticsPage() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [temas, setTemas] = useState<Temas | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -24,6 +31,15 @@ export default function AnalyticsPage() {
         setData(null);
       } finally {
         setLoading(false);
+      }
+    })();
+
+    (async () => {
+      try {
+        const res = await apiFetch('/api/assist/temas?dias=30', { cache: 'no-store' });
+        if (res.ok) setTemas(await res.json());
+      } catch {
+        setTemas(null);
       }
     })();
   }, []);
@@ -71,6 +87,39 @@ export default function AnalyticsPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="form-card">
+        <strong>O que a Bella mais responde</strong>
+        <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+          Assuntos das sugestões dos últimos 30 dias. &quot;Sem editar&quot; é quantas vezes o atendente
+          enviou o texto exatamente como ela escreveu — assunto muito frequente com aproveitamento
+          baixo é onde vale melhorar a base de conhecimento.
+        </p>
+        {!temas && <p className="muted">Carregando…</p>}
+        {temas && temas.assuntos.length === 0 && (
+          <p className="muted">Nenhuma sugestão registrada ainda no período.</p>
+        )}
+        {temas && temas.assuntos.length > 0 && (
+          <>
+            <table style={{ marginTop: 12 }}>
+              <thead><tr><th>Assunto</th><th>Vezes</th><th>Sem editar</th><th>Aproveitamento</th></tr></thead>
+              <tbody>
+                {temas.assuntos.map((a) => (
+                  <tr key={a.tema}>
+                    <td>{a.tema}</td>
+                    <td>{a.vezes}</td>
+                    <td>{a.enviadaSemEditar}</td>
+                    <td>{a.aproveitamento}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="muted" style={{ marginTop: 10, fontSize: 12 }}>
+              {temas.sugestoes} sugestões no período. Uma resposta pode tocar mais de um assunto.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="form-card">
