@@ -289,3 +289,33 @@ Instalada no PC do dono e testada em conversa real. Dois bugs achados só no uso
 
 ## Regras/preferências do dono
 Custo ZERO sempre. Não arriscar o número principal do WhatsApp. Não pôr preços/promoções na Bella. Aprovar tudo automático (bypassPermissions). Avisar ao chegar em ~90% do contexto e preparar este ESTADO.md.
+
+## 🎓 Aprendizado diário + atalhos do uso real (08/09/2026, commit `7fa3b09`)
+
+**Atalhos sugeridos.** `GET /api/assist/atalhos-sugeridos` agrupa o que a recepção
+já enviou várias vezes, quase igual, para hóspedes diferentes — isso já é um
+atalho, só não tinha botão. Aparece em **Respostas Rápidas**; ao aprovar, vira
+`QuickReply` e chip no painel do WhatsApp (encanamento que já existia).
+Ficam de fora orçamentos com link e textos com valores, de propósito.
+
+Limiar de "mesma resposta" = **0,32**, medido: paráfrases reais ficaram entre
+0,38 e 0,64; assuntos diferentes entre 0,03 e 0,18.
+
+**Aprendizado.** `POST /api/assist/aprender` roda 1x/dia, chamado pela extensão
+(`aprendizadoDoDia()` no `background.js`, marca a data em `chrome.storage`).
+Lê as divergências sugestão × enviado e propõe regras de uma frase.
+Toda lição nasce **pendente** e só entra no prompt depois de aprovada na tela
+**🎓 Aprendizado**. Travas em código (`licaoAceitavel`) barram antes disso:
+dinheiro e "fechar reserva". Lições aprovadas entram via `contextoDasLicoes()`,
+com cache de 10 min invalidado a cada aprovação.
+
+**Relatório.** `GET /api/assist/temas` — assuntos que ela mais responde e o
+aproveitamento (quantas foram enviadas sem edição). Aparece em **Analytics**.
+
+⚠️ Os números anteriores a 08/09/2026 estão contaminados: o regex que descobria
+o autor do último balão estava sem as barras invertidas, então toda última
+mensagem era tratada como nossa e o texto do hóspede virava "enviado".
+Corrigido na 1.6.1.
+
+**Tabela nova:** `licoes` + coluna `analisado` em `suggestion_feedback`
+(migration `20260908160000_licoes`). Precisa ir junto na migração para o Supabase.
