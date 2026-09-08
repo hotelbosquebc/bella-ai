@@ -73,6 +73,81 @@ export function corrigirLinks(texto: string, oficiais: string[]): string {
     .filter((l, i, arr) => !(l.trim() === '' && arr[i - 1] !== undefined && arr[i - 1].trim() === ''))
     .join('\n');
 }
+
+/**
+ * So o que o HOSPEDE escreveu.
+ *
+ * Segue o autor: uma linha sem prefixo pertence a quem falou antes, porque no
+ * WhatsApp so a PRIMEIRA linha de um balao leva o prefixo. Sem isso, "4
+ * adultos" na segunda linha some - e as travas concluem que o hospede nao
+ * informou algo que estava escrito.
+ */
+export function apenasFalasDoHospede(conversation: string): string {
+  const saida: string[] = [];
+  let doHospede = false;
+  for (const linha of (conversation || '').split(/\r?\n/)) {
+    if (/^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(linha)) doHospede = true;
+    else if (/^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(linha)) doHospede = false;
+    if (doHospede) saida.push(linha);
+  }
+  return saida.join('\n');
+}
+
+/**
+ * Em que idioma o HOSPEDE escreveu.
+ *
+ * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
+ * fechas??" e a Bella respondeu em portugues. A regra de idioma existia, mas
+ * quem decidia era o modelo - olhando a conversa INTEIRA, que e dominada pelas
+ * NOSSAS mensagens automaticas em portugues. Uma linha em espanhol perdia para
+ * dez em portugues escritas por nos.
+ *
+ * Aqui a decisao sai do modelo e vira codigo, olhando so as falas do hospede.
+ */
+export function idiomaDoHospede(falasDoHospede: string): 'es' | 'en' | 'pt' {
+  const t = (falasDoHospede || '').toLowerCase();
+  if (!t.trim()) return 'pt';
+
+  // Sinais exclusivos do espanhol (evitando palavras iguais nas duas linguas).
+  const es = [
+    /[¿¡ñ]/,
+    /\b(hola|buenas|buenos d[ií]as|quer[ií]a|quisiera|habitaci[oó]n|habitaciones)\b/,
+    /\b(disponible|disponibilidad|fechas|precio|cu[áa]nto|cu[áa]ntas|personas|noches)\b/,
+    /\b(gracias|por favor|ustedes|tienen|somos|ni[ñn]os|adultos y)\b/,
+  ];
+  // "adultos", "hotel" e "reserva" existem nos dois idiomas: nao servem de sinal.
+  const en = [
+    /\b(hello|hi|good morning|good evening)\b/,
+    /\b(available|availability|room|rooms|nights|price|how much|would like|thanks|thank you)\b/,
+  ];
+
+  const pontosEs = es.filter((r) => r.test(t)).length;
+  const pontosEn = en.filter((r) => r.test(t)).length;
+
+  if (pontosEs >= 1 && pontosEs >= pontosEn) return 'es';
+  if (pontosEn >= 1) return 'en';
+  return 'pt';
+}
+
+/** Instrucao pronta de idioma, entregue ao prompt ja decidida. */
+export function contextoDeIdioma(falasDoHospede: string): string {
+  const idioma = idiomaDoHospede(falasDoHospede);
+  if (idioma === 'es') {
+    return (
+      `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em ESPANHOL. Responda INTEIRAMENTE em espanhol, ` +
+      `sem uma palavra em português — inclusive o bloco de abertura, para o qual existe a versão em espanhol pronta. ` +
+      `Ignore o idioma das mensagens automáticas do hotel que aparecem na conversa: elas são nossas, não dele.`
+    );
+  }
+  if (idioma === 'en') {
+    return (
+      `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em INGLÊS. Responda INTEIRAMENTE em inglês, ` +
+      `inclusive o bloco de abertura, para o qual existe a versão em inglês pronta. ` +
+      `Ignore o idioma das mensagens automáticas do hotel que aparecem na conversa.`
+    );
+  }
+  return `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em PORTUGUÊS. Responda em português.`;
+}
 /**
  * A Bella deve se apresentar nesta mensagem?
  *
@@ -216,18 +291,7 @@ export class AssistController {
     // "Hospede:", eu jogava fora "4 adultos" - e a trava concluia que ele nao
     // informou a quantidade, fazendo a Bella perguntar algo que estava escrito.
     // Agora seguimos o autor: uma linha sem prefixo pertence a quem falou antes.
-    const falasDoHospede = (function () {
-      const saida = [];
-      let doHospede = false;
-      for (const linha of (conversation || '').split(/\r?\n/)) {
-        const inicioHospede = /^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(linha);
-        const inicioNosso = /^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(linha);
-        if (inicioHospede) doHospede = true;
-        else if (inicioNosso) doHospede = false;
-        if (doHospede) saida.push(linha);
-      }
-      return saida.join('\n');
-    })();
+    const falasDoHospede = apenasFalasDoHospede(conversation);
 
     // Trava contra data inventada.
     //
@@ -777,6 +841,7 @@ ${url}`;
         .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
         .replaceAll('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
       contextoDeApresentacao(conversation) +
+      contextoDeIdioma(apenasFalasDoHospede(conversation)) +
       contextoDeHorario() +
       reserva +
       (anexos.length
