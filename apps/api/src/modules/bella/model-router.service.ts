@@ -114,7 +114,8 @@ export class ModelRouterService {
   diagnostico() {
     return {
       provider: this.provider,
-      chaveConfigurada: this.provider === 'gemini' ? Boolean(process.env.GOOGLE_API_KEY) : null,
+      chaves: this.provider === 'gemini' ? this.chavesGemini().length : null,
+      chaveEmUso: this.provider === 'gemini' ? this.chaveAtual + 1 : null,
       quedasRecentes: this.quedas.length,
       ultimasQuedas: this.quedas.slice(-10),
     };
@@ -127,14 +128,24 @@ export class ModelRouterService {
     if (this.provider === 'gemini') {
       const modelos = this.modelosPara(req.task);
       const tentativas: { modelo: string; motivo: string }[] = [];
-      for (const modelo of modelos) {
-        try {
-          return await this.completeGemini(req, modelo);
-        } catch (err) {
-          const motivo = err instanceof Error ? err.message : String(err);
-          tentativas.push({ modelo, motivo: motivo.slice(0, 700) });
-          this.logger.warn(`Modelo ${modelo} indisponivel: ${motivo}`);
+      const voltas = Math.max(1, this.chavesGemini().length);
+
+      for (let volta = 0; volta < voltas; volta++) {
+        for (const modelo of modelos) {
+          try {
+            return await this.completeGemini(req, modelo);
+          } catch (err) {
+            const motivo = err instanceof Error ? err.message : String(err);
+            tentativas.push({ modelo, motivo: motivo.slice(0, 700) });
+            this.logger.warn(`Modelo ${modelo} indisponivel: ${motivo}`);
+          }
         }
+        // Todos os modelos caíram nesta chave. Se o motivo foi COTA (429), a
+        // culpa não é do modelo e sim do teto do projeto: outra chave tem teto
+        // próprio. Qualquer outro erro não melhora trocando de chave.
+        const ultimas = tentativas.slice(-modelos.length);
+        const foiCota = ultimas.length === modelos.length && ultimas.every((t) => t.motivo.includes('429'));
+        if (!foiCota || !this.proximaChave()) break;
       }
       this.logger.error(`Todos os modelos falharam na task ${req.task}`);
       // Guarda o motivo de CADA modelo, nao so do ultimo: com um 429 de cota,
@@ -162,9 +173,45 @@ export class ModelRouterService {
     }
   }
 
+  /**
+   * As chaves do Gemini, em rodizio.
+   *
+   * A cota gratuita e do PROJETO, nao do modelo: em 08/09/2026 os tres modelos
+   * estouraram no mesmo minuto (17:18), e a Bella ficou fora do ar ate a cota
+   * virar - justamente no pico do atendimento. Trocar de modelo nao resolve;
+   * outra chave, sim, porque cada projeto tem seu proprio teto.
+   *
+   * GOOGLE_API_KEY aceita varias chaves separadas por virgula. Continua custando
+   * zero: sao contas gratuitas, so somam teto. Uma chave so continua funcionando
+   * como antes.
+   */
+  private chavesGemini(): string[] {
+    return (process.env.GOOGLE_API_KEY || '')
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean);
+  }
+
+  /** Indice da chave da vez; avanca quando uma estoura a cota. */
+  private chaveAtual = 0;
+
+  private chaveGemini(): string {
+    const chaves = this.chavesGemini();
+    return chaves[this.chaveAtual % chaves.length] || '';
+  }
+
+  /** Uma chave estourou: passa para a proxima e diz se ainda ha outra para tentar. */
+  private proximaChave(): boolean {
+    const chaves = this.chavesGemini();
+    if (chaves.length < 2) return false;
+    this.chaveAtual = (this.chaveAtual + 1) % chaves.length;
+    this.logger.warn(`Cota estourada; alternando para a chave ${this.chaveAtual + 1} de ${chaves.length}.`);
+    return true;
+  }
+
   // ---------- Gemini (gratuito) ----------
   private async completeGemini(req: CompletionRequest, model: string): Promise<CompletionResult> {
-    const key = process.env.GOOGLE_API_KEY!;
+    const key = this.chaveGemini();
     const wantsJson = Boolean(req.tools?.length);
     const sys = wantsJson ? `${req.system}\n\n${this.jsonInstruction(req.tools![0])}` : req.system;
 
@@ -201,7 +248,7 @@ export class ModelRouterService {
       this.logger.warn(`Transcrição de áudio requer Gemini (provedor atual: ${this.provider})`);
       return '';
     }
-    const key = process.env.GOOGLE_API_KEY!;
+    const key = this.chaveGemini();
     // Usa o mesmo alias vigente do provedor (gemini-2.5-flash foi descontinuado)
     const model = process.env.GEMINI_MODEL_AUDIO ?? 'gemini-2.5-flash';
     const buildBody = (withThinking: boolean) => ({
