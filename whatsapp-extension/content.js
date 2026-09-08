@@ -639,13 +639,26 @@
    * elemento <audio> no balao - ele so e criado quando alguem aperta play. O que
    * sempre esta la e o icone data-icon="ptt-status" e os rotulos "Mensagem de
    * voz" / "Reproduzir mensagem de voz".
+   *
+   * A versao anterior aceitava QUALQUER aria-label com "reproduzir" e qualquer
+   * data-icon com "mic". Isso pega o botao do microfone e o play de video, GIF e
+   * previa de link - e um balao desses virava "[mensagem de voz]" na conversa.
+   * Caso real (08/09/2026): hospede escreveu tudo por texto - 2 quartos, duas
+   * pessoas, entrada dia 08 e saida dia 09 - e a Bella respondeu "Recebi seus
+   * audios! Um atendente ja vai ouvi-los", ignorando o que estava escrito.
+   *
+   * Agora so conta o que e exclusivo de nota de voz. Falso negativo aqui custa
+   * um audio invisivel; falso positivo custa a resposta inteira.
    */
   function ehAudio(row) {
+    if (row.querySelector('audio')) return true;
     const icones = [...row.querySelectorAll('[data-icon]')].map((e) => e.getAttribute('data-icon') || '');
-    if (icones.some((ic) => /ptt|audio|mic/i.test(ic))) return true;
+    if (icones.some((ic) => /^ptt|^audio-play$|voice/i.test(ic))) return true;
     const rotulos = [...row.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') || '');
-    if (rotulos.some((r) => /mensagem de voz|recado de voz|voice message|reproduzir/i.test(r))) return true;
-    return Boolean(row.querySelector('audio'));
+    // "Gravar mensagem de voz" e a barra do microfone, nao um balao recebido.
+    return rotulos.some(
+      (r) => /mensagem de voz|recado de voz|voice message|mensaje de voz/i.test(r) && !/gravar|record|cancelar/i.test(r),
+    );
   }
 
   /** Duracao que aparece no player ("0:07"), quando houver. */
