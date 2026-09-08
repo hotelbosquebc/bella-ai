@@ -108,7 +108,7 @@ export class ModelRouterService {
    * saber que caiu, nao por que. Guardamos em memoria (some no restart, o que
    * basta: interessa o que esta acontecendo agora) e sem nada sensivel.
    */
-  private readonly quedas: { quando: string; task: string; motivo: string }[] = [];
+  private readonly quedas: { quando: string; task: string; tentativas: { modelo: string; motivo: string }[] }[] = [];
 
   /** Diagnostico: a IA esta respondendo? Nao chama modelo nenhum, nao gasta cota. */
   diagnostico() {
@@ -126,18 +126,21 @@ export class ModelRouterService {
     // insistiamos no mesmo modelo saturado e so acumulavamos espera.
     if (this.provider === 'gemini') {
       const modelos = this.modelosPara(req.task);
-      let ultimoErro: unknown = null;
+      const tentativas: { modelo: string; motivo: string }[] = [];
       for (const modelo of modelos) {
         try {
           return await this.completeGemini(req, modelo);
         } catch (err) {
-          ultimoErro = err;
-          this.logger.warn(`Modelo ${modelo} indisponivel: ${err instanceof Error ? err.message : err}`);
+          const motivo = err instanceof Error ? err.message : String(err);
+          tentativas.push({ modelo, motivo: motivo.slice(0, 700) });
+          this.logger.warn(`Modelo ${modelo} indisponivel: ${motivo}`);
         }
       }
-      const motivo = ultimoErro instanceof Error ? ultimoErro.message : String(ultimoErro);
-      this.logger.error(`Todos os modelos falharam: ${motivo}`);
-      this.quedas.push({ quando: new Date().toISOString(), task: req.task, motivo: motivo.slice(0, 300) });
+      this.logger.error(`Todos os modelos falharam na task ${req.task}`);
+      // Guarda o motivo de CADA modelo, nao so do ultimo: com um 429 de cota,
+      // o que interessa e qual limite estourou e em qual modelo - e isso vem
+      // no corpo do erro, depois dos 300 primeiros caracteres.
+      this.quedas.push({ quando: new Date().toISOString(), task: req.task, tentativas });
       if (this.quedas.length > 20) this.quedas.shift();
       return this.completeMock(req);
     }

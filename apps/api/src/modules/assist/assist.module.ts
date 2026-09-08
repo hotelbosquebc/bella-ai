@@ -310,6 +310,37 @@ export function contextoDaPergunta(conversation: string): string {
 }
 
 /**
+ * Vale a pena gastar uma chamada de IA extraindo dados de estadia?
+ *
+ * Cada sugestao custava DUAS chamadas ao Gemini: uma para extrair datas e
+ * ocupacao, outra para escrever. No plano gratuito isso estourou a cota no meio
+ * da tarde (429 registrado em 08/09/2026 as 17:02) e a Bella passou a devolver
+ * o texto de emergencia - que, de fora, parecia burrice dela.
+ *
+ * Metade dessas chamadas nao precisava existir: "aceita pet?", "que horas posso
+ * entrar?", "onde fica o hotel?" nao tem data nem quantidade para extrair. Se o
+ * hospede nao escreveu NADA que pareca estadia, pulamos a extracao.
+ *
+ * O teste e de proposito frouxo - qualquer numero solto ja passa. Errar para o
+ * lado de gastar a chamada e barato; errar para o outro lado seria deixar de
+ * montar um orcamento que o hospede pediu.
+ */
+export function pareceOrcamento(falasDoHospede: string): boolean {
+  const t = falasDoHospede || '';
+  return (
+    /\d/.test(t) ||
+    /\b(hoje|amanh[ãa]|fim de semana|final de semana|feriado|natal|ano novo|r[ée]veillon|carnaval|p[áa]scoa)\b/i.test(t) ||
+    /\b(segunda|ter[çc]a|quarta|quinta|sexta|s[áa]bado|domingo)\b/i.test(t) ||
+    /\b(janeiro|fevereiro|mar[çc]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i.test(t) ||
+    /\b(casal|fam[íi]lia|adultos?|crian[çc]as?|pessoas?|hospedes?|quartos?|apartamentos?|di[áa]rias?)\b/i.test(t) ||
+    /\b(valor|pre[çc]o|or[çc]amento|disponibilidade|dispon[íi]vel|reserva|hospedagem|estadia)\b/i.test(t) ||
+    // hospede estrangeiro tambem pede orcamento, e nao usa nenhuma palavra acima
+    /\b(disponible|disponibilidad|fechas|personas|noches|habitaci[oó]n|habitaciones|precio|presupuesto)\b/i.test(t) ||
+    /\b(available|availability|nights|rooms?|price|dates|guests?)\b/i.test(t)
+  );
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -515,7 +546,7 @@ export class AssistController {
   private async extrair(conversation: string): Promise<any> {
     const chave = createHash('sha256').update(conversation).digest('hex').slice(0, 16);
     const guardado = this.extracaoCache.get(chave);
-    if (guardado && Date.now() - guardado.ts < 120000) return guardado.stay;
+    if (guardado && Date.now() - guardado.ts < 600000) return guardado.stay;
     const today = new Date().toISOString().slice(0, 10);
     const extraction = await this.ai.complete({
       task: 'booking_extraction',
@@ -532,7 +563,11 @@ export class AssistController {
   }
 
   private async bookingContext(conversation: string, htmlDisponibilidade?: string): Promise<string> {
-    const stay: any = await this.extrair(conversation);
+    // Sem nenhum sinal de estadia na fala do hospede, nao ha o que extrair:
+    // poupa uma chamada de IA por sugestao (ver pareceOrcamento).
+    const stay: any = pareceOrcamento(apenasFalasDoHospede(conversation))
+      ? await this.extrair(conversation)
+      : {};
     // Tem dados de estadia? Entao e orcamento, qualquer que seja o rotulo.
     //
     // Caso real: "preciso saber o valor total das diarias para check in sexta
