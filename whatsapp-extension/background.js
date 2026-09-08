@@ -230,3 +230,33 @@ setInterval(async () => {
     /* sem rede: tenta de novo no proximo ciclo */
   }
 }, 10 * 60 * 1000);
+
+/**
+ * O aprendizado do dia.
+ *
+ * Uma vez por dia, enquanto o WhatsApp Web estiver aberto, pede ao servidor que
+ * leia as correcoes do atendente e transforme em licoes. Nao devolve nada para
+ * a tela de proposito: o resultado nasce PENDENTE e e revisado no painel, sem
+ * atrapalhar quem esta atendendo.
+ *
+ * A data do ultimo aprendizado fica gravada, entao fechar e abrir o navegador
+ * varias vezes no mesmo dia nao repete a analise. Roda 2 min depois que o
+ * service worker sobe, para nao competir com o primeiro atendimento do dia.
+ */
+async function aprendizadoDoDia() {
+  try {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { ultimoAprendizado } = await chrome.storage.local.get('ultimoAprendizado');
+    if (ultimoAprendizado === hoje) return;
+    await authed('/api/assist/aprender', {
+      method: 'POST',
+      body: JSON.stringify({ hotelId: HOTEL_ID }),
+    });
+    await chrome.storage.local.set({ ultimoAprendizado: hoje });
+  } catch (_) {
+    /* sem rede ou sem login: tenta de novo no proximo ciclo */
+  }
+}
+
+setTimeout(aprendizadoDoDia, 2 * 60 * 1000);
+setInterval(aprendizadoDoDia, 6 * 60 * 60 * 1000);

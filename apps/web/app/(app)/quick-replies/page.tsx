@@ -6,11 +6,16 @@ import { apiFetch } from '../../lib/api';
 
 type QuickReply = { id: string; shortcut: string; title: string; content: string };
 
+type Sugerido = { tema: string; atalhoSugerido: string; vezes: number; texto: string };
+type Sugeridos = { periodoDias: number; analisadas: number; sugestoes: Sugerido[] };
+
 export default function QuickRepliesPage() {
   const [items, setItems] = useState<QuickReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ shortcut: '', title: '', content: '' });
   const [saving, setSaving] = useState(false);
+  const [sugeridos, setSugeridos] = useState<Sugeridos | null>(null);
+  const [adicionando, setAdicionando] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -23,9 +28,35 @@ export default function QuickRepliesPage() {
     }
   }, []);
 
+  const loadSugeridos = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/assist/atalhos-sugeridos?dias=60', { cache: 'no-store' });
+      setSugeridos(res.ok ? await res.json() : { periodoDias: 60, analisadas: 0, sugestoes: [] });
+    } catch {
+      setSugeridos({ periodoDias: 60, analisadas: 0, sugestoes: [] });
+    }
+  }, []);
+
   useEffect(() => {
     load();
-  }, [load]);
+    loadSugeridos();
+  }, [load, loadSugeridos]);
+
+  /** Vira atalho de verdade. Some da lista de sugeridos porque ja existe. */
+  async function adicionarSugerido(s: Sugerido, i: number) {
+    setAdicionando(i);
+    try {
+      await apiFetch('/api/quick-replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hotelId: HOTEL_ID, shortcut: s.atalhoSugerido, title: s.tema, content: s.texto }),
+      });
+      await load();
+      await loadSugeridos();
+    } finally {
+      setAdicionando(null);
+    }
+  }
 
   async function save() {
     if (!form.shortcut.trim() || !form.content.trim()) return;
@@ -54,6 +85,37 @@ export default function QuickRepliesPage() {
       <p className="muted" style={{ marginBottom: 16 }}>
         Atalhos de texto pronto. Na Caixa de Entrada, digite <strong>/</strong> seguido do atalho (ex.: <strong>/cafe</strong>) para inserir a mensagem.
       </p>
+
+      <div className="form-card">
+        <strong>Sugeridos pelo uso</strong>
+        <p className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+          Respostas que a recepção já enviou várias vezes, quase iguais, para hóspedes diferentes —
+          ou seja, já são atalhos, só não têm botão. Orçamentos com link e mensagens com valores
+          ficam de fora de propósito: mudam a cada hóspede e envelhecem.
+        </p>
+        {!sugeridos && <p className="muted">Carregando…</p>}
+        {sugeridos && sugeridos.sugestoes.length === 0 && (
+          <p className="muted">
+            Nada repetido o bastante ainda. Conforme a Bella for usada, as respostas que se repetem aparecem aqui.
+          </p>
+        )}
+        {sugeridos?.sugestoes.map((s, i) => (
+          <div key={i} style={{ borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <strong style={{ fontSize: 14 }}>{s.tema}</strong>
+              <span className="muted" style={{ fontSize: 12 }}>enviada {s.vezes}x</span>
+              <button
+                style={{ marginLeft: 'auto' }}
+                disabled={adicionando === i}
+                onClick={() => adicionarSugerido(s, i)}
+              >
+                {adicionando === i ? 'Adicionando…' : `Criar /${s.atalhoSugerido}`}
+              </button>
+            </div>
+            <p style={{ whiteSpace: 'pre-wrap', fontSize: 13, margin: 0 }}>{s.texto}</p>
+          </div>
+        ))}
+      </div>
 
       <div className="form-card">
         <strong>Novo atalho</strong>

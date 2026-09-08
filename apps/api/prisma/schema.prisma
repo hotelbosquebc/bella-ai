@@ -339,8 +339,28 @@ model SuggestionFeedback {
   sugestao  String
   enviado   String
   modelo    String?
+  /// ja passou pela analise diaria?
+  analisado Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([hotelId, createdAt])
   @@map("suggestion_feedback")
+}
+
+/// Regra que a Bella aprendeu vendo o atendente corrigir a sugestao dela.
+/// Nasce PENDENTE: nada entra no prompt sem uma pessoa aprovar.
+model Licao {
+  id        String   @id @default(uuid())
+  hotelId   String
+  /// a regra em uma frase, do jeito que entra no prompt
+  texto     String
+  tema      String?
+  /// quantas correcoes levaram a esta mesma licao
+  exemplos  Int      @default(1)
+  /// pendente, aprovada ou recusada
+  status    String   @default("pendente")
+  createdAt DateTime @default(now())
+
+  @@index([hotelId, status])
+  @@map("licoes")
 }

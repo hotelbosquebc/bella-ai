@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Module, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Module, Param, Post, Query } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Public } from '../auth/public.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -127,6 +127,132 @@ export const TEMAS: { tema: string; padrao: RegExp }[] = [
 export function temasDaSugestao(texto: string): string[] {
   const t = texto || '';
   return TEMAS.filter((x) => x.padrao.test(t)).map((x) => x.tema);
+}
+
+/**
+ * Texto reduzido ao que importa para comparar duas mensagens.
+ *
+ * Tira acento, pontuacao e caixa. Numeros viram "0": duas mensagens iguais que
+ * so mudam a data ou a quantidade ("para 2 adultos" x "para 4 adultos") sao a
+ * MESMA resposta para efeito de atalho.
+ */
+export function chaveDeTexto(t: string): string {
+  return (t || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\d+/g, '0')
+    .replace(/[^a-z0\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Quanto duas mensagens se parecem, de 0 a 1 (Jaccard sobre palavras). */
+export function parecenca(a: string, b: string): number {
+  const A = new Set(chaveDeTexto(a).split(' ').filter(Boolean));
+  const B = new Set(chaveDeTexto(b).split(' ').filter(Boolean));
+  if (!A.size || !B.size) return 0;
+  let comuns = 0;
+  A.forEach((p) => { if (B.has(p)) comuns++; });
+  return comuns / (A.size + B.size - comuns);
+}
+
+/**
+ * Uma mensagem serve de atalho?
+ *
+ * Atalho e texto que se repete IGUAL para hospedes diferentes. Fica de fora:
+ *
+ * - o que leva link do motor: cada orcamento tem datas e ocupacao proprias;
+ * - o que tem valor em dinheiro: por regra da casa a Bella nao fala preco, e um
+ *   preco congelado num atalho envelhece e vira informacao errada;
+ * - o curto demais ("ok", "obrigada"), que ninguem precisa de botao para
+ *   escrever, e o longo demais, que quase nunca se repete inteiro.
+ */
+export function serveDeAtalho(texto: string): boolean {
+  const t = (texto || '').trim();
+  if (t.length < 60 || t.length > 1200) return false;
+  if (/sbreserva|silbeck/i.test(t)) return false;
+  if (/R\$|\breais\b|\bvalor de\b|\bdi[áa]ria de\b/i.test(t)) return false;
+  return true;
+}
+
+/**
+ * A partir de quanto duas mensagens sao "a mesma resposta".
+ *
+ * Medido, nao chutado. Em pares reais de resposta reescrita a parecenca ficou
+ * entre 0,38 e 0,64; entre respostas de assuntos diferentes, entre 0,03 e 0,18.
+ * A folga entre 0,18 e 0,38 e larga, e 0,32 fica com margem dos dois lados:
+ * junta o mesmo assunto dito com outras palavras sem colar cafe com check-in.
+ */
+export const SEMELHANTE = 0.32;
+
+/**
+ * Junta mensagens parecidas em grupos.
+ *
+ * Guloso e proposital: percorre da mais frequente para a menos e encaixa cada
+ * texto no primeiro grupo parecido o bastante. Nao busca o agrupamento otimo -
+ * busca uma lista curta de candidatos que uma pessoa vai revisar antes de
+ * virar botao.
+ */
+export function agrupar(textos: string[], limiar = SEMELHANTE): { texto: string; vezes: number }[] {
+  const grupos: { textos: string[] }[] = [];
+  for (const t of textos) {
+    const g = grupos.find((x) => parecenca(x.textos[0], t) >= limiar);
+    if (g) g.textos.push(t);
+    else grupos.push({ textos: [t] });
+  }
+  return grupos
+    .map((g) => ({
+      // representante: o mais parecido com todos os outros do grupo, e nao o
+      // primeiro que apareceu - assim o botao recebe a versao mais tipica.
+      texto: g.textos
+        .map((t) => ({ t, nota: g.textos.reduce((s, o) => s + parecenca(t, o), 0) }))
+        .sort((a, b) => b.nota - a.nota)[0].t,
+      vezes: g.textos.length,
+    }))
+    .sort((a, b) => b.vezes - a.vezes);
+}
+
+/** Apelido curto e livre para o atalho (o que a pessoa digita depois da barra). */
+export function sugerirApelido(tema: string | undefined, usados: string[]): string {
+  const base = (tema || 'resposta')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .split('-')
+    .slice(0, 2)
+    .join('-');
+  if (!usados.includes(base)) return base;
+  for (let i = 2; i < 50; i++) if (!usados.includes(base + i)) return base + i;
+  return base + Date.now();
+}
+
+/**
+ * A licao pode virar regra no prompt?
+ *
+ * O aprendizado automatico e util e perigoso pela mesma razao: ele generaliza.
+ * Uma correcao pontual do atendente ("dessa vez cobramos X") viraria regra
+ * permanente. Estas travas existem porque sao regras da casa, e nao preferencia
+ * de redacao - por isso ficam no codigo, antes da aprovacao humana, e nao como
+ * pedido no prompt:
+ *
+ * - dinheiro: a Bella nao fala preco, e preco congelado envelhece e vira erro;
+ * - reserva: ela nunca fecha reserva, so manda o link do site;
+ * - tamanho: regra que nao cabe em duas linhas nao e regra, e um texto pronto.
+ */
+export function licaoAceitavel(texto: string): { ok: boolean; motivo?: string } {
+  const t = (texto || '').trim();
+  if (t.length < 15) return { ok: false, motivo: 'curta demais' };
+  if (t.length > 240) return { ok: false, motivo: 'longa demais' };
+  if (/R\$|\breais\b|\bpre[çc]o de\b|\bvalor de\b|\bcusta\b|\bdi[áa]ria de\b/i.test(t)) {
+    return { ok: false, motivo: 'fala de valores' };
+  }
+  if (/\b(fazer|efetuar|realizar|confirmar|fechar)\s+(a\s+)?reservas?\b/i.test(t)) {
+    return { ok: false, motivo: 'sugere fechar reserva' };
+  }
+  return { ok: true };
 }
 
 /**
@@ -280,6 +406,34 @@ export class AssistController {
    * Cloudflare) e chama de novo. Sem este cache, a mesma conversa pagaria duas
    * chamadas de IA so para extrair os mesmos dados.
    */
+  /**
+   * As licoes aprovadas, em memoria.
+   *
+   * Entram em TODA sugestao, entao buscar no banco a cada pedido custaria uma
+   * ida a mais no caminho critico - e a Bella ja demorava. O cache e invalidado
+   * quando alguem aprova ou recusa algo, e expira sozinho em 10 minutos para o
+   * caso de a edicao vir de outra instancia.
+   */
+  private licoesCache: { texto: string; ts: number } | null = null;
+
+  private async contextoDasLicoes(hotelId: string): Promise<string> {
+    if (this.licoesCache && Date.now() - this.licoesCache.ts < 600000) {
+      return this.licoesCache.texto;
+    }
+    const aprovadas = await this.prisma.licao.findMany({
+      where: { hotelId, status: 'aprovada' },
+      orderBy: { exemplos: 'desc' },
+      take: 40,
+    });
+    const cabecalho =
+      '\n\nAPRENDIDO NO ATENDIMENTO (corrigido por gente da casa, vale mais que suposição):\n';
+    const texto = aprovadas.length
+      ? cabecalho + aprovadas.map((l) => '- ' + l.texto).join('\n')
+      : '';
+    this.licoesCache = { texto, ts: Date.now() };
+    return texto;
+  }
+
   private readonly extracaoCache = new Map<string, { stay: any; ts: number }>();
 
   private async extrair(conversation: string): Promise<any> {
@@ -803,6 +957,165 @@ ${url}`;
   }
 
   /**
+   * Atalhos que valem a pena existir, tirados do que a recepcao realmente manda.
+   *
+   * A ideia e nao inventar atalho de escritorio: se um texto foi enviado varias
+   * vezes, quase igual, para hospedes diferentes, ele JA e um atalho - so nao
+   * tem botao. Aqui a gente descobre quais sao e propoe; quem transforma em
+   * atalho de verdade e uma pessoa, no painel.
+   *
+   * Conta tudo o que foi enviado, inclusive quando a sugestao da Bella foi
+   * descartada: o que interessa e a resposta que a casa repete, tenha vindo
+   * dela ou do atendente.
+   */
+  @Get('atalhos-sugeridos')
+  async atalhosSugeridos(@Query('hotelId') hotelId?: string, @Query('dias') dias?: string) {
+    const id = hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    const periodo = Number(dias) || 60;
+    const desde = new Date(Date.now() - periodo * 86400000);
+    const todos = await this.prisma.suggestionFeedback.findMany({
+      where: { hotelId: id, createdAt: { gte: desde } },
+      orderBy: { createdAt: 'desc' },
+      take: 3000,
+    });
+
+    const candidatos = todos.map((f) => f.enviado).filter((t) => serveDeAtalho(t));
+    const jaExistem = await this.prisma.quickReply.findMany({ where: { hotelId: id } });
+
+    const sugestoes = agrupar(candidatos)
+      .filter((g) => g.vezes >= 2)
+      // se ja existe atalho com esse texto, nao propoe de novo
+      .filter((g) => !jaExistem.some((q) => parecenca(q.content, g.texto) >= SEMELHANTE))
+      .slice(0, 15)
+      .map((g) => {
+        const temas = temasDaSugestao(g.texto);
+        return {
+          tema: temas[0] || 'Outros',
+          atalhoSugerido: sugerirApelido(temas[0], jaExistem.map((q) => q.shortcut)),
+          vezes: g.vezes,
+          texto: g.texto,
+        };
+      });
+
+    return { periodoDias: periodo, analisadas: candidatos.length, sugestoes };
+  }
+
+  /**
+   * O aprendizado do dia.
+   *
+   * A correcao do atendente e o unico retorno honesto que temos: quando ele
+   * reescreve antes de mandar, a diferenca diz onde a Bella errou - sem
+   * depender de alguem parar para reclamar. Aqui essas diferencas viram regras
+   * em uma frase.
+   *
+   * Nada entra no prompt sozinho. Toda licao nasce PENDENTE e so passa a valer
+   * depois que uma pessoa aprova no painel. Aprendizado automatico sem revisao
+   * aprende tambem o que foi engano, e depois repete o engano com confianca.
+   *
+   * Roda uma vez por dia, chamada pela extensao. E idempotente: cada divergencia
+   * e marcada como analisada e nao volta.
+   */
+  @Post('aprender')
+  async aprender(@Body() body: { hotelId?: string; dias?: number }) {
+    const id = body?.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    const desde = new Date(Date.now() - (body?.dias || 30) * 86400000);
+
+    const divergencias = await this.prisma.suggestionFeedback.findMany({
+      where: { hotelId: id, analisado: false, acao: { not: 'igual' }, createdAt: { gte: desde } },
+      orderBy: { createdAt: 'desc' },
+      take: 40,
+    });
+    if (!divergencias.length) return { ok: true, analisadas: 0, novas: 0, motivo: 'nada novo' };
+
+    const casos = divergencias
+      .map((d, i) => `CASO ${i + 1}\nBella sugeriu: ${d.sugestao.slice(0, 700)}\nAtendente enviou: ${d.enviado.slice(0, 700)}`)
+      .join('\n\n');
+
+    const resposta = await this.ai.complete({
+      // analise offline, sem hospede esperando: vale o modelo mais cuidadoso
+      task: 'policy_answer',
+      system:
+        `Você analisa o atendimento de um hotel. Em cada caso, a assistente sugeriu uma resposta e ` +
+        `o atendente humano enviou outra. Descubra o que o humano sabia e a assistente não.\n\n` +
+        `Escreva LIÇÕES: regras curtas, em português, que evitariam o erro no futuro. Uma frase cada.\n\n` +
+        `Regras da análise:\n` +
+        `- Ignore diferenças de estilo, saudação ou ordem das frases. Só interessa diferença de CONTEÚDO.\n` +
+        `- Se o atendente só reescreveu com outras palavras, NÃO gere lição.\n` +
+        `- Nunca escreva valores, preços ou percentuais.\n` +
+        `- Nada de lição sobre fechar reservas: a assistente nunca reserva, só envia o link do site.\n` +
+        `- No máximo 6 lições. Se não houver nada real a aprender, devolva lista vazia.\n\n` +
+        `Responda SOMENTE com JSON: {"licoes":[{"texto":"...","tema":"..."}]}`,
+      messages: [{ role: 'user', content: casos }],
+      temperature: 0,
+    });
+
+    let propostas: { texto: string; tema?: string }[] = [];
+    try {
+      const bruto = (resposta.text || '').replace(/```json|```/g, '').trim();
+      const inicio = bruto.indexOf('{');
+      propostas = JSON.parse(bruto.slice(inicio, bruto.lastIndexOf('}') + 1))?.licoes ?? [];
+    } catch {
+      propostas = [];
+    }
+
+    const existentes = await this.prisma.licao.findMany({ where: { hotelId: id } });
+    const recusadas: string[] = [];
+    let novas = 0;
+
+    for (const p of propostas) {
+      const texto = (p?.texto || '').trim();
+      const veredito = licaoAceitavel(texto);
+      if (!veredito.ok) {
+        recusadas.push(`${texto.slice(0, 60)} (${veredito.motivo})`);
+        continue;
+      }
+      // Mesma licao dita de outro jeito: soma exemplo em vez de duplicar.
+      const igual = existentes.find((l) => parecenca(l.texto, texto) >= SEMELHANTE);
+      if (igual) {
+        await this.prisma.licao.update({
+          where: { id: igual.id },
+          data: { exemplos: { increment: 1 } },
+        });
+        continue;
+      }
+      const criada = await this.prisma.licao.create({
+        data: { hotelId: id, texto, tema: p?.tema || null },
+      });
+      existentes.push(criada);
+      novas++;
+    }
+
+    await this.prisma.suggestionFeedback.updateMany({
+      where: { id: { in: divergencias.map((d) => d.id) } },
+      data: { analisado: true },
+    });
+
+    return { ok: true, analisadas: divergencias.length, novas, recusadas };
+  }
+
+  /** As lições, para revisar no painel. */
+  @Get('licoes')
+  async licoes(@Query('hotelId') hotelId?: string, @Query('status') status?: string) {
+    const id = hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    return this.prisma.licao.findMany({
+      where: { hotelId: id, ...(status ? { status } : {}) },
+      orderBy: [{ status: 'asc' }, { exemplos: 'desc' }, { createdAt: 'desc' }],
+      take: 200,
+    });
+  }
+
+  /** Aprovar liga a regra no prompt; recusar a mantém guardada, mas inerte. */
+  @Post('licoes/:id')
+  async decidirLicao(@Param('id') licaoId: string, @Body() body: { status?: string }) {
+    const status = ['pendente', 'aprovada', 'recusada'].includes(body?.status || '')
+      ? body!.status!
+      : 'pendente';
+    await this.prisma.licao.update({ where: { id: licaoId }, data: { status } });
+    this.licoesCache = null;
+    return { ok: true, status };
+  }
+
+  /**
    * Diagnóstico: a produção consegue mesmo consultar o Silbeck?
    *
    * A consulta de disponibilidade vive dentro de um try/catch que, ao falhar,
@@ -927,6 +1240,7 @@ ${url}`;
         .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
         .replaceAll('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
       contextoDeApresentacao(conversation) +
+      (await this.contextoDasLicoes(hotelId)) +
       contextoDeIdioma(apenasFalasDoHospede(conversation)) +
       contextoDeHorario() +
       reserva +
