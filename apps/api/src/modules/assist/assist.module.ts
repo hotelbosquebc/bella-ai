@@ -256,6 +256,60 @@ export function licaoAceitavel(texto: string): { ok: boolean; motivo?: string } 
 }
 
 /**
+ * A ultima fala do hospede, inteira.
+ *
+ * Nao e "a ultima linha": uma mensagem de varias linhas so leva o prefixo na
+ * primeira, entao pegar a ultima linha perderia metade da pergunta. Pega o
+ * ultimo bloco contiguo de falas dele.
+ */
+export function ultimaFalaDoHospede(conversation: string): string {
+  const linhas = (conversation || '').split(/\r?\n/);
+  const bloco: string[] = [];
+  let dentro = false;
+  for (let i = linhas.length - 1; i >= 0; i--) {
+    const l = linhas[i];
+    const inicioNosso = /^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(l);
+    const inicioHospede = /^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(l);
+    if (dentro) {
+      // ja achamos o fim do bloco; subimos ate encontrar onde ele comeca
+      bloco.unshift(l);
+      if (inicioHospede) break;
+      if (inicioNosso) { bloco.shift(); break; }
+      continue;
+    }
+    if (inicioHospede) { bloco.unshift(l); dentro = true; break; }
+    if (l.trim() && !inicioNosso) { bloco.unshift(l); dentro = true; }
+    else if (inicioNosso) return '';
+  }
+  return bloco
+    .join('\n')
+    .replace(/^\s*H[óo]spede\s*(\(hoje\))?\s*:\s*/i, '')
+    .trim();
+}
+
+/**
+ * Onde a resposta deve mirar.
+ *
+ * Caso real (08/09/2026): depois de varias perguntas ja respondidas, o hospede
+ * perguntou "Que horas pode entra e que teria que sair" - check-in e check-out,
+ * duas coisas numa frase so. O modelo tem a conversa inteira na frente e se
+ * dispersa nela; aqui a ultima fala e destacada e a mira fica explicita.
+ *
+ * As duas metades importam na mesma medida. So "responda a ultima" faria ela
+ * responder metade de uma mensagem com duas perguntas - reclamacao real deste
+ * mesmo mes. So "responda tudo" faz ela repetir o que ja foi respondido.
+ */
+export function contextoDaPergunta(conversation: string): string {
+  const ultima = ultimaFalaDoHospede(conversation);
+  if (!ultima) return '';
+  return (
+    `\n\nRESPONDA AGORA A ESTA MENSAGEM DO HÓSPEDE:\n"${ultima.slice(0, 600)}"\n` +
+    `Responda TUDO o que está nela — se traz duas perguntas, responda as duas. ` +
+    `E só isso: o que já foi respondido antes na conversa não se repete.`
+  );
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -1116,6 +1170,21 @@ ${url}`;
   }
 
   /**
+   * A IA esta respondendo?
+   *
+   * Publico e de proposito, como o diagnostico do Silbeck: quando a Bella
+   * devolve o texto de emergencia, precisamos saber o motivo sem depender de
+   * login nem de ler o log do Render, que hiberna. Nao chama modelo nenhum -
+   * so relata o que ja aconteceu - entao nao gasta cota e nao expoe a chave,
+   * apenas se existe.
+   */
+  @Public()
+  @Get('diagnostico-ia')
+  diagnosticoIa() {
+    return this.ai.diagnostico();
+  }
+
+  /**
    * Diagnóstico: a produção consegue mesmo consultar o Silbeck?
    *
    * A consulta de disponibilidade vive dentro de um try/catch que, ao falhar,
@@ -1242,6 +1311,7 @@ ${url}`;
       contextoDeApresentacao(conversation) +
       (await this.contextoDasLicoes(hotelId)) +
       contextoDeIdioma(apenasFalasDoHospede(conversation)) +
+      contextoDaPergunta(conversation) +
       contextoDeHorario() +
       reserva +
       (anexos.length
@@ -1263,6 +1333,24 @@ ${url}`;
     // Troca qualquer endereco inventado pelo link oficial que montamos.
     const oficiais = (reserva.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
     const textoFinal = corrigirLinks(draft.text, oficiais);
+
+    // Nenhum modelo respondeu.
+    //
+    // Caso real (08/09/2026): o hospede perguntou o horario de entrada e saida
+    // e o painel ofereceu ao atendente o texto de emergencia - "estou com a
+    // inteligencia em configuracao". Parecia a Bella errando uma pergunta
+    // simples; era ela sem resposta nenhuma. Pior: bastava clicar em inserir
+    // para o hospede receber que a IA do hotel esta quebrada.
+    //
+    // Sugestao vazia e honesta: quem atende escreve, como escrevia antes.
+    if (draft.model === 'mock') {
+      return {
+        suggestion: '',
+        model: 'mock',
+        erro: 'A IA nao respondeu agora. Tente de novo em instantes.',
+        attachments: [],
+      };
+    }
 
     return { suggestion: formatarParaWhatsApp(textoFinal), model: draft.model, attachments: anexos };
   }

@@ -98,6 +98,28 @@ export class ModelRouterService {
     return env.MODEL_SALES ?? 'claude-fable-5';
   }
 
+
+  /**
+   * As ultimas quedas para o mock, com o motivo.
+   *
+   * Quando todos os modelos falham, a Bella devolve o texto de emergencia e a
+   * causa fica so no log do Render - que hiberna e rotaciona. Sem isso, "a
+   * Bella nao respondeu" chega como relato e nao como diagnostico: da para
+   * saber que caiu, nao por que. Guardamos em memoria (some no restart, o que
+   * basta: interessa o que esta acontecendo agora) e sem nada sensivel.
+   */
+  private readonly quedas: { quando: string; task: string; motivo: string }[] = [];
+
+  /** Diagnostico: a IA esta respondendo? Nao chama modelo nenhum, nao gasta cota. */
+  diagnostico() {
+    return {
+      provider: this.provider,
+      chaveConfigurada: this.provider === 'gemini' ? Boolean(process.env.GOOGLE_API_KEY) : null,
+      quedasRecentes: this.quedas.length,
+      ultimasQuedas: this.quedas.slice(-10),
+    };
+  }
+
   async complete(req: CompletionRequest): Promise<CompletionResult> {
     // Gemini: tenta a lista de modelos em ordem. Se o primeiro estiver
     // congestionado (503/429 no nivel gratuito), o proximo assume - antes
@@ -113,9 +135,10 @@ export class ModelRouterService {
           this.logger.warn(`Modelo ${modelo} indisponivel: ${err instanceof Error ? err.message : err}`);
         }
       }
-      this.logger.error(
-        `Todos os modelos falharam: ${ultimoErro instanceof Error ? ultimoErro.message : ultimoErro}`,
-      );
+      const motivo = ultimoErro instanceof Error ? ultimoErro.message : String(ultimoErro);
+      this.logger.error(`Todos os modelos falharam: ${motivo}`);
+      this.quedas.push({ quando: new Date().toISOString(), task: req.task, motivo: motivo.slice(0, 300) });
+      if (this.quedas.length > 20) this.quedas.shift();
       return this.completeMock(req);
     }
 

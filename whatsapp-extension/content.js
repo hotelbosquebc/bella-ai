@@ -920,6 +920,15 @@
         status('A Bella está desligada no painel.', true);
         return;
       }
+      // Nenhum modelo respondeu. NAO mostramos o texto de emergencia como se
+      // fosse sugestao: ele diz ao hospede que a IA do hotel esta quebrada, e
+      // um clique em 'Inserir no chat' bastava para envia-lo.
+      if (r.data.model === 'mock' || !r.data.suggestion) {
+        status(r.data.erro || 'A IA não respondeu agora. Tente de novo.', true);
+        panel.querySelector('#bella-suggestion').style.display = 'none';
+        sugestaoPendente = null;
+        return;
+      }
       status(automatica ? 'Sugestão pronta — revise antes de enviar.' : '');
       panel.querySelector('#bella-suggestion').style.display = 'block';
       panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
