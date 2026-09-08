@@ -324,24 +324,46 @@ export function idiomaDoHospede(falasDoHospede: string): 'es' | 'en' | 'pt' {
   const t = (falasDoHospede || '').toLowerCase();
   if (!t.trim()) return 'pt';
 
-  // Sinais exclusivos do espanhol (evitando palavras iguais nas duas linguas).
+  // Sinais de cada lingua. Vale a pena repetir por que cada palavra esta aqui:
+  //
+  // - "queria" NAO e sinal de espanhol. Foi o erro que fez a Bella responder em
+  //   espanhol a "Queria saber o valor" - portugues comum. So a forma acentuada
+  //   "quería" e espanhola, e e ela que entra.
+  // - "por favor" e igual nas duas linguas; saiu da lista.
+  // - "adultos", "hotel", "reserva", "valor" tambem existem nos dois idiomas.
+  //
+  // Portugues tambem pontua, e nao so serve de padrao. Sem isso um estrangeirismo
+  // solto numa frase inteiramente portuguesa decidia a resposta sozinho.
   const es = [
     /[¿¡ñ]/,
-    /\b(hola|buenas|buenos d[ií]as|quer[ií]a|quisiera|habitaci[oó]n|habitaciones)\b/,
-    /\b(disponible|disponibilidad|fechas|precio|cu[áa]nto|cu[áa]ntas|personas|noches)\b/,
-    /\b(gracias|por favor|ustedes|tienen|somos|ni[ñn]os|adultos y)\b/,
+    /\b(hola|buenas|buenos d[ií]as|quer[íi]a|quisiera|habitaci[oó]n|habitaciones)\b/,
+    /\b(disponible|disponibilidad|precio|cu[áa]nto|cu[áa]ntas|personas|noches)\b/,
+    /\b(gracias|ustedes|tienen|somos|ni[ñn]os|desde el|hasta el)\b/,
+    /\b(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\b/,
   ];
-  // "adultos", "hotel" e "reserva" existem nos dois idiomas: nao servem de sinal.
   const en = [
     /\b(hello|hi|good morning|good evening)\b/,
     /\b(available|availability|room|rooms|nights|price|how much|would like|thanks|thank you)\b/,
+    /\b(january|february|march|april|june|july|august|september|october|november|december)\b/,
+  ];
+  const pt = [
+    /\b(n[ãa]o|voc[êe]s?|obrigad[oa]|at[ée]|ent[ãa]o|tamb[ée]m)\b/,
+    /\b(bom dia|boa tarde|boa noite|por gentileza|tudo bem)\b/,
+    /\b(quarto|quartos|di[áa]ria|di[áa]rias|hospedagem|caf[ée] da manh[ãa]|crian[çc]as?)\b/,
+    /\b(dispon[íi]vel|disponibilidade|quantas pessoas|pre[çc]o|noites|estacionamento)\b/,
+    /\b(janeiro|fevereiro|mar[çc]o|maio|junho|julho|setembro|outubro|novembro|dezembro)\b/,
+    /\b(pra|t[áa]|vou|queria|gostaria|seria)\b/,
   ];
 
-  const pontosEs = es.filter((r) => r.test(t)).length;
-  const pontosEn = en.filter((r) => r.test(t)).length;
+  const pontos = (lista: RegExp[]) => lista.filter((r) => r.test(t)).length;
+  const pEs = pontos(es);
+  const pEn = pontos(en);
+  const pPt = pontos(pt);
 
-  if (pontosEs >= 1 && pontosEs >= pontosEn) return 'es';
-  if (pontosEn >= 1) return 'en';
+  // Portugues e a lingua da casa: para responder em outra, ela precisa GANHAR,
+  // nao empatar. Um sinal ambiguo isolado nao vira mudanca de idioma.
+  if (pEs > pPt && pEs >= pEn) return 'es';
+  if (pEn > pPt && pEn > pEs) return 'en';
   return 'pt';
 }
 
