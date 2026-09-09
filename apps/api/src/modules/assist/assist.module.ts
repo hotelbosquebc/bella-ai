@@ -365,10 +365,13 @@ export function garantirLink(texto: string, oficiais: string[]): string {
   }
 
   if (!oficiais.length && !temLink) {
-    // Frases que so fazem sentido acompanhadas de um endereco.
+    // Frases que so fazem sentido acompanhadas de um endereco. "Link" nao
+    // basta: no caso de 09/09/2026 ela escreveu "fazer a sua reserva
+    // diretamente pelo nosso site:" - promessa igual, palavra diferente.
     const prometeLink =
-      /(segue|abaixo|a seguir|neste|nesse|clicando|acesse|acessar|através d)[^.!?\n]*\blinks?\b|\blinks?\b[^.!?\n]*(abaixo|a seguir)/i;
-    const linhas = texto.split('\n').filter((l) => !prometeLink.test(l));
+      /(segue|abaixo|a seguir|neste|nesse|clicando|acesse|acessar|através d|diretamente)[^.!?\n]*\b(links?|site|endereço)\b/i;
+    const prometeSite = /\b(links?|site)\b[^.!?\n]*(abaixo|a seguir)|(pelo|no|em) nosso site\s*:?\s*$/i;
+    const linhas = texto.split('\n').filter((l) => !prometeLink.test(l) && !prometeSite.test(l));
     return linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
   }
 
@@ -576,6 +579,40 @@ export class AssistController {
     return texto;
   }
 
+  /**
+   * Por que a ultima resposta saiu (ou nao saiu) com link.
+   *
+   * Tres vezes seguidas a Bella prometeu valores e nao mandou link, e as tres
+   * vezes eu tive que adivinhar qual ramo tinha barrado. Adivinhar custa um dia
+   * de atendimento. Aqui cada saida de bookingContext deixa registrado o motivo
+   * e o que foi extraido - sem nada do hospede, so o que a decisao usou.
+   *
+   * Memoria de processo, como o diagnostico da IA: some no restart, e o que
+   * interessa e o que esta acontecendo agora.
+   */
+  private readonly decisoesLink: {
+    quando: string;
+    motivo: string;
+    checkin?: string | null;
+    checkout?: string | null;
+    adultos?: number | null;
+    criancas?: unknown;
+    intent?: string | null;
+  }[] = [];
+
+  private registrarDecisao(motivo: string, stay: any = {}) {
+    this.decisoesLink.push({
+      quando: new Date().toISOString(),
+      motivo,
+      checkin: stay.checkin ?? null,
+      checkout: stay.checkout ?? null,
+      adultos: stay.adults ?? null,
+      criancas: stay.children ?? null,
+      intent: stay.intent ?? null,
+    });
+    if (this.decisoesLink.length > 20) this.decisoesLink.shift();
+  }
+
   private readonly extracaoCache = new Map<string, { stay: any; ts: number }>();
 
   private async extrair(conversation: string): Promise<any> {
@@ -611,7 +648,29 @@ export class AssistController {
     // improvisou mandando o endereco generico do site - sem datas, sem pessoas.
     // Perguntar o preco de um periodo E pedir orcamento.
     const temDadosDeEstadia = Boolean(stay.checkin && stay.checkout && stay.adults);
-    if (stay.intent !== 'booking' && !temDadosDeEstadia) return '';
+    // Sem dados suficientes para o link.
+    //
+    // Antes esta saida era MUDA: devolvia string vazia e o modelo, sem nenhuma
+    // instrucao sobre reserva, improvisava - "voce pode verificar os valores e
+    // fazer sua reserva pelo nosso site:" e nada embaixo. Tres vezes seguidas
+    // (08 e 09/09/2026) o hospede ficou olhando para uma promessa vazia.
+    //
+    // Se o hospede claramente falou de estadia mas a extracao nao fechou os
+    // tres dados, o silencio e o pior conselho possivel: agora dizemos o que
+    // NAO fazer e o que pedir.
+    if (stay.intent !== 'booking' && !temDadosDeEstadia) {
+      if (!pareceOrcamento(apenasFalasDoHospede(conversation))) {
+        this.registrarDecisao('sem assunto de estadia', stay);
+        return '';
+      }
+      this.registrarDecisao('dados incompletos apesar de falar de estadia', stay);
+      return (
+        `\n\nSEM LINK NESTA MENSAGEM: não consegui montar o link porque falta dado do período ou da ocupação. ` +
+        `NÃO prometa link, NÃO diga "segue abaixo", NÃO mande o hóspede "ao nosso site" e NÃO escreva endereço nenhum — ` +
+        `qualquer promessa aqui sai sem nada embaixo, e o hóspede fica procurando o que não veio. ` +
+        `Peça, em uma frase curta e cordial, o que ainda falta: data de entrada, data de saída e quantas pessoas.`
+      );
+    }
 
     // As travas abaixo olham SOMENTE o que o HÓSPEDE escreveu.
     //
@@ -721,6 +780,7 @@ export class AssistController {
         checkout: 'data de saída',
         adults: 'quantidade de adultos',
       };
+      this.registrarDecisao('faltam dados (checkin/checkout/adultos)', stay);
       return (
         `\n\nRESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ` +
         `${faltam.map((c) => rotulos[c]).join(', ')}. Não pergunte o que ele já informou. ` +
@@ -777,6 +837,7 @@ export class AssistController {
       (Number(stay.adults) || 0) + (Number(stay.children0_6) || 0) + (Number(stay.children7_9) || 0);
 
     if (totalNoPedido > 15) {
+      this.registrarDecisao('grupo: passa para a equipe', stay);
       return (
         `\n\nGRUPO (${totalNoPedido} pessoas): acima de 15 pessoas o atendimento é feito pela nossa equipe. ` +
         `NÃO envie link e NÃO tente montar orçamento. Confirme com cordialidade o que entendeu ` +
@@ -844,6 +905,7 @@ ${url}`;
       }
 
       const muitos = detalhe.length >= 4;
+      this.registrarDecisao('varios apartamentos: um link para cada', stay);
       return (
         `\n\nRESERVA DE ${detalhe.length} APARTAMENTOS — UM LINK PARA CADA.\n` +
         `Primeiro confirme, em uma linha, a composição que você entendeu de cada apartamento. ` +
@@ -865,6 +927,7 @@ ${url}`;
     // Sabemos que são vários, mas não conseguimos separar as composições.
     if (Number(stay.apartamentos) > 1) {
       const linkBase = this.reservations.buildSearchLink(stay.checkin, stay.checkout);
+      this.registrarDecisao('varios apartamentos sem composicao clara', stay);
       return (
         `\n\nRESERVA DE ${stay.apartamentos} APARTAMENTOS (composição de cada um não ficou clara): ` +
         `confirme com o hóspede quantas pessoas ficam em CADA apartamento — com isso você consegue ` +
@@ -901,6 +964,7 @@ ${url}`;
         const dias = disp.diasIndisponiveis.length
           ? ` O(s) dia(s) sem disponibilidade nesse intervalo: ${disp.diasIndisponiveis.join(', ')}.`
           : '';
+        this.registrarDecisao('sem disponibilidade no sistema', stay);
         return (
           `\n\nSEM DISPONIBILIDADE (consultado agora no sistema, para ${stay.checkin} a ${stay.checkout}): ` +
           `NÃO envie o link e NÃO diga que seguem os valores — para este período o site não oferece nenhum apartamento.` +
@@ -940,6 +1004,7 @@ ${url}`;
     }
 
     const link = this.reservations.buildBookingLink(stay);
+    this.registrarDecisao('link montado', stay);
     return (
       `\n\nRESERVA: envie ESTE link ao hóspede, exatamente como está, para ele ver ` +
       `disponibilidade e valores e reservar pelo site:\n${link}\n` +
@@ -1259,6 +1324,20 @@ ${url}`;
     await this.prisma.licao.update({ where: { id: licaoId }, data: { status } });
     this.licoesCache = null;
     return { ok: true, status };
+  }
+
+  /**
+   * Por que saiu (ou nao saiu) link nas ultimas sugestoes.
+   *
+   * Publico como o diagnostico da IA, e pela mesma razao: quando o hospede
+   * recebe uma promessa sem link, precisamos saber qual ramo decidiu isso sem
+   * depender de login nem do log do Render, que hiberna. Nao devolve nada do
+   * que o hospede escreveu - so o que a decisao usou.
+   */
+  @Public()
+  @Get('diagnostico-link')
+  diagnosticoLink() {
+    return { decisoes: this.decisoesLink.slice(-10) };
   }
 
   /**
