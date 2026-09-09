@@ -668,6 +668,23 @@ export class AssistController {
     }
 
     const extraido: any = extraction.toolInput ?? {};
+    // Poda antes de guardar: o cache tinha uma entrada por conversa distinta e
+    // NUNCA saia nada dele. Numa instancia gratuita de 512 MB que fica semanas
+    // sem reiniciar, isso cresce sozinho. Entradas vencidas nao servem para
+    // nada mesmo - o proprio get ja as ignora.
+    if (this.extracaoCache.size > 200) {
+      const limite = Date.now() - 600000;
+      for (const [k, v] of this.extracaoCache) {
+        if (v.ts < limite) this.extracaoCache.delete(k);
+      }
+      // Ainda grande depois de tirar as vencidas: descarta as mais antigas.
+      if (this.extracaoCache.size > 200) {
+        const porIdade = [...this.extracaoCache.entries()].sort((a, b) => a[1].ts - b[1].ts);
+        for (const [k] of porIdade.slice(0, this.extracaoCache.size - 200)) {
+          this.extracaoCache.delete(k);
+        }
+      }
+    }
     this.extracaoCache.set(chave, { stay: extraido, ts: Date.now() });
     return extraido;
   }

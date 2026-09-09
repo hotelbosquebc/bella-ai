@@ -716,10 +716,15 @@
   }
 
   /**
-   * Guarda o texto dos audios que estao na tela, indexado pelo balao, para que
-   * o leitor da conversa possa inclui-los na ordem certa.
+   * Texto dos audios que estao na tela, indexado pelo BALAO.
+   *
+   * WeakMap, e nao Map, de proposito: o WhatsApp Web destroi e recria os baloes
+   * o tempo todo ao rolar a conversa. Um Map guardaria referencia forte a cada
+   * balao ja descartado, e a aba fica aberta o dia inteiro na recepcao - o
+   * navegador nunca recuperaria essa memoria. Com WeakMap, o balao sai da
+   * memoria junto com o DOM.
    */
-  const audiosLidos = new Map();
+  const audiosLidos = new WeakMap();
 
   async function incluirAudios() {
     const main = document.querySelector('#main');
@@ -1002,7 +1007,12 @@
     // Grava o que apareceu na tela mesmo que ninguém peça sugestão agora: o
     // WhatsApp Web descarta o histórico, então o que não for guardado quando
     // passa, some.
-    if (conversation) {
+    //
+    // Só quando MUDOU. Antes isso rodava a cada ciclo do observador - a cada
+    // 1,2s de tela parada - lendo, mesclando e regravando a conversa inteira no
+    // chrome.storage. Numa aba que fica aberta o dia todo na recepcao, era
+    // escrita continua sem nada de novo para escrever.
+    if (conversation && conversation !== ultimaConversa) {
       mesclarHistorico(lido.estruturado).catch(function () {});
     }
     if (!conversation || conversation === ultimaConversa) return;
