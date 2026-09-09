@@ -615,6 +615,19 @@ export class AssistController {
 
   private readonly extracaoCache = new Map<string, { stay: any; ts: number }>();
 
+  /**
+   * Marca de que a extracao NAO rodou - diferente de "o hospede nao informou".
+   *
+   * Quando a cota estoura, completeMock devolve {intent:'other'} sem dado
+   * nenhum: identico a uma conversa em que o hospede nao disse nada. O codigo
+   * nao distinguia "nao sei" de "nao informou", seguia como se o hospede fosse
+   * omisso e a redacao - que um instante depois ja pegava outra janela de
+   * minuto - escrevia uma mensagem confiante SEM link. Foi essa confusao que
+   * gerou as tres promessas vazias de 08 e 09/09/2026, todas em conversas em
+   * que o hospede tinha informado data e ocupacao.
+   */
+  private static readonly EXTRACAO_INDISPONIVEL = '__extracao_indisponivel__';
+
   private async extrair(conversation: string): Promise<any> {
     const chave = createHash('sha256').update(conversation).digest('hex').slice(0, 16);
     const guardado = this.extracaoCache.get(chave);
@@ -629,6 +642,13 @@ export class AssistController {
       temperature: 0,
       tools: [STAY_EXTRACTION_TOOL],
     });
+
+    // Nao guardamos em cache o que nao foi extraido: seria congelar por dez
+    // minutos a ignorancia de um segundo.
+    if (extraction.model === 'mock') {
+      return { [AssistController.EXTRACAO_INDISPONIVEL]: true };
+    }
+
     const extraido: any = extraction.toolInput ?? {};
     this.extracaoCache.set(chave, { stay: extraido, ts: Date.now() });
     return extraido;
@@ -647,6 +667,15 @@ export class AssistController {
     // 'question' (ele pediu um VALOR), o link nunca foi montado e a Bella
     // improvisou mandando o endereco generico do site - sem datas, sem pessoas.
     // Perguntar o preco de um periodo E pedir orcamento.
+    // A extracao nao rodou (cota, rede). Nao da para tratar como "o hospede nao
+    // informou": ele pode ter informado tudo. Sem esse dado, qualquer resposta
+    // sobre valores sai errada - entao a sugestao inteira falha, honestamente,
+    // e quem atende tenta de novo em segundos.
+    if (stay[AssistController.EXTRACAO_INDISPONIVEL]) {
+      this.registrarDecisao('extracao indisponivel (IA sem resposta)', {});
+      throw new Error(AssistController.EXTRACAO_INDISPONIVEL);
+    }
+
     const temDadosDeEstadia = Boolean(stay.checkin && stay.checkout && stay.adults);
     // Sem dados suficientes para o link.
     //
@@ -1459,14 +1488,31 @@ ${url}`;
       return { suggestion: '', model: 'desligada', mode: modo };
     }
 
-    const [settings, hotel, relevantPolicies, knowledgeText, reserva, anexos] = await Promise.all([
-      this.prisma.aiSettings.findUnique({ where: { hotelId } }),
-      this.prisma.hotel.findUnique({ where: { id: hotelId } }),
-      this.policies.findRelevant(hotelId, focus),
-      this.knowledge.getKnowledgeContext(hotelId),
-      this.bookingContext(conversation, body.disponibilidadeHtml),
-      this.anexosRelevantes(focus, hotelId),
-    ]);
+    // A extracao pode falhar por indisponibilidade da IA. Nesse caso a sugestao
+    // nao sai - e melhor o atendente escrever do que receber um orcamento
+    // montado sobre dados que ninguem conseguiu ler.
+    let dadosDaConversa: [any, any, any, any, string, any[]];
+    try {
+      dadosDaConversa = await Promise.all([
+        this.prisma.aiSettings.findUnique({ where: { hotelId } }),
+        this.prisma.hotel.findUnique({ where: { id: hotelId } }),
+        this.policies.findRelevant(hotelId, focus),
+        this.knowledge.getKnowledgeContext(hotelId),
+        this.bookingContext(conversation, body.disponibilidadeHtml),
+        this.anexosRelevantes(focus, hotelId),
+      ]);
+    } catch (err) {
+      if (err instanceof Error && err.message === AssistController.EXTRACAO_INDISPONIVEL) {
+        return {
+          suggestion: '',
+          model: 'mock',
+          erro: 'A IA nao respondeu agora. Tente de novo em instantes.',
+          attachments: [],
+        };
+      }
+      throw err;
+    }
+    const [settings, hotel, relevantPolicies, knowledgeText, reserva, anexos] = dadosDaConversa;
 
     const system =
       (settings?.masterPrompt ?? MASTER_PROMPT)
@@ -1477,7 +1523,7 @@ ${url}`;
         // (abaixo), que enxerga a conversa raspada do WhatsApp.
         .replaceAll('{{identityRule}}', 'siga a instrução de APRESENTAÇÃO indicada mais abaixo.')
         .replaceAll('{{guestContext}}', 'Atendimento em andamento pelo WhatsApp.')
-        .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
+        .replaceAll('{{policiesContext}}', relevantPolicies.map((p: any) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
         .replaceAll('{{knowledgeContext}}', knowledgeText || 'Nenhum.') +
       contextoDeApresentacao(conversation) +
       (await this.contextoDasLicoes(hotelId)) +

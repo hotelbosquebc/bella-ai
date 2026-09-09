@@ -991,6 +991,10 @@
    * continua SEMPRE manual: a Bella escreve, quem manda é o atendente.
    */
   let ultimaConversa = '';
+  let tituloAnterior = null;
+  /** Ultima fala do hospede que ja rendeu sugestao automatica. */
+  let ultimaFalaSugerida = null;
+  let ultimaSugestaoAutomatica = 0;
   async function aoTrocarDeConversa() {
     const lido = scrapeConversation();
     const { conversation } = lido;
@@ -1002,14 +1006,36 @@
       mesclarHistorico(lido.estruturado).catch(function () {});
     }
     if (!conversation || conversation === ultimaConversa) return;
+    const trocouDeConversa = tituloDaConversa() !== tituloAnterior;
+    tituloAnterior = tituloDaConversa();
     ultimaConversa = conversation;
-    // Conversa nova: descarta rastreamento da anterior para nao cruzar dados.
-    sugestaoPendente = null;
-    ultimaNossaConhecida = null;
-    panel.querySelector('#bella-suggestion').style.display = 'none';
-    panel.querySelector('#bella-sugtext').value = '';
-    mostrarAnexos([]);
-    if (modo && modo.autoSuggest) sugerir(true);
+    if (trocouDeConversa) {
+      // Conversa nova: descarta rastreamento da anterior para nao cruzar dados.
+      sugestaoPendente = null;
+      ultimaNossaConhecida = null;
+      panel.querySelector('#bella-suggestion').style.display = 'none';
+      panel.querySelector('#bella-sugtext').value = '';
+      mostrarAnexos([]);
+    }
+
+    // Sugerir sozinha SO quando o hospede falou algo novo.
+    //
+    // Antes bastava o texto da conversa mudar - e ele muda o tempo todo: quando
+    // NOS mandamos mensagem, quando o WhatsApp carrega historico antigo ao
+    // rolar a tela, quando um balao e redesenhado. Em 09/09/2026 isso gerou dez
+    // chamadas em cinco minutos, duas delas com 0,6s de diferenca, e foi a
+    // rajada que estourou o limite de 20 requisicoes por minuto do Gemini - que
+    // por sua vez derrubou a extracao e tirou o link das respostas.
+    //
+    // Duas travas: a fala do hospede precisa ser NOVA, e ha um intervalo minimo
+    // entre sugestoes automaticas.
+    if (!modo || !modo.autoSuggest) return;
+    const falaNova = lido.lastMessage && lido.lastMessage !== ultimaFalaSugerida;
+    const passouTempo = Date.now() - ultimaSugestaoAutomatica > 15000;
+    if (!falaNova || !passouTempo) return;
+    ultimaFalaSugerida = lido.lastMessage;
+    ultimaSugestaoAutomatica = Date.now();
+    sugerir(true);
   }
 
   // O WhatsApp Web troca de conversa sem recarregar a página; observamos o DOM.
