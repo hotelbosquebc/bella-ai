@@ -176,9 +176,9 @@ const conhecimentos = [
       'Menores devem estar sempre acompanhados dos pais. Quando viajam com outro responsável (avós, tios, terceiros), é obrigatória a autorização de viagem assinada, no modelo oficial do governo. Sem essa autorização o menor não pode se hospedar.',
   },
   {
-    title: 'Distância da praia',
+    title: 'Localização, praia e centro',
     content:
-      'O hotel fica a aproximadamente 100 metros da praia — poucos minutos a pé.',
+      'O hotel fica na Av. Brasil, 22, no CENTRO de Balneário Camboriú, a aproximadamente 100 metros da praia central — poucos minutos a pé. Sempre que falar de localização, diga a avenida e o centro: é o que situa quem não conhece a cidade, e "perto da praia" sozinho não diz onde.',
   },
   {
     title: 'Entorno e transporte',
@@ -266,6 +266,18 @@ const ATALHOS_A_REMOVER = ['24', 'banco', 'bomdia', 'confirmacao', 'confirmar', 
 const respostasRapidas = [
 ];
 
+/**
+ * Conhecimentos que mudaram de titulo e ficariam duplicados.
+ *
+ * O seed casa por TITULO: renomear um item cria o novo e deixa o antigo vivo,
+ * com o texto velho. Dois conhecimentos sobre o mesmo assunto, um deles errado,
+ * e a Bella lendo os dois. Aqui os titulos aposentados sao removidos.
+ */
+const TITULOS_OBSOLETOS = [
+  // virou "Localização, praia e centro", agora com a avenida e o centro
+  'Distância da praia',
+];
+
 async function main() {
   const hotel = await prisma.hotel.findUnique({ where: { id: HOTEL_ID } });
   if (!hotel) {
@@ -308,6 +320,10 @@ async function main() {
 
   // Remove os atalhos que este seed criou (o hotel usa os atalhos nativos do
   // WhatsApp). Idempotente: se ja foram apagados, deleteMany nao faz nada.
+  await prisma.knowledgeDocument.deleteMany({
+    where: { hotelId: hotel.id, title: { in: TITULOS_OBSOLETOS } },
+  });
+
   const removidos = await prisma.quickReply.deleteMany({
     where: { hotelId: hotel.id, shortcut: { in: ATALHOS_A_REMOVER } },
   });

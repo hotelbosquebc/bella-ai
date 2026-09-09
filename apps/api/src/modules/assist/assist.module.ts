@@ -341,6 +341,41 @@ export function pareceOrcamento(falasDoHospede: string): boolean {
 }
 
 /**
+ * A resposta promete um link? Entao o link tem que estar la.
+ *
+ * Caso real (09/09/2026): "Para verificar os valores e a disponibilidade para
+ * 10/11 a 12/11 para 2 adultos e 1 crianca de 8 anos, voce pode acessar o link
+ * abaixo" - e abaixo nao havia nada. O modelo escreveu um endereco inventado,
+ * corrigirLinks tirou (certo, era falso) e sobrou a promessa sozinha. Do lado
+ * do hospede isso e pior que nao responder: ele fica procurando o que nao veio.
+ *
+ * Duas situacoes, duas saidas:
+ *
+ * - Temos link oficial e o texto ficou sem nenhum: o link entra no fim. E o
+ *   endereco certo, montado pelo servidor - nao ha por que perder a resposta.
+ * - Nao temos link algum: a promessa e apagada. Nada de "segue o link abaixo"
+ *   quando nao existe link para seguir.
+ */
+export function garantirLink(texto: string, oficiais: string[]): string {
+  const temLink = /https?:\/\//.test(texto);
+
+  if (oficiais.length && !temLink) {
+    const faltando = oficiais.filter((u) => !texto.includes(u));
+    return (texto.trimEnd() + '\n\n' + faltando.join('\n\n')).trim();
+  }
+
+  if (!oficiais.length && !temLink) {
+    // Frases que so fazem sentido acompanhadas de um endereco.
+    const prometeLink =
+      /(segue|abaixo|a seguir|neste|nesse|clicando|acesse|acessar|através d)[^.!?\n]*\blinks?\b|\blinks?\b[^.!?\n]*(abaixo|a seguir)/i;
+    const linhas = texto.split('\n').filter((l) => !prometeLink.test(l));
+    return linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  return texto;
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -1389,7 +1424,7 @@ ${url}`;
     // do Silbeck bloqueia o IP do Render (403 "Just a moment").
     // Troca qualquer endereco inventado pelo link oficial que montamos.
     const oficiais = (reserva.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
-    const textoFinal = corrigirLinks(draft.text, oficiais);
+    const textoFinal = garantirLink(corrigirLinks(draft.text, oficiais), oficiais);
 
     // Nenhum modelo respondeu.
     //
