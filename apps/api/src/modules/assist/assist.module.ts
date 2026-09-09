@@ -379,6 +379,24 @@ export function garantirLink(texto: string, oficiais: string[]): string {
 }
 
 /**
+ * A conversa veio com autoria (quem falou cada linha)?
+ *
+ * O leitor da extensao tem um caminho de emergencia: quando nao consegue casar
+ * os baloes, manda o texto cru da tela - sem os prefixos "Hospede:" e "Nos:".
+ * E util (melhor contexto imperfeito do que resposta nenhuma), mas TODAS as
+ * travas deterministas leem esses prefixos: idioma, foco na ultima pergunta,
+ * data, ocupacao e a triagem de orcamento.
+ *
+ * Sem autoria, apenasFalasDoHospede devolve vazio e cada trava conclui, em
+ * silencio, que o hospede nao disse nada - que e exatamente a conclusao errada.
+ * Registrado no diagnostico em 09/09/2026 como "sem assunto de estadia" em
+ * conversas nas quais o hospede tinha escrito periodo e quantidade.
+ */
+export function temAutoria(conversation: string): boolean {
+  return /^\s*(H[óo]spede|N[óo]s)\s*(\(hoje\))?\s*:/im.test(conversation || '');
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -657,7 +675,20 @@ export class AssistController {
   private async bookingContext(conversation: string, htmlDisponibilidade?: string): Promise<string> {
     // Sem nenhum sinal de estadia na fala do hospede, nao ha o que extrair:
     // poupa uma chamada de IA por sugestao (ver pareceOrcamento).
-    const stay: any = pareceOrcamento(apenasFalasDoHospede(conversation))
+    //
+    // Quando a conversa vem SEM autoria (caminho cru do leitor), as falas do
+    // hospede saem vazias e a triagem concluiria que ninguem falou de estadia -
+    // calando a resposta justamente quando ela mais importa. Nesse caso a
+    // triagem olha a conversa inteira: errar para o lado de gastar a chamada e
+    // barato; errar para o outro e o hospede sem orcamento.
+    //
+    // As travas de data e ocupacao NAO seguem por aqui: aquelas continuam
+    // exigindo fala do hospede, porque validar uma data usando texto que NOS
+    // escrevemos foi o erro que gerou datas inventadas.
+    const falasParaTriagem = temAutoria(conversation)
+      ? apenasFalasDoHospede(conversation)
+      : conversation;
+    const stay: any = pareceOrcamento(falasParaTriagem)
       ? await this.extrair(conversation)
       : {};
     // Tem dados de estadia? Entao e orcamento, qualquer que seja o rotulo.
@@ -688,8 +719,8 @@ export class AssistController {
     // tres dados, o silencio e o pior conselho possivel: agora dizemos o que
     // NAO fazer e o que pedir.
     if (stay.intent !== 'booking' && !temDadosDeEstadia) {
-      if (!pareceOrcamento(apenasFalasDoHospede(conversation))) {
-        this.registrarDecisao('sem assunto de estadia', stay);
+      if (!pareceOrcamento(falasParaTriagem)) {
+        this.registrarDecisao(temAutoria(conversation) ? 'sem assunto de estadia' : 'sem assunto de estadia (conversa sem autoria)', stay);
         return '';
       }
       this.registrarDecisao('dados incompletos apesar de falar de estadia', stay);
