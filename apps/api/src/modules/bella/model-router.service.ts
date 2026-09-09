@@ -138,13 +138,17 @@ export class ModelRouterService {
             const motivo = err instanceof Error ? err.message : String(err);
             tentativas.push({ modelo, motivo: motivo.slice(0, 700) });
             this.logger.warn(`Modelo ${modelo} indisponivel: ${motivo}`);
+            // 429 e cota do PROJETO por minuto, compartilhada por TODOS os
+            // modelos: tentar o proximo nao ajuda e ainda gasta o pouco que
+            // resta da janela. Para o laco aqui.
+            if (motivo.includes('429')) break;
           }
         }
-        // Todos os modelos caíram nesta chave. Se o motivo foi COTA (429), a
-        // culpa não é do modelo e sim do teto do projeto: outra chave tem teto
-        // próprio. Qualquer outro erro não melhora trocando de chave.
-        const ultimas = tentativas.slice(-modelos.length);
-        const foiCota = ultimas.length === modelos.length && ultimas.every((t) => t.motivo.includes('429'));
+        // A ultima tentativa caiu por cota? Entao a culpa nao e do modelo e sim
+        // do teto do projeto - e outra chave tem teto proprio. Qualquer outro
+        // erro nao melhora trocando de chave.
+        const ultima = tentativas[tentativas.length - 1];
+        const foiCota = Boolean(ultima && ultima.motivo.includes('429'));
         if (!foiCota || !this.proximaChave()) break;
       }
       this.logger.error(`Todos os modelos falharam na task ${req.task}`);
@@ -306,7 +310,36 @@ export class ModelRouterService {
     }
   }
 
-  /** POST ao Gemini com retry em 503/429 (transitórios comuns no nível gratuito) */
+  /**
+   * Quantos segundos o proprio Google pede para esperar, quando ele diz.
+   *
+   * O corpo do 429 traz "Please retry in 26.4s" e/ou "retryDelay": "26s".
+   * Obedecer isso e melhor que chutar backoff: o numero e o tempo que falta
+   * para a janela do minuto virar.
+   */
+  private segundosDeEspera(texto: string): number | null {
+    const m =
+      texto.match(/retry in ([\d.]+)s/i) || texto.match(/"retryDelay"\s*:\s*"([\d.]+)s"/i);
+    return m ? Number(m[1]) : null;
+  }
+
+  /**
+   * POST ao Gemini com nova tentativa quando o erro e transitorio.
+   *
+   * 503 e congestionamento do modelo: outro modelo pode atender, e insistir um
+   * pouco costuma resolver.
+   *
+   * 429 e OUTRA coisa, e por muito tempo tratamos igual - foi o erro que nos
+   * custou o dia 08/09/2026. O limite gratuito e de 20 requisicoes POR MINUTO
+   * e vale para o PROJETO INTEIRO, nao para cada modelo. Insistir tres vezes em
+   * cada um dos tres modelos gerava nove requisicoes por chamada, e a Bella faz
+   * duas chamadas por sugestao: dezoito, num teto de vinte. Ou seja, o proprio
+   * mecanismo de defesa estourava a cota que ele tentava contornar.
+   *
+   * Agora: se a espera pedida e curta, esperamos e tentamos DE NOVO no mesmo
+   * modelo (a janela vira em segundos). Se e longa, desistimos rapido - e quem
+   * chamou sabe, pelo 429 na mensagem, que nao adianta tentar outro modelo.
+   */
   private async fetchWithRetry(url: string, body: unknown, attempts = 3): Promise<any> {
     let lastErr = '';
     for (let i = 0; i < attempts; i++) {
@@ -317,8 +350,19 @@ export class ModelRouterService {
       });
       if (res.ok) return res.json();
       lastErr = `Gemini ${res.status}: ${await res.text()}`;
-      if (res.status === 503 || res.status === 429) {
-        // backoff curto e crescente (0,8s, 1,6s) antes de nova tentativa
+
+      if (res.status === 429) {
+        const espera = this.segundosDeEspera(lastErr);
+        if (espera !== null && espera <= 8 && i < attempts - 1) {
+          this.logger.warn(`Cota por minuto atingida; aguardando ${espera}s como o Google pediu.`);
+          await new Promise((r) => setTimeout(r, espera * 1000 + 250));
+          continue;
+        }
+        break;
+      }
+
+      if (res.status === 503) {
+        // congestionamento: backoff curto e crescente (0,8s, 1,6s)
         await new Promise((r) => setTimeout(r, 800 * (i + 1)));
         continue;
       }
