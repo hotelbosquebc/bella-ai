@@ -397,6 +397,64 @@ export function temAutoria(conversation: string): boolean {
 }
 
 /**
+ * Os dias extraidos aparecem MESMO no que o hospede escreveu?
+ *
+ * A trava anterior perguntava "o hospede citou alguma data?" - fraca demais.
+ * Caso real (09/09/2026): ele escreveu "Final novembro" e "6 dias", e o extrator
+ * devolveu 01/12 a 07/12. A Bella entao respondeu "para 6 pessoas em dezembro" e
+ * consultou disponibilidade num periodo que ninguem pediu. Periodo VAGO virou
+ * periodo exato, com a confianca de quem foi informado.
+ *
+ * Agora exigimos corroboracao: o dia da entrada e o da saida precisam aparecer
+ * como numero na fala do hospede. "22/11 a 27/11" corrobora 2026-11-22; "final
+ * novembro" nao corrobora dia nenhum.
+ *
+ * A excecao sao as expressoes relativas que apontam um periodo unico e
+ * resolvivel - "amanha", "fim de semana", "natal", "ano novo". Essas o extrator
+ * PODE converter, e exigir digito ali seria recusar data legitima. Nome de mes
+ * solto ("final de novembro", "em janeiro") nao entra nessa lista de proposito:
+ * e justamente o caso ambiguo que gerou o erro.
+ */
+export function datasCorroboradas(falasDoHospede: string, checkin?: string | null, checkout?: string | null): boolean {
+  const t = falasDoHospede || '';
+  if (!checkin && !checkout) return true;
+
+  const relativaResolvivel =
+    /\b(hoje|amanh[ãa]|depois de amanh[ãa]|fim de semana|final de semana|feriado|natal|ano novo|r[ée]veillon|carnaval|p[áa]scoa)\b/i;
+  if (relativaResolvivel.test(t)) return true;
+
+  const numeros = new Set((t.match(/\d{1,2}/g) || []).map((n) => String(Number(n))));
+  const diaAparece = (data?: string | null) => {
+    if (!data) return true;
+    const m = data.match(/^\d{4}-(\d{2})-(\d{2})$/);
+    if (!m) return true;
+    return numeros.has(String(Number(m[2])));
+  };
+
+  return diaAparece(checkin) && diaAparece(checkout);
+}
+
+/**
+ * O hospede pediu mais de um periodo na mesma conversa?
+ *
+ * Caso real (09/09/2026): "22/11 a 27/11" e, na mensagem seguinte, "E para 5
+ * pessoas 27/09 a 28/09". A extracao devolveu UM orcamento so - as datas do
+ * primeiro pedido com a quantidade do segundo - e o link saiu com a combinacao
+ * que ninguem pediu. Misturar dois pedidos e pior que nao responder: parece
+ * atendimento feito, e esta errado.
+ */
+export function periodosPedidos(falasDoHospede: string): string[] {
+  const t = falasDoHospede || '';
+  const intervalo = /\b(\d{1,2})\s*\/\s*(\d{1,2})\s*(?:a|at[ée]|-|\u2013)\s*(\d{1,2})\s*\/\s*(\d{1,2})\b/gi;
+  const achados = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = intervalo.exec(t)) !== null) {
+    achados.add(`${m[1]}/${m[2]}-${m[3]}/${m[4]}`);
+  }
+  return [...achados];
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -780,6 +838,13 @@ export class AssistController {
       temDataRelativa.test(falasDoHospede) ||
       temDiaDaSemana.test(falasDoHospede);
 
+    // Datas que o hospede nao corroborou nao valem, mesmo que ele tenha citado
+    // ALGUMA data em algum momento: ver datasCorroboradas.
+    if ((stay.checkin || stay.checkout) && !datasCorroboradas(falasDoHospede, stay.checkin, stay.checkout)) {
+      stay.checkin = null;
+      stay.checkout = null;
+      stay.periodoVago = true;
+    }
     if (!mencionaData && (stay.checkin || stay.checkout)) {
       stay.checkin = null;
       stay.checkout = null;
@@ -850,6 +915,24 @@ export class AssistController {
         `NÃO prometa valor, desconto, prazo nem condição: só ofereça o encaminhamento. ` +
         `Se ele aceitar, encaminhe para a equipe.`
       : '';
+    // Dois periodos diferentes no mesmo pedido.
+    //
+    // A extracao devolve UM orcamento so, e o que sai e a combinacao errada -
+    // as datas de um pedido com a quantidade do outro. Um link assim parece
+    // atendimento pronto e esta errado, o que e pior do que nao mandar link.
+    const periodos = periodosPedidos(falasDoHospede);
+    if (periodos.length > 1) {
+      this.registrarDecisao(`${periodos.length} periodos pedidos`, stay);
+      return (
+        `\n\nO HÓSPEDE PEDIU ${periodos.length} PERÍODOS DIFERENTES (${periodos.join(' e ')}) — ` +
+        `e cada um pode ter quantidade de pessoas própria.\n` +
+        `NÃO mande link nesta mensagem: um link só misturaria as datas de um pedido com as pessoas do outro. ` +
+        `Responda reconhecendo os DOIS períodos, um por um, e confirme numa frase curta quantas pessoas ficam em cada. ` +
+        `Assim que ele confirmar, você monta um orçamento para cada período.` +
+        ofertaAtendimento
+      );
+    }
+
     const faltam = ['checkin', 'checkout', 'adults'].filter((c) => !stay[c]);
     if (faltam.length) {
       const rotulos: Record<string, string> = {
@@ -858,10 +941,17 @@ export class AssistController {
         adults: 'quantidade de adultos',
       };
       this.registrarDecisao('faltam dados (checkin/checkout/adultos)', stay);
+      const avisoVago = stay.periodoVago
+        ? ` O hóspede deu um período VAGO (ex.: "final de novembro"): NÃO afirme um mês, ` +
+          `uma semana ou datas específicas que ele não disse — foi assim que "final de novembro" ` +
+          `virou "dezembro" numa resposta. Peça as datas exatas e explique, em meia frase, ` +
+          `que os valores mudam conforme o período.`
+        : '';
       return (
         `\n\nRESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ` +
         `${faltam.map((c) => rotulos[c]).join(', ')}. Não pergunte o que ele já informou. ` +
-        `NÃO prometa verificar valores ou disponibilidade — quem consulta é o próprio hóspede no link.`
+        `NÃO prometa verificar valores ou disponibilidade — quem consulta é o próprio hóspede no link.` +
+        avisoVago
       );
     }
 
