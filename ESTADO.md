@@ -319,3 +319,43 @@ Corrigido na 1.6.1.
 
 **Tabela nova:** `licoes` + coluna `analisado` em `suggestion_feedback`
 (migration `20260908160000_licoes`). Precisa ir junto na migração para o Supabase.
+
+## 🧠 Ler sem IA + sobreviver ao 429 (09–10/09/2026)
+
+**A cota é por MINUTO, não por dia.** O plano grátis do Gemini dá 20 requisições
+por minuto para o PROJETO inteiro, compartilhadas por todos os modelos — por isso
+trocar de modelo não ajuda. Quando estoura, `completeMock` devolve
+`{intent:'other'}` vazio, que é idêntico a "o hóspede não informou nada": foi essa
+confusão que gerou as promessas de link sem link.
+
+Diagnóstico, público e sem gastar cota:
+- `GET /api/assist/diagnostico-ia` — quedas com o motivo de cada modelo
+- `GET /api/assist/diagnostico-link` — por que saiu (ou não) link, com `semIA`
+
+**O que passou a rodar sem IA nenhuma** (`assist.module.ts`):
+- `intervalosNaFala()` — lê `10/10 a 12/10`, `14 a 19 janeiro`,
+  `28 janeiro a 02 fevereiro`, `de 8 a 13 de setembro`. Mês por PREFIXO de 3
+  letras (o hóspede erra: "janwiro"). Devolve TODOS os períodos: "ou" = duas
+  alternativas, não uma.
+- `extrairDeterminista()` — período + ocupação explícitos ⇒ zero chamadas de IA.
+  Devolve `null` em qualquer ambiguidade (dois períodos, "casal", vários quartos).
+- `ocupacaoNaFala()` + `normalizarOcupacao()` — **≥ 10 anos conta como adulto**
+  (política: 0-6 cortesia, 7-9 meia, 10+ adulto). Idade só conta perto de palavra
+  de criança, senão "venho há 10 anos" viraria hóspede.
+- `datasCorroboradas()` — o dia extraído precisa aparecer na fala. "Final
+  novembro" não corrobora 01/12.
+- `respostaSemIA()` — com o modelo fora, pede o período em pt/es/en, só o que
+  falta, respeitando a apresentação diária.
+
+**Extensão 1.8.1:** auto-sugestão só quando o HÓSPEDE fala algo novo (15s de
+intervalo); `audiosLidos` virou WeakMap; histórico só grava quando muda.
+
+⚠️ **Quedas em PARES no mesmo segundo = WhatsApp Web com Bella automática em duas
+máquinas.** Deixar automático em uma só corta metade do consumo.
+
+⚠️ **PENDENTE — a única peça que falta:** 2ª e 3ª `GOOGLE_API_KEY` (contas Google
+diferentes), separadas por vírgula em Render → bella-api → Environment. O rodízio
+já está implementado e ativa sozinho no 429.
+
+⚠️ **PENDENTE — backup:** `DATABASE_URL="..." node scripts/backup.js` antes de o
+Postgres grátis expirar (~12/09/2026). `scripts/restore.js` recoloca em outro banco.
