@@ -744,6 +744,68 @@ export function contextoDeIdioma(falasDoHospede: string): string {
   return `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em PORTUGUÊS. Responda em português.`;
 }
 /**
+ * A resposta que a casa daria, escrita sem IA nenhuma.
+ *
+ * Existe para o caso em que o modelo esta fora do ar - hoje, quase sempre por
+ * cota - e a pergunta e a mais comum do atendimento: "gostaria de reservar um
+ * quarto pra 2 pessoas?", sem dizer quando. A resposta certa ai nao tem nada de
+ * criativo: e pedir periodo, quantidade e idades, exatamente como a propria
+ * mensagem automatica do hotel ja pede.
+ *
+ * Caso real (10/09/2026): a IA caiu, a sugestao veio vazia e o hospede ficou
+ * sem resposta - quando bastava pedir a data.
+ *
+ * NAO tenta cobrir o resto. Duvida sobre cafe, pet ou estacionamento continua
+ * exigindo o modelo: inventar texto pronto para tudo seria trocar "sem
+ * resposta" por "resposta errada", que e pior.
+ */
+export function respostaSemIA(reserva: string, conversation: string): string {
+  const marca = 'RESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ';
+  const i = (reserva || '').indexOf(marca);
+  if (i < 0) return '';
+
+  const pedidos = (reserva || '').slice(i + marca.length).split('.')[0];
+  const falta = (campo: string) => pedidos.includes(campo);
+  const idioma = idiomaDoHospede(apenasFalasDoHospede(conversation));
+
+  const textos = {
+    pt: {
+      saudacao: 'Olá! Sou a Bella, assistente online do Hotel do Bosque.',
+      pedido: 'Para eu preparar o seu orçamento, me informe por gentileza:',
+      data: '📅 Período da estadia (data de entrada e saída)',
+      pessoas: '👥 Quantidade total de pessoas',
+      criancas: '🧒 Caso tenha crianças, as idades',
+      fim: 'Assim que me passar esses dados, envio o link com os valores e a disponibilidade.',
+    },
+    es: {
+      saudacao: '¡Hola! Soy Bella, asistente online del Hotel do Bosque.',
+      pedido: 'Para preparar su presupuesto, por favor infórmeme:',
+      data: '📅 Período de la estadía (fecha de entrada y salida)',
+      pessoas: '👥 Cantidad total de personas',
+      criancas: '🧒 Si viajan niños, las edades',
+      fim: 'Con esos datos le envío el enlace con los valores y la disponibilidad.',
+    },
+    en: {
+      saudacao: "Hello! I'm Bella, the Hotel do Bosque online assistant.",
+      pedido: 'To prepare your quote, could you please tell me:',
+      data: '📅 Dates of your stay (check-in and check-out)',
+      pessoas: '👥 Total number of guests',
+      criancas: '🧒 If children are coming, their ages',
+      fim: 'With that, I can send you the link with rates and availability.',
+    },
+  };
+
+  const x = textos[idioma];
+  // Nao se apresenta duas vezes no mesmo dia: a mesma regra do caminho normal.
+  const jaSeApresentou = /JÁ se apresentou/.test(contextoDeApresentacao(conversation));
+  const linhas = jaSeApresentou ? [x.pedido, ''] : [x.saudacao, '', x.pedido, ''];
+  if (falta('data de entrada') || falta('data de saída')) linhas.push(x.data);
+  if (falta('quantidade de adultos')) linhas.push(x.pessoas);
+  linhas.push(x.criancas, '', x.fim);
+  return linhas.join('\n');
+}
+
+/**
  * A Bella deve se apresentar nesta mensagem?
  *
  * O modelo vê a conversa mas não sabe se já se apresentou, então repetia
@@ -1881,6 +1943,24 @@ ${url}`;
       ]);
     } catch (err) {
       if (err instanceof Error && err.message === AssistController.EXTRACAO_INDISPONIVEL) {
+        // A extracao caiu, mas nem tudo depende dela: se o hospede NAO escreveu
+        // periodo nenhum - e isso a gente verifica no codigo, sem IA - a
+        // resposta certa e pedir a data. Foi o caso de 10/09/2026: "gostaria de
+        // reservar um quarto pra 2 pessoas?" ficou sem resposta porque a IA
+        // estava fora, quando bastava perguntar quando.
+        const falas = apenasFalasDoHospede(conversation);
+        const semPeriodo = intervalosNaFala(falas).length === 0;
+        const dizQuantos = Boolean(ocupacaoNaFala(falas)) || /\b\d{1,2}\s*(?:adultos?|pessoas?|hóspedes?)\b/i.test(falas);
+        if (semPeriodo && pareceOrcamento(falas)) {
+          const pedir = ['data de entrada', 'data de saída'];
+          if (!dizQuantos) pedir.push('quantidade de adultos');
+          const marca = 'RESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ' + pedir.join(', ') + '.';
+          const pronta = respostaSemIA(marca, conversation);
+          if (pronta) {
+            this.registrarDecisao('resposta sem IA (pediu as datas)', {});
+            return { suggestion: formatarParaWhatsApp(pronta), model: 'sem-ia', attachments: [] };
+          }
+        }
         return {
           suggestion: '',
           model: 'mock',
@@ -1939,6 +2019,21 @@ ${url}`;
     //
     // Sugestao vazia e honesta: quem atende escreve, como escrevia antes.
     if (draft.model === 'mock') {
+      // Antes de desistir: da para responder sem IA?
+      //
+      // Na pergunta mais comum do atendimento - "gostaria de reservar um quarto
+      // pra 2 pessoas?", sem dizer quando - a resposta certa e pedir a data, e
+      // isso nao precisa de modelo. Caso real de 10/09/2026: a IA caiu, a
+      // sugestao veio vazia e o hospede ficou sem resposta quando bastava
+      // perguntar o periodo.
+      const pronta = respostaSemIA(reserva, conversation);
+      if (pronta) {
+        return {
+          suggestion: formatarParaWhatsApp(pronta),
+          model: 'sem-ia',
+          attachments: [],
+        };
+      }
       return {
         suggestion: '',
         model: 'mock',
