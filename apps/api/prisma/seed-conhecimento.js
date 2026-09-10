@@ -74,7 +74,10 @@ const conhecimentos = [
   {
     title: 'Formas e condições de pagamento',
     content:
-      'Pagamento com 5% de desconto no pix. Parcelamento em até 10x, sendo até 3x sem juros, com valor MÍNIMO de parcela de R$ 200,00 (ou seja, o número de parcelas depende do valor total da reserva). IMPORTANTE para a Bella: no caminho que ela conduz, o hóspede reserva no próprio site e paga ali, no momento de concluir a reserva — é o pagamento que confirma. Sinal, entrada e prazos de pagamento valem para reservas feitas pela equipe e NÃO devem ser informados pela Bella.',
+      'Toda reserva só é CONFIRMADA com um PRÉ-PAGAMENTO — não existe reserva garantida sem pagar. Há dois caminhos, e a Bella PODE explicar as opções de entrada quando perguntarem. ' +
+      '(1) SITE oficial (o caminho que a Bella conduz): o hóspede conclui a reserva pagando o VALOR TOTAL na hora, com PIX (5% de desconto) ou CARTÃO DE CRÉDITO (até 10x, sendo até 3x sem juros, com valor MÍNIMO de parcela de R$ 200,00 — o número de parcelas depende do valor total). É esse pagamento que confirma; sempre envie o link e oriente a reservar e pagar ali. ' +
+      '(2) WhatsApp, com a EQUIPE de reservas: a reserva e o pagamento via PIX são feitos PELA EQUIPE de atendimento — a Bella NÃO fecha nem processa esse pagamento, ela informa as opções e encaminha para a equipe realizar. Duas opções de entrada: (a) 50% do valor total para confirmar e o restante no check-in; (b) o valor total parcelado em pagamentos mensais até a data do check-in, com o ÚLTIMO pagamento no check-in (a quantidade de parcelas depende do mês vigente e da data da estadia). ' +
+      'A Bella informa essas opções, mas NÃO negocia preço, desconto ou condição diferente das acima; o fechamento via WhatsApp é sempre com a equipe.',
   },
   {
     title: 'Secador de cabelo e ferro de passar',

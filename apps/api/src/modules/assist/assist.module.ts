@@ -458,6 +458,80 @@ export function periodosPedidos(falasDoHospede: string): string[] {
 }
 
 /**
+ * Extracao sem IA, para quando a frase nao tem o que interpretar.
+ *
+ * "10/10 a 12/10 / 2 adultos" nao precisa de modelo nenhum - e data e numero,
+ * escritos por extenso. Mas cada sugestao gastava uma chamada so para ler isso,
+ * e a chamada de extracao virou a maior consumidora do teto de 20 requisicoes
+ * por minuto: em 10/09/2026 as VINTE ultimas quedas eram todas de extracao, com
+ * o Google pedindo 30 a 46 segundos de espera. Toda vez que o teto estourava, a
+ * ocupacao voltava vazia e a resposta saia sem link.
+ *
+ * Aqui a conversa e lida no codigo. So devolve resultado quando os tres dados
+ * saem inteiros e sem ambiguidade; em qualquer duvida devolve null e a IA
+ * assume, como antes. E melhor gastar a chamada do que adivinhar.
+ *
+ * Ano: DD/MM sem ano vira a proxima ocorrencia a partir de hoje - "10/10" em
+ * setembro e outubro deste ano; em novembro seria outubro do ano que vem.
+ */
+export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): any | null {
+  const t = falasDoHospede || '';
+
+  // Um periodo, e apenas um: dois pedidos diferentes tem tratamento proprio.
+  const intervalos = t.match(/\b\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?\s*(?:a|at[ée]|-|\u2013)\s*\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?\b/gi);
+  if (!intervalos || intervalos.length !== 1) return null;
+
+  const m = intervalos[0].match(
+    /(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|at[ée]|-|\u2013)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?/i,
+  );
+  if (!m) return null;
+
+  const monta = (dia: string, mes: string, ano?: string) => {
+    const d = Number(dia);
+    const mm = Number(mes);
+    if (d < 1 || d > 31 || mm < 1 || mm > 12) return null;
+    let yyyy = ano ? Number(ano.length === 2 ? '20' + ano : ano) : hoje.getFullYear();
+    const data = new Date(Date.UTC(yyyy, mm - 1, d));
+    if (data.getUTCMonth() !== mm - 1 || data.getUTCDate() !== d) return null; // 31/02
+    if (!ano) {
+      // Sem ano: se a data ja passou, o hospede fala do ano que vem.
+      const hojeUTC = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+      if (data < hojeUTC) {
+        yyyy += 1;
+        return new Date(Date.UTC(yyyy, mm - 1, d));
+      }
+    }
+    return data;
+  };
+
+  const entrada = monta(m[1], m[2], m[3]);
+  const saida = monta(m[4], m[5], m[6]);
+  if (!entrada || !saida || saida <= entrada) return null;
+
+  // Ocupacao: so a forma explicita. "casal", "familia" e afins ficam com a IA.
+  const mAdultos = t.match(/\b(\d{1,2})\s*adultos?\b/i);
+  const mPessoas = t.match(/\b(\d{1,2})\s*(?:pessoas?|h[óo]spedes?)\b/i);
+  const semCrianca = !/(crian[çc]a|menor|filh|beb[êe]|neto|neta)/i.test(t);
+  const adultos = mAdultos ? Number(mAdultos[1]) : semCrianca && mPessoas ? Number(mPessoas[1]) : null;
+  if (!adultos || adultos < 1 || adultos > 15) return null;
+
+  // Mais de um apartamento pedido: a composicao de cada um nao sai de regex.
+  if (/\b(\d{1,2})\s*(?:apartamentos|quartos|apt[os]?|su[íi]tes)\b/i.test(t)) return null;
+
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return {
+    checkin: iso(entrada),
+    checkout: iso(saida),
+    adults: adultos,
+    children0_6: 0,
+    children7_9: 0,
+    intent: 'booking',
+    apartamentos: 1,
+    semIA: true,
+  };
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -748,6 +822,7 @@ export class AssistController {
     adultos?: number | null;
     criancas?: unknown;
     intent?: string | null;
+    semIA?: boolean;
   }[] = [];
 
   private registrarDecisao(motivo: string, stay: any = {}) {
@@ -759,6 +834,8 @@ export class AssistController {
       adultos: stay.adults ?? null,
       criancas: stay.children ?? null,
       intent: stay.intent ?? null,
+      // leu sem gastar chamada de IA? serve para medir a economia
+      semIA: Boolean(stay.semIA),
     });
     if (this.decisoesLink.length > 20) this.decisoesLink.shift();
   }
@@ -837,9 +914,17 @@ export class AssistController {
     const falasParaTriagem = temAutoria(conversation)
       ? apenasFalasDoHospede(conversation)
       : conversation;
-    const stay: any = pareceOrcamento(falasParaTriagem)
-      ? await this.extrair(conversation)
-      : {};
+    // Antes de gastar chamada: a frase se le sozinha?
+    //
+    // "10/10 a 12/10 / 2 adultos" nao precisa de modelo. Isso corta a maior
+    // consumidora do teto de 20 requisicoes por minuto - e, de quebra, torna o
+    // caso mais comum imune a 429.
+    const semIA = extrairDeterminista(apenasFalasDoHospede(conversation));
+    const stay: any = semIA
+      ? semIA
+      : pareceOrcamento(falasParaTriagem)
+        ? await this.extrair(conversation)
+        : {};
     // Tem dados de estadia? Entao e orcamento, qualquer que seja o rotulo.
     //
     // Caso real: "preciso saber o valor total das diarias para check in sexta
