@@ -446,15 +446,93 @@ export function datasCorroboradas(falasDoHospede: string, checkin?: string | nul
  * que ninguem pediu. Misturar dois pedidos e pior que nao responder: parece
  * atendimento feito, e esta errado.
  */
-export function periodosPedidos(falasDoHospede: string): string[] {
-  const t = falasDoHospede || '';
-  const intervalo = /\b(\d{1,2})\s*\/\s*(\d{1,2})\s*(?:a|at[ée]|-|\u2013)\s*(\d{1,2})\s*\/\s*(\d{1,2})\b/gi;
-  const achados = new Set<string>();
+export function periodosPedidos(falasDoHospede: string, hoje = new Date()): string[] {
+  return intervalosNaFala(falasDoHospede, hoje).map((p) => {
+    const br = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+    return br(p.checkin) + ' a ' + br(p.checkout);
+  });
+}
+
+/**
+ * Meses por prefixo, de proposito.
+ *
+ * O hospede digita rapido e erra: "28janwiro a 02 fevereiro" e uma mensagem
+ * real de 10/09/2026. Casar so a grafia certa deixaria a frase inteira sem
+ * leitura. Tres letras bastam para nao haver confusao entre meses.
+ */
+const MESES: Record<string, number> = {
+  jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6,
+  jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12,
+};
+
+/**
+ * Todos os periodos que o hospede escreveu, em qualquer das formas usuais.
+ *
+ * Antes so lia "10/10 a 12/10". Mas em conversa de hotel o periodo vem escrito
+ * de varios jeitos - "14 a 19 janeiro", "28 janeiro a 02 fevereiro", "de 8 a 13
+ * de setembro" - e cada forma que a gente nao le vira uma chamada de IA gasta,
+ * ou pior, um orcamento errado.
+ *
+ * Devolve TODOS os intervalos achados: um pedido com duas alternativas ("14 a
+ * 19 janeiro OU 28 de janeiro a 02 de fevereiro") precisa ser reconhecido como
+ * dois, nao colapsado num so.
+ */
+export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: string; checkout: string }[] {
+  const t = texto || '';
+  const mes = (p: string) => MESES[(p || '').slice(0, 3).toLowerCase()] || 0;
+
+  const brutos: { d1: number; m1: number; a1?: string; d2: number; m2: number; a2?: string }[] = [];
+  const push = (d1: any, m1: any, d2: any, m2: any, a1?: string, a2?: string) => {
+    if (m1 && m2) brutos.push({ d1: Number(d1), m1: Number(m1), a1, d2: Number(d2), m2: Number(m2), a2 });
+  };
+
+  // Escritas em literal, e nao montadas com new RegExp: as barras invertidas
+  // sobrevivem intactas e o que se le aqui e o que roda.
+  //
+  // 10/10 a 12/10  |  16/01/2027 a 20/01/2027
+  const rNumerico = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+  // 28 janeiro a 02 fevereiro  |  28 de janeiro até 2 de fevereiro
+  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*/gi;
+  // 14 a 19 janeiro  |  de 8 a 13 de setembro
+  const rUmMes = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*/gi;
+
   let m: RegExpExecArray | null;
-  while ((m = intervalo.exec(t)) !== null) {
-    achados.add(`${m[1]}/${m[2]}-${m[3]}/${m[4]}`);
+  while ((m = rNumerico.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
+  while ((m = rDoisMeses.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
+  while ((m = rUmMes.exec(t)) !== null) push(m[1], mes(m[3]), m[2], mes(m[3]));
+
+  const hojeUTC = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
+  const vistos = new Set<string>();
+  const saida: { checkin: string; checkout: string }[] = [];
+
+  for (const b of brutos) {
+    const monta = (d: number, mm: number, ano?: string) => {
+      if (d < 1 || d > 31 || mm < 1 || mm > 12) return null;
+      const yyyy = ano ? Number(ano.length === 2 ? '20' + ano : ano) : hojeUTC.getUTCFullYear();
+      let data = new Date(Date.UTC(yyyy, mm - 1, d));
+      if (data.getUTCMonth() !== mm - 1) return null; // 31/02 e afins
+      // Sem ano: data que ja passou e do ano que vem.
+      if (!ano && data < hojeUTC) data = new Date(Date.UTC(yyyy + 1, mm - 1, d));
+      return data;
+    };
+    const entrada = monta(b.d1, b.m1, b.a1);
+    let saidaData = monta(b.d2, b.m2, b.a2);
+    if (!entrada || !saidaData) continue;
+    // Virada de ano: "28 de dezembro a 02 de janeiro".
+    if (saidaData <= entrada && !b.a2) {
+      saidaData = new Date(Date.UTC(saidaData.getUTCFullYear() + 1, saidaData.getUTCMonth(), saidaData.getUTCDate()));
+    }
+    if (saidaData <= entrada) continue;
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const chave = iso(entrada) + '|' + iso(saidaData);
+    if (vistos.has(chave)) continue;
+    vistos.add(chave);
+    saida.push({ checkin: iso(entrada), checkout: iso(saidaData) });
   }
-  return [...achados];
+
+  // Ordem estavel: quando avisamos que ha dois periodos, eles saem na ordem
+  // em que acontecem, nao na ordem em que os regex casaram.
+  return saida.sort((a, b) => (a.checkin < b.checkin ? -1 : 1));
 }
 
 /**
@@ -477,54 +555,40 @@ export function periodosPedidos(falasDoHospede: string): string[] {
 export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): any | null {
   const t = falasDoHospede || '';
 
-  // Um periodo, e apenas um: dois pedidos diferentes tem tratamento proprio.
-  const intervalos = t.match(/\b\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?\s*(?:a|at[ée]|-|\u2013)\s*\d{1,2}\s*\/\s*\d{1,2}(?:\s*\/\s*\d{2,4})?\b/gi);
-  if (!intervalos || intervalos.length !== 1) return null;
-
-  const m = intervalos[0].match(
-    /(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|at[ée]|-|\u2013)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?/i,
-  );
-  if (!m) return null;
-
-  const monta = (dia: string, mes: string, ano?: string) => {
-    const d = Number(dia);
-    const mm = Number(mes);
-    if (d < 1 || d > 31 || mm < 1 || mm > 12) return null;
-    let yyyy = ano ? Number(ano.length === 2 ? '20' + ano : ano) : hoje.getFullYear();
-    const data = new Date(Date.UTC(yyyy, mm - 1, d));
-    if (data.getUTCMonth() !== mm - 1 || data.getUTCDate() !== d) return null; // 31/02
-    if (!ano) {
-      // Sem ano: se a data ja passou, o hospede fala do ano que vem.
-      const hojeUTC = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
-      if (data < hojeUTC) {
-        yyyy += 1;
-        return new Date(Date.UTC(yyyy, mm - 1, d));
-      }
-    }
-    return data;
-  };
-
-  const entrada = monta(m[1], m[2], m[3]);
-  const saida = monta(m[4], m[5], m[6]);
-  if (!entrada || !saida || saida <= entrada) return null;
+  // Um periodo, e apenas um: duas alternativas tem tratamento proprio.
+  const periodos = intervalosNaFala(t, hoje);
+  if (periodos.length !== 1) return null;
 
   // Ocupacao: so a forma explicita. "casal", "familia" e afins ficam com a IA.
+  const daFala = ocupacaoNaFala(t);
   const mAdultos = t.match(/\b(\d{1,2})\s*adultos?\b/i);
-  const mPessoas = t.match(/\b(\d{1,2})\s*(?:pessoas?|h[óo]spedes?)\b/i);
-  const semCrianca = !/(crian[çc]a|menor|filh|beb[êe]|neto|neta)/i.test(t);
-  const adultos = mAdultos ? Number(mAdultos[1]) : semCrianca && mPessoas ? Number(mPessoas[1]) : null;
+  const mPessoas = t.match(/\b(\d{1,2})\s*(?:pessoas?|hóspedes?|hospedes?)\b/i);
+  const temCrianca = /(criança|crianca|menor|filh|bebê|bebe|neto|neta)/i.test(t);
+
+  let adultos: number | null = null;
+  let idades: number[] = [];
+  if (daFala) {
+    // "3 adultos e 1 criança de 13 anos": adultos e idades, ditos por ele.
+    adultos = daFala.adultos;
+    idades = daFala.idades;
+  } else if (mAdultos) {
+    adultos = Number(mAdultos[1]);
+    if (temCrianca) return null; // citou criança sem idade: quem decide é a IA
+  } else if (mPessoas && !temCrianca) {
+    adultos = Number(mPessoas[1]);
+  }
   if (!adultos || adultos < 1 || adultos > 15) return null;
 
   // Mais de um apartamento pedido: a composicao de cada um nao sai de regex.
-  if (/\b(\d{1,2})\s*(?:apartamentos|quartos|apt[os]?|su[íi]tes)\b/i.test(t)) return null;
+  if (/\b(\d{1,2})\s*(?:apartamentos|quartos|apt[os]?|suítes|suites)\b/i.test(t)) return null;
 
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
   return {
-    checkin: iso(entrada),
-    checkout: iso(saida),
+    checkin: periodos[0].checkin,
+    checkout: periodos[0].checkout,
     adults: adultos,
     children0_6: 0,
     children7_9: 0,
+    idades,
     intent: 'booking',
     apartamentos: 1,
     semIA: true,
