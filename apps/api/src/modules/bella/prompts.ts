@@ -263,6 +263,14 @@ export const STAY_EXTRACTION_TOOL = {
           'Conte pela composição: "3 casais" = 3; "duplo e triplo" = 2; "somos 2 famílias, 2 quartos" = 2. ' +
           'Um casal com filhos continua sendo 1 apartamento se couber (máximo 6 pessoas por apartamento).',
       },
+      idades: {
+        type: ['array', 'null'],
+        items: { type: 'integer' },
+        description:
+          'TODAS as idades citadas pelo hóspede, como números crus, sem classificar. ' +
+          'Ex.: "2 adultos e 2 crianças (5 e 10 anos)" -> adults=2 e idades=[5,10]. ' +
+          'NÃO decida se é criança ou adulto e NÃO some em children0_6/children7_9: quem classifica é o sistema.',
+      },
       children0_6: { type: ['integer', 'null'], description: 'Crianças de 0 a 6 anos' },
       children7_9: { type: ['integer', 'null'], description: 'Crianças de 7 a 9 anos' },
       intent: {

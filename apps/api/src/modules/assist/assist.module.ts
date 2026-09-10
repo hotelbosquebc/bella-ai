@@ -53,7 +53,10 @@ export function formatarParaWhatsApp(texto: string): string {
  *   link, e porque ainda falta dado - mandar qualquer coisa e pior que nada.
  */
 export function corrigirLinks(texto: string, oficiais: string[]): string {
-  const doMotor = /https?:\/\/(?:www\.)?sbreserva\.silbeck\.com\.br\/\S*/gi;
+  // Sem exigir o "https://": ela ja escreveu "sbreserva.silbeck.com.br/hotelbosque"
+  // cru, sem protocolo, e o endereco escapou desta troca inteira - o hospede
+  // recebeu a home do motor em vez do orcamento com as datas dele.
+  const doMotor = /(?:https?:\/\/)?(?:www\.)?sbreserva\.silbeck\.com\.br\/\S*/gi;
   const achados = texto.match(doMotor);
   if (!achados) return texto;
 
@@ -455,6 +458,35 @@ export function periodosPedidos(falasDoHospede: string): string[] {
 }
 
 /**
+ * Idade vira categoria - no codigo, nao no julgamento do modelo.
+ *
+ * Regra da casa: a partir de 10 anos a pessoa conta como ADULTO no sistema de
+ * reservas; 7 a 9 e 0 a 6 sao as duas faixas de crianca.
+ *
+ * A regra ja existia, mas so rodava quando o hospede pedia VARIOS apartamentos.
+ * No caso comum - um apartamento - ninguem classificava, e o extrator tinha
+ * apenas os campos "criancas 0-6" e "criancas 7-9" para preencher: uma crianca
+ * de 10 anos nao cabia em nenhum deles e sumia do link. Caso real (09/09/2026):
+ * "2 adultos e 2 criancas (5 e 10 anos)" saiu como 2 adultos, sem as criancas,
+ * quando o correto sao 3 adultos e 1 crianca de 5 anos.
+ *
+ * Idempotente: sem idades citadas, devolve a ocupacao como estava.
+ */
+export function normalizarOcupacao(stay: any): any {
+  const idades: number[] = Array.isArray(stay?.idades)
+    ? stay.idades.map(Number).filter((n: number) => !isNaN(n) && n >= 0 && n < 120)
+    : [];
+  if (!idades.length) return stay;
+
+  stay.adults = (Number(stay.adults) || 0) + idades.filter((i) => i >= 10).length;
+  stay.children0_6 = (Number(stay.children0_6) || 0) + idades.filter((i) => i <= 6).length;
+  stay.children7_9 = (Number(stay.children7_9) || 0) + idades.filter((i) => i >= 7 && i <= 9).length;
+  // Consumidas: uma segunda passagem nao pode somar de novo.
+  stay.idades = null;
+  return stay;
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -822,6 +854,10 @@ export class AssistController {
     // informou a quantidade, fazendo a Bella perguntar algo que estava escrito.
     // Agora seguimos o autor: uma linha sem prefixo pertence a quem falou antes.
     const falasDoHospede = apenasFalasDoHospede(conversation);
+
+    // Idades citadas viram adultos/criancas pela regra da casa (>=10 e adulto),
+    // antes de qualquer trava ou montagem de link. Ver normalizarOcupacao.
+    normalizarOcupacao(stay);
 
     // Trava contra data inventada.
     //
