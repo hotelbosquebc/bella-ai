@@ -458,6 +458,48 @@ export function periodosPedidos(falasDoHospede: string): string[] {
 }
 
 /**
+ * Adultos e idades lidos DIRETO do que o hospede escreveu.
+ *
+ * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
+ * ele e a peca que mais falha (cota, 429, classificacao errada) e, quando
+ * falha, some com a crianca inteira do orcamento. Quando a frase e explicita -
+ * "2 adultos e 2 criancas (5 e 10 anos)" - nao ha nada a interpretar, e isso
+ * vira conta no codigo.
+ *
+ * So aceita quando o hospede disse AS DUAS coisas: quantos adultos e as idades.
+ * Com uma delas faltando, a frase admite leituras diferentes ("as criancas
+ * estao entre os 4 que citei?") e a decisao volta para o extrator - errar
+ * calado numa ocupacao e pior do que nao saber.
+ *
+ * Idades so contam perto de palavra de crianca, senao "moro aqui ha 10 anos"
+ * viraria um hospede.
+ */
+export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idades: number[] } | null {
+  const t = falasDoHospede || '';
+
+  const mAdultos = t.match(/\b(\d{1,2})\s*adultos?\b/i);
+  if (!mAdultos) return null;
+
+  const palavraDeCrianca = /(crian[çc]a|menor|filh|beb[êe]|neto|neta)/i;
+  const idades: number[] = [];
+  for (const linha of t.split(/\r?\n/)) {
+    if (!palavraDeCrianca.test(linha)) continue;
+    // "5 e 10 anos", "5, 7 e 10 anos", "8 anos" — a lista toda antes de "anos".
+    const lista = /((?:\d{1,2}\s*(?:,|e)\s*)*\d{1,2})\s*anos?\b/gi;
+    let m: RegExpExecArray | null;
+    while ((m = lista.exec(linha)) !== null) {
+      for (const n of m[1].split(/\s*(?:,|e)\s*/)) {
+        const idade = Number(n);
+        if (!isNaN(idade) && idade >= 0 && idade <= 17) idades.push(idade);
+      }
+    }
+  }
+  if (!idades.length) return null;
+
+  return { adultos: Number(mAdultos[1]), idades };
+}
+
+/**
  * Idade vira categoria - no codigo, nao no julgamento do modelo.
  *
  * Regra da casa: a partir de 10 anos a pessoa conta como ADULTO no sistema de
@@ -854,6 +896,19 @@ export class AssistController {
     // informou a quantidade, fazendo a Bella perguntar algo que estava escrito.
     // Agora seguimos o autor: uma linha sem prefixo pertence a quem falou antes.
     const falasDoHospede = apenasFalasDoHospede(conversation);
+
+    // A fala do hospede manda na ocupacao.
+    //
+    // Quando ele escreveu quantos adultos E as idades, a conta e dele, nao do
+    // extrator: sobrescrevemos o que veio da IA. Foi assim que "2 adultos e 2
+    // criancas (5 e 10 anos)" saiu como 2 adultos e nenhuma crianca.
+    const daFala = ocupacaoNaFala(falasDoHospede);
+    if (daFala) {
+      stay.adults = daFala.adultos;
+      stay.children0_6 = 0;
+      stay.children7_9 = 0;
+      stay.idades = daFala.idades;
+    }
 
     // Idades citadas viram adultos/criancas pela regra da casa (>=10 e adulto),
     // antes de qualquer trava ou montagem de link. Ver normalizarOcupacao.
