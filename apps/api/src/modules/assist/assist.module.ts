@@ -491,15 +491,44 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   //
   // 10/10 a 12/10  |  16/01/2027 a 20/01/2027
   const rNumerico = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+  // Prefixos de mes escolhidos para NAO colidir com palavra comum. Com o
+  // prefixo de tres letras de antes, "2 a 3 mais ou menos" virava maio, "2 a 3
+  // juntos" virava junho, "2 a 3 outros" outubro, e "dia 21 a 23 agora em
+  // novembro" virava AGOSTO. Nos meses com colisao exigimos mais letras (maio,
+  // junh, julh, agos, outu, nove, marco); nos outros o prefixo curto continua,
+  // porque e onde o hospede erra a grafia ("janwiro").
+  //
   // 28 janeiro a 02 fevereiro  |  28 de janeiro até 2 de fevereiro
-  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*/gi;
+  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 14 a 19 janeiro  |  de 8 a 13 de setembro
-  const rUmMes = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)[a-zç]*/gi;
+  const rUmMes = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
 
   let m: RegExpExecArray | null;
   while ((m = rNumerico.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
   while ((m = rDoisMeses.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
   while ((m = rUmMes.exec(t)) !== null) push(m[1], mes(m[3]), m[2], mes(m[3]));
+
+  // Dias num balao, mes em outro.
+  //
+  // Caso real (11/09/2026): "Gostaria de reservar a Stander do dia 21 a 23?",
+  // nos perguntamos "Deste mes?", e ele respondeu so "Novembro" na mensagem
+  // seguinte. Nenhum balao tem o periodo inteiro - e a Bella respondeu pedindo
+  // a data que ele ja tinha dado.
+  //
+  // So junta quando e inequivoco: os dias vem com "dia/dias" na frente (senao
+  // "2 a 3 pessoas" viraria periodo) e ha UM mes citado, por extenso, na fala
+  // dele. Dois meses citados, ou nenhum, e ambiguo - fica com a IA.
+  if (!brutos.length) {
+    const rSoDias = /\bdias?\s*(\d{1,2})\s*(?:a|até|ate|-|–)\s*(?:dia\s*)?(\d{1,2})\b/gi;
+    const rMesSolto = /\b(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/gi;
+    const citados = new Set<number>();
+    let mm: RegExpExecArray | null;
+    while ((mm = rMesSolto.exec(t)) !== null) citados.add(mes(mm[1]));
+    if (citados.size === 1) {
+      const unico = [...citados][0];
+      while ((m = rSoDias.exec(t)) !== null) push(m[1], unico, m[2], unico);
+    }
+  }
 
   const hojeUTC = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
   const vistos = new Set<string>();
@@ -744,6 +773,60 @@ export function contextoDeIdioma(falasDoHospede: string): string {
   return `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em PORTUGUÊS. Responda em português.`;
 }
 /**
+ * "de 21/11 a 23/11, para 1 adulto" - lido do proprio link, nao inventado.
+ *
+ * O dono pediu que acima do link fosse dito para quem ele e (quantas pessoas,
+ * que periodo): o hospede confere antes de clicar. Tirando isso dos parametros
+ * da URL que o servidor montou, o resumo nunca diverge do que o link faz.
+ */
+export function resumoDoLink(url: string, idioma: 'pt' | 'es' | 'en' = 'pt'): string {
+  let q: URL;
+  try {
+    q = new URL(url);
+  } catch {
+    return '';
+  }
+  const ci = q.searchParams.get('checkin') || '';
+  const co = q.searchParams.get('checkout') || '';
+  const ad = Number(q.searchParams.get('adultos-000001') || 0);
+  const cr = Number(q.searchParams.get('criancas-000003') || 0) + Number(q.searchParams.get('criancas-000004') || 0);
+  if (!ci || !co || !ad) return '';
+  const br = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+
+  const p = {
+    pt: { de: 'de', a: 'a', para: 'para', ad: ad === 1 ? 'adulto' : 'adultos', cr: cr === 1 ? 'criança' : 'crianças', e: 'e' },
+    es: { de: 'del', a: 'al', para: 'para', ad: ad === 1 ? 'adulto' : 'adultos', cr: cr === 1 ? 'niño' : 'niños', e: 'y' },
+    en: { de: 'from', a: 'to', para: 'for', ad: ad === 1 ? 'adult' : 'adults', cr: cr === 1 ? 'child' : 'children', e: 'and' },
+  }[idioma];
+  const gente = `${ad} ${p.ad}` + (cr ? ` ${p.e} ${cr} ${p.cr}` : '');
+  return `${p.de} ${br(ci)} ${p.a} ${br(co)}, ${p.para} ${gente}`;
+}
+
+/**
+ * O hospede deu ALGUM sinal de data, mesmo que a gente nao consiga montar?
+ *
+ * Existe para proteger a resposta sem IA de um erro especifico: pedir de novo
+ * o que ele ja disse. Em 11/09/2026 o hospede escreveu "do dia 21 a 23" e
+ * depois "Novembro"; o leitor nao juntou as duas coisas, concluiu que nao havia
+ * periodo, e a Bella respondeu pedindo a data. Perguntar o que ja foi
+ * respondido e o que mais irrita quem esta do outro lado.
+ *
+ * Aqui a pergunta e mais frouxa de proposito: nao "da para montar?", mas "tem
+ * cara de data?". Se tiver, e nao conseguimos montar, a resposta pronta nao
+ * sai - melhor o atendente escrever.
+ */
+export function temIndicioDeData(falasDoHospede: string): boolean {
+  const t = falasDoHospede || '';
+  return (
+    /\bdias?\s*\d{1,2}\b/i.test(t) ||
+    /\b\d{1,2}\s*\/\s*\d{1,2}\b/.test(t) ||
+    /\b\d{1,2}\s*(?:de\s*)?(?:jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)/i.test(t) ||
+    /\b(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/i.test(t) ||
+    /\b(hoje|amanh[ãa]|fim de semana|final de semana|feriado|natal|ano novo|r[ée]veillon|carnaval|p[áa]scoa)\b/i.test(t)
+  );
+}
+
+/**
  * A resposta que a casa daria, escrita sem IA nenhuma.
  *
  * Existe para o caso em que o modelo esta fora do ar - hoje, quase sempre por
@@ -760,12 +843,52 @@ export function contextoDeIdioma(falasDoHospede: string): string {
  * resposta" por "resposta errada", que e pior.
  */
 export function respostaSemIA(reserva: string, conversation: string): string {
+  // Link JA montado pelo servidor, mas o modelo nao escreveu a mensagem.
+  //
+  // Com a leitura de datas sem IA, o caso mais comum chega aqui com o link
+  // certo em maos - e ficava sem resposta so porque a REDACAO precisava do
+  // modelo. A mensagem de orcamento, porem, e sempre a mesma: o que o link
+  // cobre e onde clicar. So para UM link: com varios apartamentos a
+  // explicacao de cada um exige o modelo.
+  const marcaLink = 'RESERVA: envie ESTE link';
+  const j = (reserva || '').indexOf(marcaLink);
+  if (j >= 0) {
+    const links = (reserva.slice(j).match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
+    if (links.length !== 1) return '';
+    const idiomaL = idiomaDoHospede(apenasFalasDoHospede(conversation));
+    const resumo = resumoDoLink(links[0], idiomaL);
+    const t = {
+      pt: {
+        oi: 'Olá! Sou a Bella, assistente online do Hotel do Bosque.',
+        link: `Segue o link com os valores e a disponibilidade ${resumo ? resumo + '. ' : 'para o seu período. '}Por ele você já consegue concluir a sua reserva:`,
+        fim: 'Qualquer dúvida, estou à disposição!',
+      },
+      es: {
+        oi: '¡Hola! Soy Bella, asistente online del Hotel do Bosque.',
+        link: `Aquí tiene el enlace con los valores y la disponibilidad ${resumo ? resumo + '. ' : 'para su período. '}Por él ya puede concluir su reserva:`,
+        fim: '¡Cualquier duda, estoy a su disposición!',
+      },
+      en: {
+        oi: "Hello! I'm Bella, the Hotel do Bosque online assistant.",
+        link: `Here is the link with rates and availability ${resumo ? resumo + '. ' : 'for your stay. '}You can complete your booking right there:`,
+        fim: "If you have any questions, I'm here to help!",
+      },
+    }[idiomaL];
+    const jaApresentou = /JÁ se apresentou/.test(contextoDeApresentacao(conversation));
+    return [...(jaApresentou ? [] : [t.oi, '']), t.link, '', links[0], '', t.fim].join('\n');
+  }
+
   const marca = 'RESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ';
   const i = (reserva || '').indexOf(marca);
   if (i < 0) return '';
 
   const pedidos = (reserva || '').slice(i + marca.length).split('.')[0];
   const falta = (campo: string) => pedidos.includes(campo);
+  // Pedir data que ele ja deu, so porque nao conseguimos monta-la, e o erro
+  // que esta resposta pronta mais pode cometer. Com cara de data na fala, nao sai.
+  if ((falta('data de entrada') || falta('data de saída')) && temIndicioDeData(apenasFalasDoHospede(conversation))) {
+    return '';
+  }
   const idioma = idiomaDoHospede(apenasFalasDoHospede(conversation));
 
   const textos = {
@@ -1949,7 +2072,8 @@ ${url}`;
         // reservar um quarto pra 2 pessoas?" ficou sem resposta porque a IA
         // estava fora, quando bastava perguntar quando.
         const falas = apenasFalasDoHospede(conversation);
-        const semPeriodo = intervalosNaFala(falas).length === 0;
+        // Sem periodo MONTAVEL e sem nem cara de data: so ai pedir a data.
+        const semPeriodo = intervalosNaFala(falas).length === 0 && !temIndicioDeData(falas);
         const dizQuantos = Boolean(ocupacaoNaFala(falas)) || /\b\d{1,2}\s*(?:adultos?|pessoas?|hóspedes?)\b/i.test(falas);
         if (semPeriodo && pareceOrcamento(falas)) {
           const pedir = ['data de entrada', 'data de saída'];
