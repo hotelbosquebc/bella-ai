@@ -1,13 +1,12 @@
-# Blueprint do Render — publica a API + banco PostgreSQL da Bella (plano Free).
-# No Render: New > Blueprint > conectar este repositório. O banco é criado e
-# conectado automaticamente; as variáveis "sync: false" você preenche no painel.
-
-databases:
-  - name: bella-db
-    plan: free
-    databaseName: bella_ai
-    user: bella
-    region: virginia
+# Blueprint do Render — publica a API da Bella (plano Free).
+#
+# O BANCO NÃO É MAIS CRIADO AQUI. Até 12/09/2026 este arquivo declarava um
+# Postgres free do próprio Render, que expira em 30 dias e é APAGADO — aconteceu
+# duas vezes, e na primeira levou todo o treinamento da Bella. O banco agora é
+# externo (Supabase), e DATABASE_URL é preenchida à mão no painel.
+#
+# Não volte a declarar `databases:` aqui: o serviço é Blueprint managed, e um
+# re-sync religaria a API a um banco free novo e vazio.
 
 services:
   - type: web
@@ -21,10 +20,8 @@ services:
     startCommand: cd apps/api && npx prisma migrate deploy && node prisma/seed.js && node prisma/seed-conhecimento.js && node dist/main.js
     healthCheckPath: /api/health
     envVars:
-      - key: DATABASE_URL # conectado automaticamente ao banco bella-db acima
-        fromDatabase:
-          name: bella-db
-          property: connectionString
+      - key: DATABASE_URL # Supabase: use a URL do SESSION POOLER (...pooler.supabase.com:5432), não a conexão direta — a direta é só IPv6 e o Render não sai por IPv6
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: DEFAULT_HOTEL_ID
