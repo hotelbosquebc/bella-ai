@@ -590,9 +590,12 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
 
   // Ocupacao: so a forma explicita. "casal", "familia" e afins ficam com a IA.
   const daFala = ocupacaoNaFala(t);
-  const mAdultos = t.match(/\b(\d{1,2})\s*adultos?\b/i);
-  const mPessoas = t.match(/\b(\d{1,2})\s*(?:pessoas?|hóspedes?|hospedes?)\b/i);
-  const temCrianca = /(criança|crianca|menor|filh|bebê|bebe|neto|neta)/i.test(t);
+  // Numero e palavra na MESMA linha ([ \t], nunca \s): senao o fim de uma linha
+  // cola no comeco da proxima.
+  const semPref = semPrefixos(t);
+  const mAdultos = semPref.match(/\b(\d{1,2})[ \t]*adultos?\b/i);
+  const mPessoas = semPref.match(/\b(\d{1,2})[ \t]*(?:pessoas?|hóspedes?|hospedes?)\b/i);
+  const temCrianca = PALAVRA_DE_CRIANCA.test(semPref);
 
   let adultos: number | null = null;
   let idades: number[] = [];
@@ -605,6 +608,8 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
     if (temCrianca) return null; // citou criança sem idade: quem decide é a IA
   } else if (mPessoas && !temCrianca) {
     adultos = Number(mPessoas[1]);
+  } else if (!temCrianca && adultosDeCasal(semPref)) {
+    adultos = 2;
   }
   if (!adultos || adultos < 1 || adultos > 15) return null;
 
@@ -625,6 +630,45 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
 }
 
 /**
+ * Palavras que indicam crianca na conversa - UMA lista so, usada por todos.
+ *
+ * Havia duas listas, e as duas esqueciam "menina": "casal e 1 menina 13 anos"
+ * (15/09/2026) saiu como 2 adultos, com a menina sumida calada do orcamento.
+ * Duas listas divergem; uma nao tem como.
+ */
+const PALAVRA_DE_CRIANCA =
+  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|enteado|enteada|pequen[oa])/i;
+
+/**
+ * Tira os prefixos de quem falou ("Hospede:", "Nos (hoje):").
+ *
+ * A conversa chega com um prefixo por linha, e a leitura de ocupacao casava o
+ * numero do FIM de uma linha com o "Hospede" do COMECO da seguinte:
+ * "Hospede: 10/10 a 12/10" + "Hospede: Casal" virava "10 hospedes". Toda leitura
+ * de quantidade passa por aqui antes.
+ */
+export function semPrefixos(texto: string): string {
+  return (texto || '').replace(/^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:[ \t]*/gim, '');
+}
+
+/**
+ * "casal" como PESSOAS, e nao como tipo de cama.
+ *
+ * E uma das palavras mais comuns do atendimento - "casal e 1 menina 13 anos",
+ * "para um casal" - e valia 2 adultos so quando a IA estava de pe. Mas ela tem
+ * uma armadilha real: "Somente 1 adulto. Cama de casal" (11/09/2026) e UMA
+ * pessoa querendo cama de casal. Por isso "cama/quarto/apartamento/suite de
+ * casal" nao conta, "casais" (plural, varios apartamentos) fica com a IA, e
+ * quantidade escrita ("1 adulto") sempre vence.
+ */
+export function adultosDeCasal(texto: string): number | null {
+  const t = semPrefixos(texto);
+  if (/\bcasais\b/i.test(t)) return null;
+  const pessoas = /(?<!cama\s(?:de\s)?|quarto\s(?:de\s)?|apartamento\s(?:de\s)?|apto\.?\s(?:de\s)?|su[íi]te\s(?:de\s)?)\bcasal\b/i;
+  return pessoas.test(t) ? 2 : null;
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -642,12 +686,14 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
  * viraria um hospede.
  */
 export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idades: number[] } | null {
-  const t = falasDoHospede || '';
+  const t = semPrefixos(falasDoHospede);
 
-  const mAdultos = t.match(/\b(\d{1,2})\s*adultos?\b/i);
-  if (!mAdultos) return null;
+  const mAdultos = t.match(/\b(\d{1,2})[ \t]*adultos?\b/i);
+  // Quantidade escrita vence; sem ela, "casal" (pessoas, nao cama) vale 2.
+  const adultosDeclarados = mAdultos ? Number(mAdultos[1]) : adultosDeCasal(t);
+  if (!adultosDeclarados) return null;
 
-  const palavraDeCrianca = /(crian[çc]a|menor|filh|beb[êe]|neto|neta)/i;
+  const palavraDeCrianca = PALAVRA_DE_CRIANCA;
   const idades: number[] = [];
   for (const linha of t.split(/\r?\n/)) {
     if (!palavraDeCrianca.test(linha)) continue;
@@ -663,7 +709,7 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
   }
   if (!idades.length) return null;
 
-  return { adultos: Number(mAdultos[1]), idades };
+  return { adultos: adultosDeclarados, idades };
 }
 
 /**

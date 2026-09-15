@@ -156,6 +156,61 @@
     return juntas;
   }
 
+  /**
+   * Nome de contato limpo, para comparar dois textos do WhatsApp.
+   *
+   * O cabecalho e o balao exibem o mesmo contato, mas NAO com os mesmos bytes:
+   * o WhatsApp embrulha numeros com marcas invisiveis de direcao de texto e usa
+   * espaco nao-quebravel em alguns lugares. Visualmente identicos, diferentes
+   * para ===. Caso real (15/09/2026): contato nao salvo, "+55 54 9124-2692",
+   * e TODAS as mensagens da hospede foram marcadas como nossas - a Bella
+   * concluiu que ninguem tinha pedido orcamento e nao mandou link.
+   */
+  function limparNome(s) {
+    return String(s || '')
+      .normalize('NFKC')
+      .replace(/[\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/^~\s*/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  /**
+   * Os dois textos sao o mesmo contato?
+   *
+   * Numero de telefone compara pelos ultimos 8 digitos: some a formatacao, as
+   * marcas invisiveis e o 9 extra do celular, que as vezes aparece num lugar e
+   * nao no outro.
+   */
+  function mesmoContato(a, b) {
+    const x = limparNome(a);
+    const y = limparNome(b);
+    if (!x || !y) return false;
+    const dx = x.replace(/\D/g, '');
+    const dy = y.replace(/\D/g, '');
+    if (dx.length >= 8 && dy.length >= 8) return dx.slice(-8) === dy.slice(-8);
+    return x === y;
+  }
+
+  /**
+   * Quem enviou, pelo identificador interno da mensagem.
+   *
+   * O WhatsApp marca cada mensagem com data-id "true_..." (enviada por nos) ou
+   * "false_..." (recebida). E o sinal mais confiavel que existe: nao depende de
+   * nome, numero nem de como o cabecalho foi desenhado. So quando ele falta a
+   * decisao volta para a comparacao de nomes.
+   */
+  function direcaoPeloId(el) {
+    if (!el) return null;
+    const alvo = el.matches && el.matches('[data-id]') ? el : el.querySelector && el.querySelector('[data-id]');
+    const id = (alvo && alvo.getAttribute('data-id')) || '';
+    if (id.startsWith('true_')) return 'nossa';
+    if (id.startsWith('false_')) return 'hospede';
+    return null;
+  }
+
   /** Nome/título do contato da conversa aberta (usado para saber quem falou). */
   function tituloDaConversa() {
     const hdr = document.querySelector('#main header');
@@ -332,7 +387,12 @@
           m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
           const remetente = m ? m[3] : '';
           t = (el.innerText || '').replace(/ /g, ' ').trim();
-          isIn = titulo ? remetente === titulo : !/hotel do bosque|recep|reserva/i.test(remetente);
+          const direcao = direcaoPeloId(row);
+          isIn = direcao
+            ? direcao === 'hospede'
+            : titulo
+              ? mesmoContato(remetente, titulo)
+              : !/hotel do bosque|recep|reserva/i.test(remetente);
         } else if (audiosLidos.has(row)) {
           t = audiosLidos.get(row);
           // Sem data-pre-plain-text no audio: quem envia e identificado pelo
@@ -841,7 +901,12 @@
     const m = attr.match(/\]\s*(.*?):\s*$/);
     const remetente = m ? m[1] : '';
     const titulo = tituloDaConversa();
-    const nossa = titulo ? remetente !== titulo : /hotel do bosque|recep|reserva/i.test(remetente);
+    const direcao = direcaoPeloId(el.closest('[data-id]') || el.closest('div[role="row"]'));
+    const nossa = direcao
+      ? direcao === 'nossa'
+      : titulo
+        ? !mesmoContato(remetente, titulo)
+        : /hotel do bosque|recep|reserva/i.test(remetente);
     if (!nossa) return null;
     return (el.innerText || '').trim() || null;
   }
