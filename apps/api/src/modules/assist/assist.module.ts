@@ -695,6 +695,38 @@ export function normalizarOcupacao(stay: any): any {
   return stay;
 }
 
+
+/**
+ * Reveillon: estica a estadia para o pacote de 5 diarias.
+ *
+ * O pacote e de 5 diarias no minimo. Se o hospede pedir menos e o periodo
+ * incluir a noite de 31/12, o site NAO mostra disponibilidade - ele conclui que
+ * estamos lotados e desiste. Esticamos a saida para completar 5 diarias, para
+ * que ele veja os valores, e a Bella explica a regra com naturalidade.
+ *
+ * Isolada do bookingContext para poder ser testada: a regra estava embutida no
+ * meio da montagem do link e nunca tinha sido exercitada com uma data real.
+ *
+ * Devolve o periodo pedido e o ajustado; `null` quando nao ha o que ajustar.
+ */
+export function ajustarPacoteReveillon(
+  checkin?: string | null,
+  checkout?: string | null,
+): { noitesPedidas: number; original: string; novaSaida: string } | null {
+  if (!checkin || !checkout) return null;
+  const entrada = new Date(checkin + 'T12:00:00');
+  const saida = new Date(checkout + 'T12:00:00');
+  const noites = Math.round((saida.getTime() - entrada.getTime()) / 86400000);
+
+  // A virada esta dentro da estadia? (a noite de 31/12 e a que conta)
+  const virada = new Date(`${entrada.getFullYear() + (entrada.getMonth() === 0 ? -1 : 0)}-12-31T12:00:00`);
+  const pegaVirada = entrada <= virada && virada < saida;
+  if (!pegaVirada || noites <= 0 || noites >= 5) return null;
+
+  const novaSaida = new Date(entrada.getTime() + 5 * 86400000).toISOString().slice(0, 10);
+  return { noitesPedidas: noites, original: `${checkin} a ${checkout}`, novaSaida };
+}
+
 /**
  * Em que idioma o HOSPEDE escreveu.
  *
@@ -1307,29 +1339,17 @@ export class AssistController {
     // que estamos lotados e desiste. Esticamos a busca para 5 diarias para que
     // ele veja os valores, e a Bella explica a regra com naturalidade.
     let contextoReveillon = '';
-    if (stay.checkin && stay.checkout) {
-      const entrada = new Date(stay.checkin + 'T12:00:00');
-      const saida = new Date(stay.checkout + 'T12:00:00');
-      const noites = Math.round((saida.getTime() - entrada.getTime()) / 86400000);
-
-      // A virada esta dentro da estadia? (a noite de 31/12 e a que conta)
-      const virada = new Date(`${entrada.getFullYear() + (entrada.getMonth() === 0 ? -1 : 0)}-12-31T12:00:00`);
-      const pegaVirada = entrada <= virada && virada < saida;
-
-      if (pegaVirada && noites > 0 && noites < 5) {
-        const novaSaida = new Date(entrada.getTime() + 5 * 86400000);
-        const iso = novaSaida.toISOString().slice(0, 10);
-        const original = `${stay.checkin} a ${stay.checkout}`;
-        stay.checkout = iso;
-        contextoReveillon =
-          `\n\nPACOTE DE RÉVEILLON: o hóspede pediu ${noites} diária(s) (${original}), mas a virada de ano é ` +
-          `pacote fechado de 5 diárias — com menos que isso o site nem mostra disponibilidade. ` +
-          `O link abaixo JÁ FOI AJUSTADO para as 5 diárias (até ${iso}), para ele conseguir ver os valores.\n` +
-          `Explique isso de forma leve e acolhedora, como uma característica da temporada e não como uma negativa: ` +
-          `no Réveillon a estadia é um pacote de 5 diárias, e por isso o link mostra o período completo. ` +
-          `Diga que o valor total é o mesmo de 1 a 5 diárias, então ele pode aproveitar os dias extras sem custo ` +
-          `adicional — é um ganho, e vale apresentar assim. Nada de "não é possível" ou "infelizmente".`;
-      }
+    const pacote = ajustarPacoteReveillon(stay.checkin, stay.checkout);
+    if (pacote) {
+      stay.checkout = pacote.novaSaida;
+      contextoReveillon =
+        `\n\nPACOTE DE RÉVEILLON: o hóspede pediu ${pacote.noitesPedidas} diária(s) (${pacote.original}), mas a virada de ano é ` +
+        `pacote fechado de 5 diárias — com menos que isso o site nem mostra disponibilidade. ` +
+        `O link abaixo JÁ FOI AJUSTADO para as 5 diárias (até ${pacote.novaSaida}), para ele conseguir ver os valores.\n` +
+        `Explique isso de forma leve e acolhedora, como uma característica da temporada e não como uma negativa: ` +
+        `no Réveillon a estadia é um pacote de 5 diárias, e por isso o link mostra o período completo. ` +
+        `Diga que o valor total é o mesmo de 1 a 5 diárias, então ele pode aproveitar os dias extras sem custo ` +
+        `adicional — é um ganho, e vale apresentar assim. Nada de "não é possível" ou "infelizmente".`;
     }
 
     const ofertaAtendimento = isWithinBusinessHours()
