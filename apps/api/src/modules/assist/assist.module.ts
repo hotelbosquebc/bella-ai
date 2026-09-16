@@ -360,6 +360,18 @@ export function pareceOrcamento(falasDoHospede: string): boolean {
  *   quando nao existe link para seguir.
  */
 export function garantirLink(texto: string, oficiais: string[]): string {
+  // Link de mentira: "[LINK PARA RESERVA AQUI]".
+  //
+  // Caso real (16/09/2026): sem ocupacao o servidor nao montou link, e o modelo
+  // preencheu o buraco com um marcador em colchetes. Nao e URL, entao passava
+  // por todas as travas - e o hospede receberia literalmente isso. Com link
+  // oficial em maos, o marcador vira o link; sem ele, sai da mensagem junto com
+  // a promessa.
+  const marcador = /[\[\(<][^\]\)>\n]*\blinks?\b[^\]\)>\n]*[\]\)>]/gi;
+  if (marcador.test(texto)) {
+    texto = oficiais.length ? texto.replace(marcador, oficiais[0]) : texto.replace(marcador, '');
+  }
+
   const temLink = /https?:\/\//.test(texto);
 
   if (oficiais.length && !temLink) {
@@ -638,14 +650,22 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
 }
 
 /**
- * Palavras que indicam crianca na conversa - UMA lista so, usada por todos.
+ * Palavras que indicam crianca - nos tres idiomas que atendemos.
  *
- * Havia duas listas, e as duas esqueciam "menina": "casal e 1 menina 13 anos"
- * (15/09/2026) saiu como 2 adultos, com a menina sumida calada do orcamento.
- * Duas listas divergem; uma nao tem como.
+ * Havia duas listas e nenhuma tinha "menina"; depois virou uma lista so, mas
+ * ainda so em portugues. Em 16/09/2026 uma hospede paraguaia escreveu "mis 4
+ * hijos de 20 15 14 10 anos" e a trava de ocupacao, cega para o espanhol,
+ * concluiu que ela nao tinha dito quantas pessoas eram - APAGOU o numero que a
+ * IA havia extraido, e sem ocupacao nao ha link.
  */
 const PALAVRA_DE_CRIANCA =
-  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|enteado|enteada|pequen[oa])/i;
+  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|entead[oa]|pequen[oa]|hij[oa]|ni[ñn][oa]|nen[ea]|chic[oa]|nieto|child|kid|son|daughter|baby)/i;
+
+/** Como se diz "pessoa" nos tres idiomas. */
+const PALAVRA_DE_PESSOA = /(pessoa|persona|adulto|adult|h[óo]spede|hu[ée]sped|guest|gente|people|person)/i;
+
+/** Como se diz "anos" nos tres idiomas. */
+const PALAVRA_DE_IDADE = /(anos?|años?|years?|yo\b)/i;
 
 /**
  * Tira os prefixos de quem falou ("Hospede:", "Nos (hoje):").
@@ -705,13 +725,17 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
   const idades: number[] = [];
   for (const linha of t.split(/\r?\n/)) {
     if (!palavraDeCrianca.test(linha)) continue;
-    // "5 e 10 anos", "5, 7 e 10 anos", "8 anos" — a lista toda antes de "anos".
-    const lista = /((?:\d{1,2}\s*(?:,|e)\s*)*\d{1,2})\s*anos?\b/gi;
+    // "5 e 10 anos", "5, 7 e 10 anos", "20 15 14 10 años" - a hospede paraguaia
+    // separou so por espaco, e nos tres idiomas o "anos" muda de grafia.
+    const lista = /((?:\d{1,2}[\s,]*(?:e|y|and)?[\s,]*)*\d{1,2})\s*(?:anos?|años?|years?)\b/gi;
     let m: RegExpExecArray | null;
     while ((m = lista.exec(linha)) !== null) {
-      for (const n of m[1].split(/\s*(?:,|e)\s*/)) {
+      for (const n of m[1].split(/[\s,]+|\s*(?:e|y|and)\s*/i)) {
+        if (!/^\d{1,2}$/.test(n)) continue; // "y", "e" e vazios viravam idade 0
         const idade = Number(n);
-        if (!isNaN(idade) && idade >= 0 && idade <= 17) idades.push(idade);
+        // Ate 30: "mis 4 hijos de 20 15 14 10 años" - o filho de 20 e filho, e
+        // pela regra da casa conta como adulto. O limite de 17 o descartava.
+        if (idade >= 0 && idade <= 30) idades.push(idade);
       }
     }
   }
@@ -1362,17 +1386,18 @@ export class AssistController {
     }
 
 
-    // Trava contra quantidade de pessoas inventada.
-    //
-    // Caso real: o hospede escreveu "gostaria de ver disponibilidade pra
-    // 16/01/2027 ate 20/01/2027" - so as datas - e a sugestao saiu "para 2
-    // pessoas" com o link pronto. O 2 nunca foi dito por ninguem. Mesmo erro da
-    // data inventada, so que na ocupacao: o modelo preenche o campo com um
-    // padrao plausivel e o link sai com gente a mais ou a menos.
-    const temNumeroDePessoas = /\b\d+\s*(pessoa|adulto|h[óo]spede|crian|beb[êe]|gente)/i;
-    const temPessoasPorExtenso = /\b(um|uma|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez)\s+(pessoa|adulto|h[óo]spede|crian)/i;
-    const temTipoDeQuarto = /\b(casal|duplo|dupla|triplo|tripla|qu[áa]druplo|individual|single|solteiro)\b/i;
-    const temComposicao = /\b(somos|seremos|s[ãa]o)\s+\d+|\bsozinh[oa]\b|\beu e (a |o |minha |meu )/i;
+    // String.raw: a expressao precisa chegar com as barras invertidas intactas.
+    // Escrita como texto comum, '\b' virava caractere de controle e a trava nao
+    // casava NADA - foi assim que ela deixou passar "4 hijos" na primeira versao.
+    const temNumeroDePessoas = new RegExp(
+      String.raw`\b\d+\s*(?:` + PALAVRA_DE_PESSOA.source + '|' + PALAVRA_DE_CRIANCA.source + ')',
+      'i',
+    );
+    const temPessoasPorExtenso =
+      /\b(um|uma|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six)\s+(pessoa|persona|adulto|adult|h[óo]spede|hu[ée]sped|guest|crian|ni[ñn]|hij|child|kid)/i;
+    const temTipoDeQuarto = /\b(casal|duplo|dupla|triplo|tripla|qu[áa]druplo|individual|single|solteiro|matrimonial|doble|triple|double)\b/i;
+    const temComposicao =
+      /\b(somos|seremos|s[ãa]o|seria|ser[íi]a|vamos)\s+\d+|\bsozinh[oa]\b|\b(eu|yo)\s+(e|y|com|con)\s|\beu e (a |o |minha |meu )/i;
     const mencionaPessoas =
       temNumeroDePessoas.test(falasDoHospede) ||
       temPessoasPorExtenso.test(falasDoHospede) ||
