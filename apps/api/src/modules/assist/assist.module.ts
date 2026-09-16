@@ -8,7 +8,7 @@ import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesModule } from '../policies/policies.module';
 import { PoliciesService } from '../policies/policies.service';
-import { MASTER_PROMPT, STAY_EXTRACTION_TOOL } from '../bella/prompts';
+import { DEFAULT_GREETING, DEFAULT_GREETING_EN, DEFAULT_GREETING_ES, MASTER_PROMPT, STAY_EXTRACTION_TOOL } from '../bella/prompts';
 import { contextoDeHorario, isWithinBusinessHours, HORARIO_RESERVAS_TEXTO } from '../bella/business-hours';
 import { normalizar } from '../attachments/attachments.module';
 import { ReservationsModule } from '../reservations/reservations.module';
@@ -863,24 +863,56 @@ export function idiomaDoHospede(falasDoHospede: string): 'es' | 'en' | 'pt' {
   return 'pt';
 }
 
-/** Instrucao pronta de idioma, entregue ao prompt ja decidida. */
+/**
+ * Como a resposta e escrita - decidido no codigo, com o texto pronto junto.
+ *
+ * Nao basta dizer "responda em espanhol": o prompt trazia os TRES blocos de
+ * abertura e pedia que o modelo escolhesse, e ele pegava o portugues. Caso real
+ * (16/09/2026): conversa inteira em espanhol, a Bella ja tinha respondido em
+ * espanhol, e a sugestao seguinte comecou com "Olá! Sou a Bella..." - o bloco
+ * portugues, copiado literalmente, arrastando a mensagem toda com ele.
+ *
+ * E a mesma licao que este projeto ja aprendeu tres vezes: texto pronto vence
+ * regra escrita longe. Entao entregamos UM bloco so, o do idioma decidido.
+ */
 export function contextoDeIdioma(falasDoHospede: string): string {
   const idioma = idiomaDoHospede(falasDoHospede);
-  if (idioma === 'es') {
+  if (idioma === 'pt') {
     return (
-      `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em ESPANHOL. Responda INTEIRAMENTE em espanhol, ` +
-      `sem uma palavra em português — inclusive o bloco de abertura, para o qual existe a versão em espanhol pronta. ` +
-      `Ignore o idioma das mensagens automáticas do hotel que aparecem na conversa: elas são nossas, não dele.`
+      `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em PORTUGUÊS. Responda em português.` +
+      `\nSe for se apresentar, use exatamente este bloco:\n---\n${DEFAULT_GREETING}\n---`
     );
   }
-  if (idioma === 'en') {
-    return (
-      `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em INGLÊS. Responda INTEIRAMENTE em inglês, ` +
-      `inclusive o bloco de abertura, para o qual existe a versão em inglês pronta. ` +
-      `Ignore o idioma das mensagens automáticas do hotel que aparecem na conversa.`
-    );
-  }
-  return `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em PORTUGUÊS. Responda em português.`;
+  const nome = idioma === 'es' ? 'ESPANHOL' : 'INGLÊS';
+  const bloco = idioma === 'es' ? DEFAULT_GREETING_ES : DEFAULT_GREETING_EN;
+  return (
+    `\n\nIDIOMA (JÁ DECIDIDO): o hóspede escreveu em ${nome}. Responda INTEIRAMENTE em ${nome.toLowerCase()}, ` +
+    `da primeira à última palavra — saudação, explicações, despedida. NENHUMA palavra em português.` +
+    `\nIgnore o idioma das mensagens automáticas do hotel que aparecem na conversa: elas são nossas, não dele.` +
+    `\nSe for se apresentar, use exatamente este bloco e NUNCA a versão em português:\n---\n${bloco}\n---`
+  );
+}
+
+/**
+ * A resposta saiu no idioma que foi decidido?
+ *
+ * Conferencia na saida, porque instrucao no prompt ja falhou: o modelo comecava
+ * com o bloco portugues numa conversa em espanhol. Aqui nao ha diplomacia -
+ * conta marca exclusiva de cada lingua e compara.
+ */
+export function pareceEscritoEm(texto: string, idioma: 'pt' | 'es' | 'en'): boolean {
+  const t = (texto || '').toLowerCase();
+  if (!t.trim()) return true;
+
+  const marcas = {
+    pt: [/\bol[áa]\b/, /\bvoc[êe]s?\b/, /[çã]/, /\b(n[ãa]o|s[ãa]o|est[ãa]o)\b/, /\bdisponibilidade\b/, /\bhosp[ée]d/, /\bobrigad/, /\bdi[áa]ria/],
+    es: [/[¿¡ñ]/, /\bhola\b/, /\busted\b/, /\bdisponibilidad\b/, /\bhabitaci[oó]n/, /\bestad[íi]a\b/, /\bpor favor inf[oó]rmeme\b/, /\bvalores y\b/],
+    en: [/\bhello\b/, /\byou\b/, /\bavailability\b/, /\broom\b/, /\bplease\b/, /\brates\b/],
+  };
+  const pontos = (lista: RegExp[]) => lista.filter((r) => r.test(t)).length;
+  const alvo = pontos(marcas[idioma]);
+  const outros = (['pt', 'es', 'en'] as const).filter((i) => i !== idioma).map((i) => pontos(marcas[i]));
+  return alvo >= Math.max(...outros);
 }
 /**
  * "de 21/11 a 23/11, para 1 adulto" - lido do proprio link, nao inventado.
@@ -2231,6 +2263,27 @@ ${url}`;
     // Troca qualquer endereco inventado pelo link oficial que montamos.
     const oficiais = (reserva.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
     const textoFinal = garantirLink(corrigirLinks(draft.text, oficiais), oficiais);
+
+    // Saiu no idioma certo?
+    //
+    // A instrucao no prompt ja falhou uma vez: conversa inteira em espanhol e a
+    // sugestao veio em portugues, comecando pelo bloco de abertura errado.
+    // Aqui a saida e conferida e, se destoar, refaz UMA vez com ordem direta.
+    // Uma chamada extra so nesse caso - nao no caminho normal.
+    const idiomaEsperado = idiomaDoHospede(apenasFalasDoHospede(conversation));
+    if (idiomaEsperado !== 'pt' && draft.text && !pareceEscritoEm(draft.text, idiomaEsperado)) {
+      this.registrarDecisao(`resposta veio fora do idioma (${idiomaEsperado})`, {});
+      const nome = idiomaEsperado === 'es' ? 'ESPANHOL' : 'INGLÊS';
+      const segunda = await this.ai.complete({
+        task: 'sales',
+        system:
+          `${system}\n\nATENÇÃO: a resposta anterior saiu no idioma ERRADO. ` +
+          `Escreva a mensagem inteira em ${nome}, sem uma única palavra em português.`,
+        messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
+        temperature: settings?.temperature ?? 0.7,
+      });
+      if (segunda.text && segunda.model !== 'mock') draft.text = segunda.text;
+    }
 
     // Nenhum modelo respondeu.
     //
