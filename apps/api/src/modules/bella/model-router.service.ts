@@ -116,6 +116,8 @@ export class ModelRouterService {
       provider: this.provider,
       chaves: this.provider === 'gemini' ? this.chavesGemini().length : null,
       chaveEmUso: this.provider === 'gemini' ? this.chaveAtual + 1 : null,
+      // Posicao das chaves que o Google recusou (nunca o valor delas).
+      chavesRecusadas: this.provider === 'gemini' ? [...this.chavesInvalidas].map((i) => i + 1) : null,
       quedasRecentes: this.quedas.length,
       ultimasQuedas: this.quedas.slice(-10),
     };
@@ -138,18 +140,24 @@ export class ModelRouterService {
             const motivo = err instanceof Error ? err.message : String(err);
             tentativas.push({ modelo, motivo: motivo.slice(0, 700) });
             this.logger.warn(`Modelo ${modelo} indisponivel: ${motivo}`);
+            // Chave recusada: o problema nao e o modelo, e a credencial. Marca e
+            // sai, para tentar a proxima chave.
+            if (motivo.includes('API_KEY_INVALID')) {
+              this.marcarChaveInvalida();
+              break;
+            }
             // 429 e cota do PROJETO por minuto, compartilhada por TODOS os
             // modelos: tentar o proximo nao ajuda e ainda gasta o pouco que
             // resta da janela. Para o laco aqui.
             if (motivo.includes('429')) break;
           }
         }
-        // A ultima tentativa caiu por cota? Entao a culpa nao e do modelo e sim
-        // do teto do projeto - e outra chave tem teto proprio. Qualquer outro
-        // erro nao melhora trocando de chave.
+        // Trocar de chave so ajuda quando o problema e da chave: cota estourada
+        // ou credencial recusada. Qualquer outro erro se repetiria igual.
         const ultima = tentativas[tentativas.length - 1];
-        const foiCota = Boolean(ultima && ultima.motivo.includes('429'));
-        if (!foiCota || !this.proximaChave()) break;
+        const motivoUltima = ultima ? ultima.motivo : '';
+        const trocaAjuda = motivoUltima.includes('429') || motivoUltima.includes('API_KEY_INVALID');
+        if (!trocaAjuda || !this.proximaChave()) break;
       }
       this.logger.error(`Todos os modelos falharam na task ${req.task}`);
       // Guarda o motivo de CADA modelo, nao so do ultimo: com um 429 de cota,
@@ -196,20 +204,60 @@ export class ModelRouterService {
       .filter(Boolean);
   }
 
-  /** Indice da chave da vez; avanca quando uma estoura a cota. */
+  /** Indice da chave da vez; avanca quando uma estoura a cota ou e recusada. */
   private chaveAtual = 0;
+
+  /**
+   * Chaves que o Google recusou (400 API_KEY_INVALID).
+   *
+   * Em 16/09/2026 a segunda chave, colada no painel dias antes, estava
+   * invalida. O rodizio trocou para ela num pico, e a Bella ficou fora do ar
+   * por horas: chave invalida nao da 429, da 400, e so o 429 fazia trocar de
+   * chave. Uma chave ruim derrubava o atendimento inteiro.
+   *
+   * Agora a chave recusada e marcada e pulada enquanto o processo viver. Some
+   * no restart, que e quando faz sentido testar de novo - a chave pode ter sido
+   * corrigida no painel.
+   */
+  private readonly chavesInvalidas = new Set<number>();
+
+  private indiceValido(inicio: number): number | null {
+    const total = this.chavesGemini().length;
+    for (let i = 0; i < total; i++) {
+      const idx = (inicio + i) % total;
+      if (!this.chavesInvalidas.has(idx)) return idx;
+    }
+    return null; // todas recusadas
+  }
 
   private chaveGemini(): string {
     const chaves = this.chavesGemini();
-    return chaves[this.chaveAtual % chaves.length] || '';
+    if (!chaves.length) return '';
+    const idx = this.indiceValido(this.chaveAtual);
+    if (idx === null) return chaves[this.chaveAtual % chaves.length] || '';
+    this.chaveAtual = idx;
+    return chaves[idx];
   }
 
-  /** Uma chave estourou: passa para a proxima e diz se ainda ha outra para tentar. */
+  /** O Google recusou esta chave: nao insistir nela. */
+  private marcarChaveInvalida() {
+    const chaves = this.chavesGemini();
+    if (!chaves.length) return;
+    this.chavesInvalidas.add(this.chaveAtual % chaves.length);
+    this.logger.error(
+      `Chave ${this.chaveAtual + 1} de ${chaves.length} foi RECUSADA pelo Google (API_KEY_INVALID). ` +
+        `Corrija o valor em GOOGLE_API_KEY; ela sera pulada ate o proximo restart.`,
+    );
+  }
+
+  /** Passa para a proxima chave utilizavel; false se nao houver outra. */
   private proximaChave(): boolean {
     const chaves = this.chavesGemini();
     if (chaves.length < 2) return false;
-    this.chaveAtual = (this.chaveAtual + 1) % chaves.length;
-    this.logger.warn(`Cota estourada; alternando para a chave ${this.chaveAtual + 1} de ${chaves.length}.`);
+    const proximo = this.indiceValido((this.chaveAtual + 1) % chaves.length);
+    if (proximo === null || proximo === this.chaveAtual) return false;
+    this.chaveAtual = proximo;
+    this.logger.warn(`Alternando para a chave ${this.chaveAtual + 1} de ${chaves.length}.`);
     return true;
   }
 

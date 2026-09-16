@@ -502,11 +502,19 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 14 a 19 janeiro  |  de 8 a 13 de setembro
   const rUmMes = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
+  // 15 a 17/10  |  15 a 17/10/2026 - o mes vem so na segunda data
+  const rUmMesNumerico = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
 
   let m: RegExpExecArray | null;
   while ((m = rNumerico.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
   while ((m = rDoisMeses.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
   while ((m = rUmMes.exec(t)) !== null) push(m[1], mes(m[3]), m[2], mes(m[3]));
+  // "15 a 17/10": o mes vem so na segunda data. So entra em acao se nenhuma das
+  // leituras acima achou periodo - senao, em "15/10 a 17/10", ela leria o MES da
+  // primeira data como dia ("10 a 17/10") e inventaria um segundo periodo.
+  if (!brutos.length) {
+    while ((m = rUmMesNumerico.exec(t)) !== null) push(m[1], m[3], m[2], m[3], m[4], m[4]);
+  }
 
   // Dias num balao, mes em outro.
   //
