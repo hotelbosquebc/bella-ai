@@ -900,25 +900,59 @@ export function contextoDeIdioma(falasDoHospede: string): string {
 }
 
 /**
+ * Marcas de cada idioma dentro de um texto.
+ *
+ * Usada para duas perguntas diferentes: a resposta saiu no idioma certo, e ela
+ * MISTUROU idiomas. Uma lista so, para as duas nao divergirem.
+ */
+export function marcasDeIdioma(texto: string): { pt: number; es: number; en: number } {
+  const t = (texto || '').toLowerCase();
+  const listas = {
+    // Portugues precisa de marcas fortes o bastante para uma resposta limpa nao
+    // parecer "fora do idioma" e disparar refacao a toa: nem toda frase tem ç
+    // ou ã. "equipe", "atendimento", "feira" e "nosso" nao existem em espanhol
+    // (equipo, atención, feria, nuestro).
+    pt: [
+      /\bol[áa]\b/, /\bvoc[êe]s?\b/, /[çãõ]/, /\b(n[ãa]o|s[ãa]o|est[ãa]o)\b/,
+      /\bdisponibilidade\b/, /\bhosp[ée]d/, /\bobrigad/, /\bdi[áa]ria/,
+      /\b(equipe|atendimento|feira|nossos?|nossas?|hor[á]rio|apartamentos?)\b/, /(^|[\s,.])[àé]([\s,.]|$)/,
+    ],
+    // "ción" cobre disposición, habitación, información - o portugues faz "ção".
+    es: [/[¿¡ñ]/, /ci[óo]n\b/, /\b(hola|buenas|usted|ustedes|gracias|quedamos|enlace|ni[ñn]os?)\b/, /\bdisponibilidad\b/, /\bhabitaci/, /\bestad[íi]a\b/, /\ba su disposici/, /\bvalores y\b/],
+    en: [/\bhello\b/, /\b(you|your)\b/, /\bavailability\b/, /\broom\b/, /\bplease\b/, /\brates\b/],
+  };
+  const conta = (lista: RegExp[]) => lista.filter((r) => r.test(t)).length;
+  return { pt: conta(listas.pt), es: conta(listas.es), en: conta(listas.en) };
+}
+
+/**
  * A resposta saiu no idioma que foi decidido?
  *
  * Conferencia na saida, porque instrucao no prompt ja falhou: o modelo comecava
- * com o bloco portugues numa conversa em espanhol. Aqui nao ha diplomacia -
- * conta marca exclusiva de cada lingua e compara.
+ * com o bloco portugues numa conversa em espanhol.
  */
 export function pareceEscritoEm(texto: string, idioma: 'pt' | 'es' | 'en'): boolean {
-  const t = (texto || '').toLowerCase();
-  if (!t.trim()) return true;
+  const t = (texto || '').trim();
+  if (!t) return true;
+  const m = marcasDeIdioma(t);
+  const outros = (['pt', 'es', 'en'] as const).filter((i) => i !== idioma).map((i) => m[i]);
+  return m[idioma] >= Math.max(...outros);
+}
 
-  const marcas = {
-    pt: [/\bol[áa]\b/, /\bvoc[êe]s?\b/, /[çã]/, /\b(n[ãa]o|s[ãa]o|est[ãa]o)\b/, /\bdisponibilidade\b/, /\bhosp[ée]d/, /\bobrigad/, /\bdi[áa]ria/],
-    es: [/[¿¡ñ]/, /\bhola\b/, /\busted\b/, /\bdisponibilidad\b/, /\bhabitaci[oó]n/, /\bestad[íi]a\b/, /\bpor favor inf[oó]rmeme\b/, /\bvalores y\b/],
-    en: [/\bhello\b/, /\byou\b/, /\bavailability\b/, /\broom\b/, /\bplease\b/, /\brates\b/],
-  };
-  const pontos = (lista: RegExp[]) => lista.filter((r) => r.test(t)).length;
-  const alvo = pontos(marcas[idioma]);
-  const outros = (['pt', 'es', 'en'] as const).filter((i) => i !== idioma).map((i) => pontos(marcas[i]));
-  return alvo >= Math.max(...outros);
+/**
+ * A resposta misturou idiomas?
+ *
+ * Caso real (18/09/2026): hospede brasileiro, resposta inteira em portugues e a
+ * despedida em espanhol - "Quedamos a su disposición". A conferencia acima
+ * aprovava (portugues dominava) e, pior, nem rodava: eu so checava o idioma
+ * quando o hospede NAO era brasileiro. Uma frase estrangeira no fim da mensagem
+ * passa despercebida por quem escreve e nao por quem recebe.
+ */
+export function respostaMisturada(texto: string, idioma: 'pt' | 'es' | 'en'): boolean {
+  const t = (texto || '').trim();
+  if (!t) return false;
+  const m = marcasDeIdioma(t);
+  return (['pt', 'es', 'en'] as const).some((i) => i !== idioma && m[i] > 0);
 }
 /**
  * "de 21/11 a 23/11, para 1 adulto" - lido do proprio link, nao inventado.
@@ -2270,26 +2304,33 @@ ${url}`;
     const oficiais = (reserva.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
     const textoFinal = garantirLink(corrigirLinks(draft.text, oficiais), oficiais);
 
-    // Saiu no idioma certo?
+    // Saiu no idioma certo, e SEM mistura?
     //
-    // A instrucao no prompt ja falhou uma vez: conversa inteira em espanhol e a
-    // sugestao veio em portugues, comecando pelo bloco de abertura errado.
-    // Aqui a saida e conferida e, se destoar, refaz UMA vez com ordem direta.
-    // Uma chamada extra so nesse caso - nao no caminho normal.
+    // A conferencia vale para os tres idiomas, inclusive portugues. Antes eu a
+    // pulava quando o hospede era brasileiro, e foi assim que passou uma
+    // resposta em portugues terminando com "Quedamos a su disposición"
+    // (18/09/2026). Uma frase estrangeira no fim escapa de quem escreve, nao de
+    // quem recebe.
     const idiomaEsperado = idiomaDoHospede(apenasFalasDoHospede(conversation));
-    if (idiomaEsperado !== 'pt' && draft.text && !pareceEscritoEm(draft.text, idiomaEsperado)) {
-      this.registrarDecisao(`resposta veio fora do idioma (${idiomaEsperado})`, {});
-      const nome = idiomaEsperado === 'es' ? 'ESPANHOL' : 'INGLÊS';
+    const foraDoIdioma = draft.text && !pareceEscritoEm(draft.text, idiomaEsperado);
+    const misturou = draft.text && respostaMisturada(draft.text, idiomaEsperado);
+    if (foraDoIdioma || misturou) {
+      const nome = idiomaEsperado === 'es' ? 'ESPANHOL' : idiomaEsperado === 'en' ? 'INGLÊS' : 'PORTUGUÊS';
+      this.registrarDecisao(foraDoIdioma ? `resposta veio fora do idioma (${idiomaEsperado})` : `resposta misturou idiomas (${idiomaEsperado})`, {});
+      const queixa = foraDoIdioma
+        ? `a resposta anterior saiu no idioma ERRADO.`
+        : `a resposta anterior MISTUROU idiomas — tinha trechos fora do ${nome.toLowerCase()}, como uma despedida em outra língua.`;
       const segunda = await this.ai.complete({
         task: 'sales',
         system:
-          `${system}\n\nATENÇÃO: a resposta anterior saiu no idioma ERRADO. ` +
-          `Escreva a mensagem inteira em ${nome}, sem uma única palavra em português.`,
+          `${system}\n\nATENÇÃO: ${queixa} ` +
+          `Escreva a mensagem INTEIRA em ${nome}, do cumprimento à despedida, sem uma única palavra em outro idioma.`,
         messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
         temperature: settings?.temperature ?? 0.7,
       });
       if (segunda.text && segunda.model !== 'mock') draft.text = segunda.text;
     }
+
 
     // Nenhum modelo respondeu.
     //
