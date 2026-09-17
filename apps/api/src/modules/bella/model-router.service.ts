@@ -54,28 +54,34 @@ export class ModelRouterService {
   }
 
   /**
-   * Modelos em ordem de preferencia, com alternativa.
+   * Modelos por tarefa, escolhidos pela COTA DIARIA do nivel gratuito.
    *
-   * MEDIDO em 04/09/2026: os aliases "-latest" do nivel gratuito estavam
-   * saturados - gemini-flash-latest devolvia 503/429 em 5 de 5 tentativas, e
-   * flash-lite-latest 400/503. Como o codigo so repetia no MESMO modelo, cada
-   * sugestao pagava 3 tentativas com espera na extracao E outras 3 na escrita.
-   * Era essa a demora que o hotel sentia.
+   * Medido no painel do AI Studio em 17/09/2026 (Limite de taxa, projeto
+   * AI-Studio-Free):
    *
-   * gemini-2.5-flash e gemini-2.5-flash-lite responderam 200 em ~0,6s. Em vez de
-   * cravar um nome (o Google aposenta modelos), tentamos a lista em ordem: se um
-   * estiver congestionado, o proximo assume na hora.
+   *   gemini-3.5-flash-lite   15/min   500/dia
+   *   gemini-3.1-flash-lite   15/min   500/dia
+   *   gemini-2.5-flash-lite   10/min    20/dia
+   *   gemini-2.5-flash         5/min    20/dia
+   *   3.5 / 3.6 / 3.7 / 3.8 flash       20/dia
+   *
+   * A Bella rodava nos de 20 POR DIA - o atendimento de uma tarde. O "limit:
+   * 20" que aparecia no 429 era a cota diaria, e eu a li como se fosse por
+   * minuto: os flash-lite da linha 3.x dao 25 vezes mais, de graca, no mesmo
+   * projeto. Trocar de modelo aqui vale mais do que qualquer chave nova.
+   *
+   * Ao mexer nesta lista, confira a cota no painel antes - nao adianta pegar o
+   * modelo mais novo se ele vier com teto de 20 por dia.
    */
   private modelosPara(task: AiTask): string[] {
     const env = process.env;
     const lista = (v?: string) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null);
+    const altaCota = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
 
     if (task === 'booking_extraction') {
-      return (
-        lista(env.GEMINI_MODEL_FAST) ?? ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-lite-latest']
-      );
+      return lista(env.GEMINI_MODEL_FAST) ?? altaCota;
     }
-    return lista(env.GEMINI_MODEL_PRECISE) ?? ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
+    return lista(env.GEMINI_MODEL_PRECISE) ?? altaCota;
   }
 
   /** Modelo por tarefa, configurável por env conforme o provedor */
@@ -302,6 +308,9 @@ export class ModelRouterService {
     }
     const key = this.chaveGemini();
     // Usa o mesmo alias vigente do provedor (gemini-2.5-flash foi descontinuado)
+    // Transcricao fica no 2.5-flash de proposito: e o que sabemos que aceita
+    // audio. Ele tem cota diaria de 20, mas audio e raro; trocar por um
+    // flash-lite sem testar audio de verdade arriscaria quebrar em silencio.
     const model = process.env.GEMINI_MODEL_AUDIO ?? 'gemini-2.5-flash';
     const buildBody = (withThinking: boolean) => ({
       contents: [
