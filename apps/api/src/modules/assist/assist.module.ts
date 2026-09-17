@@ -633,8 +633,14 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   }
   if (!adultos || adultos < 1 || adultos > 15) return null;
 
-  // Mais de um apartamento pedido: a composicao de cada um nao sai de regex.
-  if (/\b(\d{1,2})\s*(?:apartamentos|quartos|apt[os]?|suítes|suites)\b/i.test(t)) return null;
+  // Varios apartamentos: a COMPOSICAO de cada um nao sai de regex, mas a
+  // quantidade sai - e com ela o bookingContext ja sabe pedir quantas pessoas
+  // ficam em cada quarto, sem gastar IA. Caso real (17/09/2026): "13/11 a 14/11
+  // / 4 pessoas 2 quartos com 2 camas de solteiro" ficou sem resposta porque a
+  // leitura desistia aqui e a IA estava sem cota.
+  const mQuartos = semPref.match(/\b(\d{1,2})[ \t]*(?:apartamentos?|quartos?|apt[os]?\.?|su[íi]tes?)\b/i);
+  const apartamentos = mQuartos ? Number(mQuartos[1]) : 1;
+  if (apartamentos < 1 || apartamentos > 8) return null;
 
   return {
     checkin: periodos[0].checkin,
@@ -644,7 +650,7 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
     children7_9: 0,
     idades,
     intent: 'booking',
-    apartamentos: 1,
+    apartamentos,
     semIA: true,
   };
 }
