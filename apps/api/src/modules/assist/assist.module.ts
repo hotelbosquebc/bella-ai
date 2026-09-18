@@ -812,6 +812,56 @@ export function ajustarPacoteReveillon(
 }
 
 /**
+ * So o que NOS escrevemos na conversa (o avesso de apenasFalasDoHospede).
+ */
+export function apenasNossasFalas(conversation: string): string {
+  const saida: string[] = [];
+  let nossa = false;
+  for (const linha of (conversation || '').split(/\r?\n/)) {
+    if (/^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(linha)) nossa = true;
+    else if (/^\s*H[óo]spede\s*(\(hoje\))?\s*:/i.test(linha)) nossa = false;
+    if (nossa) saida.push(linha);
+  }
+  return saida.join('\n');
+}
+
+/**
+ * Este orcamento JA foi enviado nesta conversa - e o hospede nao pediu de novo?
+ *
+ * Caso real (18/09/2026): o link de 12/10 a 18/10 ja tinha ido, o hospede
+ * perguntou "Sobre a limpeza se e feita tb nos quartos?", e a sugestao mandou o
+ * link DE NOVO e perguntou "qual seria a sua duvida?" - sem responder a duvida.
+ * A ordem "envie este link" vinha pronta no contexto e venceu a pergunta real.
+ *
+ * Reenviar so quando ele pede ("pode me reenviar", "manda o link de novo") -
+ * caso de 16/09, em que a hospede voltou no dia seguinte pedindo os valores.
+ */
+export function orcamentoJaEnviado(conversation: string, checkin: string, checkout: string): boolean {
+  const nossas = apenasNossasFalas(conversation);
+  const mesmoPeriodo = nossas.includes(`checkin=${checkin}`) && nossas.includes(`checkout=${checkout}`);
+  if (!mesmoPeriodo) return false;
+  const ultima = ultimaFalaDoHospede(conversation);
+  const pedeDeNovo =
+    /\b(reenvi|reenv[íi]|manda(r)?\s+(de novo|novamente|o link|os valores)|envia(r)?\s+(de novo|novamente|o link)|de novo|novamente|link|valores?|cota[çc][ãa]o|or[çc]amento|pre[çc]o)\b/i;
+  return !pedeDeNovo.test(ultima);
+}
+
+/**
+ * O hospede citou crianca mas nao disse a idade?
+ *
+ * A idade decide a categoria no site (0-6 cortesia, 7-9 meia, 10+ adulto).
+ * Sem ela, o link sai com as criancas de fora - ou como adultos, se a IA chutar.
+ * Caso real (18/09/2026): "3 adultos e 3 criancas" e a sugestao terminou em
+ * "Ficamos a disposicao!", sem link e sem perguntar nada: beco sem saida.
+ */
+export function criancaSemIdade(falasDoHospede: string): boolean {
+  const t = semPrefixos(falasDoHospede);
+  if (!PALAVRA_DE_CRIANCA.test(t)) return false;
+  if (/\b(sem|nenhuma?|n[ãa]o\s+(tem|temos|vai|vao|vão)|sin|no\s+hay)\s+(crian|filh|beb|ni[ñn]|hij|menor|child|kid)/i.test(t)) return false;
+  return !/\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(t);
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -1546,11 +1596,15 @@ export class AssistController {
     }
 
     const faltam = ['checkin', 'checkout', 'adults'].filter((c) => !stay[c]);
+    // Crianca citada sem idade: o link nao pode sair, porque a categoria depende
+    // da idade. Pedir, em vez de terminar a conversa num beco sem saida.
+    if (criancaSemIdade(falasDoHospede)) faltam.push('idades');
     if (faltam.length) {
       const rotulos: Record<string, string> = {
         checkin: 'data de entrada',
         checkout: 'data de saída',
         adults: 'quantidade de adultos',
+        idades: 'idade de cada criança (define a categoria no site)',
       };
       this.registrarDecisao('faltam dados (checkin/checkout/adultos)', stay);
       const avisoVago = stay.periodoVago
@@ -1780,6 +1834,18 @@ ${url}`;
       }
     } catch (_) {
       /* indisponível: segue sem falar de procura */
+    }
+
+    // Ja mandamos este mesmo orcamento e ele esta perguntando outra coisa: nao
+    // reenviar - ver orcamentoJaEnviado.
+    if (orcamentoJaEnviado(conversation, stay.checkin, stay.checkout)) {
+      this.registrarDecisao('orcamento ja enviado antes: nao reenviar', stay);
+      return (
+        `\n\nORÇAMENTO JÁ ENVIADO: o link com os valores de ${stay.checkin} a ${stay.checkout} já foi mandado ` +
+        `nesta conversa. NÃO reenvie o link e NÃO repita o orçamento. ` +
+        `Responda APENAS à pergunta atual do hóspede, usando a base de conhecimento. ` +
+        `Se ele fez uma pergunta, não pergunte "qual é a sua dúvida": ela já está escrita.`
+      );
     }
 
     const link = this.reservations.buildBookingLink(stay);
