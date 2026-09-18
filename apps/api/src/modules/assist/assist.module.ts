@@ -1335,6 +1335,7 @@ export class AssistController {
     versao: string | null;
     sinaisAudio: string[];
     marcadorDeAudioNaConversa: boolean;
+    formato?: Record<string, number | boolean>;
   }[] = [];
 
   private readonly extracaoCache = new Map<string, { stay: any; ts: number }>();
@@ -2270,11 +2271,27 @@ ${url}`;
   async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[] }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
+    // Formato da conversa que chegou - so contagens, nenhum texto do hospede.
+    //
+    // Em 18/09/2026 cinco sugestoes seguidas deram "sem assunto de estadia"
+    // com a extensao atualizada e a IA funcionando. Isso tem duas explicacoes
+    // opostas: o hospede so cumprimentou, ou as falas dele foram marcadas como
+    // nossas. estadiaNaConversa=true com estadiaNaFalaDoHospede=false aponta
+    // para a segunda sem precisar ver a conversa.
+    const falasDoHospedeAgora = apenasFalasDoHospede(conversation);
+    const formato = {
+      linhasHospede: (conversation.match(/^\s*H[óo]spede\s*(\(hoje\))?\s*:/gim) || []).length,
+      linhasNossas: (conversation.match(/^\s*N[óo]s\s*(\(hoje\))?\s*:/gim) || []).length,
+      estadiaNaConversa: pareceOrcamento(conversation),
+      estadiaNaFalaDoHospede: pareceOrcamento(falasDoHospedeAgora),
+      ultimaLinhaEhDoHospede: /^\s*H[óo]spede/i.test(conversation.trim().split(/\r?\n/).filter((l) => /^\s*(H[óo]spede|N[óo]s)/i.test(l)).pop() || ''),
+    };
     this.clientes.push({
       quando: new Date().toISOString(),
       versao: typeof body.versao === 'string' ? body.versao.slice(0, 20) : null,
       sinaisAudio: Array.isArray(body.sinaisAudio) ? body.sinaisAudio.map((s) => String(s).slice(0, 80)).slice(0, 5) : [],
       marcadorDeAudioNaConversa: /\[(mensagem de voz|áudio transcrito)/i.test(conversation),
+      formato,
     });
     if (this.clientes.length > 20) this.clientes.shift();
     const focus = body.lastMessage || conversation;
