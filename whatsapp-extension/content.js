@@ -592,6 +592,51 @@
   // ---------- anexos (regras de pets, catálogo de ingressos) ----------
 
   /**
+   * Este campo aceita DOCUMENTO?
+   *
+   * O teste antigo era "o filtro contem *" - e o campo de FOTO do WhatsApp
+   * aceita "image/*", que tambem contem *. O campo de foto passava por campo de
+   * documento, a imagem ia comprimida e chegava ilegivel. Era esta a raiz da
+   * reclamacao das regras de pet, em agosto e de novo em 18/09/2026.
+   */
+  function campoAceitaDocumento(input) {
+    const a = (input.accept || '').toLowerCase().trim();
+    if (!a || a === '*' || a === '*/*') return true;
+    return !/(image|video|audio)\//.test(a);
+  }
+
+  /** Existe na tela um campo que aceita DOCUMENTO (qualquer tipo de arquivo)? */
+  function temCampoDeDocumento() {
+    return [...document.querySelectorAll('input[type="file"]')].some(campoAceitaDocumento);
+  }
+
+  /**
+   * Abre o menu do clipe para o WhatsApp criar o campo de documento.
+   *
+   * O WhatsApp Web so poe o campo de DOCUMENTO na pagina depois que o menu do
+   * clipe e aberto. Sem ele, sobrava so o campo de foto - e foto e comprimida.
+   * Caso real (18/09/2026): as regras de pet chegaram ao hospede "desconfiguradas
+   * em miniatura", a mesma reclamacao de agosto, que ja tinha sido resolvida
+   * enviando como documento.
+   */
+  async function garantirCampoDeDocumento() {
+    if (temCampoDeDocumento()) return true;
+    const rodape = document.querySelector('#main footer') || document;
+    const botao =
+      rodape.querySelector('[data-icon="plus"], [data-icon="plus-rounded"], [data-icon="attach-menu-plus"], [data-icon="clip"]') ||
+      [...rodape.querySelectorAll('[aria-label], [title]')].find((e) =>
+        /anexar|attach|adjuntar/i.test(e.getAttribute('aria-label') || e.getAttribute('title') || ''),
+      );
+    if (!botao) return false;
+    (botao.closest('button, [role="button"]') || botao).click();
+    for (let i = 0; i < 15; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      if (temCampoDeDocumento()) return true;
+    }
+    return false;
+  }
+
+  /**
    * Coloca o arquivo no campo de anexo do WhatsApp Web.
    *
    * IMPORTANTE — por que preferimos o campo de DOCUMENTO:
@@ -607,33 +652,18 @@
     const dt = new DataTransfer();
     dt.items.add(file);
 
-    const candidatos = [...document.querySelectorAll('input[type="file"]')].filter((i) => {
-      const aceita = (i.accept || '').toLowerCase();
-      return !aceita || aceita.includes('*') || aceita.includes(file.type) || aceita.includes(file.type.split('/')[0]);
-    });
-
-    // Campo de documento primeiro; o de imagem/video fica como reserva.
-    const ehMidia = (i) => /image|video/.test((i.accept || '').toLowerCase());
-    candidatos.sort((a, b) => Number(ehMidia(a)) - Number(ehMidia(b)));
-
-    for (const input of candidatos) {
+    // SO o campo de documento. O de foto/video comprime - e a folha de regras
+    // chega ilegivel. Antes ele era usado como reserva, e colar na caixa de
+    // texto era o ultimo recurso: os dois viram FOTO. Sem campo de documento,
+    // e melhor avisar o atendente do que mandar algo que ninguem consegue ler.
+    const documentos = [...document.querySelectorAll('input[type="file"]')].filter(campoAceitaDocumento);
+    for (const input of documentos) {
       try {
         input.files = dt.files;
         input.dispatchEvent(new Event('change', { bubbles: true }));
-        return ehMidia(input) ? 'input-midia' : 'input-documento';
+        return 'input-documento';
       } catch (_) {
         /* tenta o proximo */
-      }
-    }
-
-    // Ultimo recurso: colar na caixa de texto. So funciona para imagem, e aqui
-    // o WhatsApp trata como foto - ou seja, comprime.
-    if (file.type.startsWith('image/')) {
-      const box = composeBox();
-      if (box) {
-        box.focus();
-        box.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
-        return 'paste';
       }
     }
     return null;
@@ -653,11 +683,12 @@
     const ext = tipo.includes('pdf') ? '.pdf' : tipo.includes('png') ? '.png' : '.jpg';
     const file = new File([bytes], a.title.replace(/[\\/:*?"<>|]/g, '') + ext, { type: tipo });
 
-    const via = inserirArquivo(file);
+    const abriu = await garantirCampoDeDocumento();
+    const via = abriu ? inserirArquivo(file) : null;
     if (via) {
-      status('Arquivo anexado — confira e envie.');
+      status('Anexado como DOCUMENTO (sai sem compressão) — confira e envie.');
     } else {
-      status('Não consegui anexar automaticamente. Abra o clipe 📎 do WhatsApp e escolha o arquivo.', true);
+      status('Não consegui abrir o campo de documento. Clique no clipe 📎 → Documento e escolha o arquivo — como foto ele chega ilegível.', true);
     }
   }
 
