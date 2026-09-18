@@ -693,33 +693,39 @@
   const transcricoes = new Map();
 
   /**
-   * O balao e uma mensagem de voz?
+   * Por que este balao e uma mensagem de voz - ou null se nao for.
    *
-   * Marcacao real do WhatsApp Web (inspecionada em 22/08/2026): NAO existe
-   * elemento <audio> no balao - ele so e criado quando alguem aperta play. O que
-   * sempre esta la e o icone data-icon="ptt-status" e os rotulos "Mensagem de
-   * voz" / "Reproduzir mensagem de voz".
+   * Devolve o MOTIVO, e nao so sim/nao, porque "Recebi seus audios" sem audio
+   * nenhum na conversa aconteceu duas vezes (08 e 18/09/2026) e na segunda eu
+   * nao tinha como saber o que tinha sido confundido. O motivo segue para o
+   * servidor e aparece no diagnostico: da proxima vez, ha prova.
    *
-   * A versao anterior aceitava QUALQUER aria-label com "reproduzir" e qualquer
-   * data-icon com "mic". Isso pega o botao do microfone e o play de video, GIF e
-   * previa de link - e um balao desses virava "[mensagem de voz]" na conversa.
-   * Caso real (08/09/2026): hospede escreveu tudo por texto - 2 quartos, duas
-   * pessoas, entrada dia 08 e saida dia 09 - e a Bella respondeu "Recebi seus
-   * audios! Um atendente ja vai ouvi-los", ignorando o que estava escrito.
-   *
-   * Agora so conta o que e exclusivo de nota de voz. Falso negativo aqui custa
-   * um audio invisivel; falso positivo custa a resposta inteira.
+   * So conta MENSAGEM de verdade (com identificador de enviada/recebida). A
+   * varredura passa por todas as linhas da conversa, inclusive o aviso de
+   * criptografia, o cartao "Nao esta nos seus contatos" e os divisores de data
+   * - e um icone qualquer num desses virava "audio".
    */
-  function ehAudio(row) {
-    if (row.querySelector('audio')) return true;
+  function motivoAudio(row) {
+    if (!direcaoPeloId(row)) return null; // nao e mensagem
+    if (row.querySelector('audio')) return 'elemento <audio>';
     const icones = [...row.querySelectorAll('[data-icon]')].map((e) => e.getAttribute('data-icon') || '');
-    if (icones.some((ic) => /^ptt|^audio-play$|voice/i.test(ic))) return true;
+    const icone = icones.find((ic) => /^ptt|^audio-play$|voice/i.test(ic));
+    if (icone) return 'data-icon=' + icone;
     const rotulos = [...row.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') || '');
     // "Gravar mensagem de voz" e a barra do microfone, nao um balao recebido.
-    return rotulos.some(
+    const rotulo = rotulos.find(
       (r) => /mensagem de voz|recado de voz|voice message|mensaje de voz/i.test(r) && !/gravar|record|cancelar/i.test(r),
     );
+    if (rotulo) return 'aria-label=' + rotulo;
+    return null;
   }
+
+  function ehAudio(row) {
+    return Boolean(motivoAudio(row));
+  }
+
+  /** Motivos dos audios achados na ultima leitura, para o diagnostico. */
+  let sinaisDeAudio = [];
 
   /** Duracao que aparece no player ("0:07"), quando houver. */
   function duracaoDoAudio(row) {
@@ -790,9 +796,12 @@
     const main = document.querySelector('#main');
     if (!main) return;
     const rows = [...main.querySelectorAll('div[role="row"]')];
+    sinaisDeAudio = [];
     for (const row of rows) {
       if (row.querySelector('.copyable-text[data-pre-plain-text]')) continue; // e texto
-      if (!ehAudio(row)) continue;
+      const motivo = motivoAudio(row);
+      if (!motivo) continue;
+      sinaisDeAudio.push(motivo);
       if (audiosLidos.has(row)) continue;
       audiosLidos.set(row, await textoDoAudio(row));
     }
@@ -975,7 +984,7 @@
         (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage });
+      const r = await send('SUGGEST', { conversation, lastMessage, versao: chrome.runtime.getManifest().version, sinaisAudio: sinaisDeAudio.slice(0, 5) });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do

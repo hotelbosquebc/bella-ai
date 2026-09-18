@@ -1271,6 +1271,22 @@ export class AssistController {
     if (this.decisoesLink.length > 20) this.decisoesLink.shift();
   }
 
+  /**
+   * De onde veio cada sugestao: versao da extensao e o que ela achou que era
+   * audio.
+   *
+   * Duas vezes a Bella respondeu "Recebi seus audios" sem audio nenhum, e na
+   * segunda nao havia como saber o que tinha sido confundido - nem se aquela
+   * maquina estava com a extensao atualizada. Aqui fica a prova: nenhum texto
+   * do hospede, so a versao e o nome do atributo que disparou a deteccao.
+   */
+  private readonly clientes: {
+    quando: string;
+    versao: string | null;
+    sinaisAudio: string[];
+    marcadorDeAudioNaConversa: boolean;
+  }[] = [];
+
   private readonly extracaoCache = new Map<string, { stay: any; ts: number }>();
 
   /**
@@ -2100,7 +2116,7 @@ ${url}`;
   @Public()
   @Get('diagnostico-link')
   diagnosticoLink() {
-    return { decisoes: this.decisoesLink.slice(-10) };
+    return { decisoes: this.decisoesLink.slice(-10), clientes: this.clientes.slice(-10) };
   }
 
   /**
@@ -2185,9 +2201,16 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[] }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
+    this.clientes.push({
+      quando: new Date().toISOString(),
+      versao: typeof body.versao === 'string' ? body.versao.slice(0, 20) : null,
+      sinaisAudio: Array.isArray(body.sinaisAudio) ? body.sinaisAudio.map((s) => String(s).slice(0, 80)).slice(0, 5) : [],
+      marcadorDeAudioNaConversa: /\[(mensagem de voz|áudio transcrito)/i.test(conversation),
+    });
+    if (this.clientes.length > 20) this.clientes.shift();
     const focus = body.lastMessage || conversation;
 
     // Pede a disponibilidade ANTES de escrever qualquer coisa.

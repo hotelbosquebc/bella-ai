@@ -200,6 +200,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             lastMessage: msg.lastMessage,
             disponibilidadeHtml: msg.disponibilidadeHtml,
             pularDisponibilidade: msg.pularDisponibilidade,
+            // diagnostico: qual versao da extensao e o que ela achou que era audio
+            versao: msg.versao,
+            sinaisAudio: msg.sinaisAudio,
           }),
         });
         sendResponse({ ok: true, data: out });
