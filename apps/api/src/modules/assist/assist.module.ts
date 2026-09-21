@@ -1337,6 +1337,9 @@ export class AssistController {
    * maquina estava com a extensao atualizada. Aqui fica a prova: nenhum texto
    * do hospede, so a versao e o nome do atributo que disparou a deteccao.
    */
+  /** Tempo das etapas das ultimas sugestoes (ms). So numeros, nenhum texto. */
+  private readonly tempos: Record<string, number | string>[] = [];
+
   private readonly clientes: {
     quando: string;
     versao: string | null;
@@ -2190,7 +2193,7 @@ ${url}`;
   @Public()
   @Get('diagnostico-link')
   diagnosticoLink() {
-    return { decisoes: this.decisoesLink.slice(-10), clientes: this.clientes.slice(-10) };
+    return { decisoes: this.decisoesLink.slice(-10), clientes: this.clientes.slice(-10), tempos: this.tempos.slice(-10) };
   }
 
   /**
@@ -2277,6 +2280,10 @@ ${url}`;
   @Post('suggest')
   async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[] }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
+    // Cronometro das etapas. "Esta demorando muito" precisa virar numero: sem
+    // isso a gente otimiza no escuro. Nenhum texto entra aqui, so tempos.
+    const t0 = Date.now();
+    const marcos: Record<string, number> = {};
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
     // Formato da conversa que chegou - so contagens, nenhum texto do hospede.
     //
@@ -2379,6 +2386,7 @@ ${url}`;
       throw err;
     }
     const [settings, hotel, relevantPolicies, knowledgeText, reserva, anexos] = dadosDaConversa;
+    marcos.contexto = Date.now() - t0;
 
     const system =
       (settings?.masterPrompt ?? MASTER_PROMPT)
@@ -2409,6 +2417,7 @@ ${url}`;
       messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
       temperature: settings?.temperature ?? 0.7,
     });
+    marcos.geracao = Date.now() - t0 - marcos.contexto;
 
     // Se ha datas mas ninguem consultou a disponibilidade, pedimos que a
     // extensao consulte e chame de novo. O servidor nao consegue: o Cloudflare
@@ -2428,6 +2437,7 @@ ${url}`;
     const foraDoIdioma = draft.text && !pareceEscritoEm(draft.text, idiomaEsperado);
     const misturou = draft.text && respostaMisturada(draft.text, idiomaEsperado);
     if (foraDoIdioma || misturou) {
+      const tRefacao = Date.now();
       const nome = idiomaEsperado === 'es' ? 'ESPANHOL' : idiomaEsperado === 'en' ? 'INGLÊS' : 'PORTUGUÊS';
       // As marcas encontradas entram no motivo: sem isso nao da para saber se
       // o modelo misturou de verdade ou se o alarme e meu.
@@ -2449,6 +2459,7 @@ ${url}`;
         temperature: settings?.temperature ?? 0.7,
       });
       if (segunda.text && segunda.model !== 'mock') draft.text = segunda.text;
+      marcos.refacaoIdioma = Date.now() - tRefacao;
     }
 
 
@@ -2485,6 +2496,9 @@ ${url}`;
       };
     }
 
+    marcos.total = Date.now() - t0;
+    this.tempos.push({ quando: new Date().toISOString(), ...marcos });
+    if (this.tempos.length > 20) this.tempos.shift();
     return { suggestion: formatarParaWhatsApp(textoFinal), model: draft.model, attachments: anexos };
   }
 }
