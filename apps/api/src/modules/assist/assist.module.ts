@@ -2422,7 +2422,14 @@ ${url}`;
     const misturou = draft.text && respostaMisturada(draft.text, idiomaEsperado);
     if (foraDoIdioma || misturou) {
       const nome = idiomaEsperado === 'es' ? 'ESPANHOL' : idiomaEsperado === 'en' ? 'INGLÊS' : 'PORTUGUÊS';
-      this.registrarDecisao(foraDoIdioma ? `resposta veio fora do idioma (${idiomaEsperado})` : `resposta misturou idiomas (${idiomaEsperado})`, {});
+      // As marcas encontradas entram no motivo: sem isso nao da para saber se
+      // o modelo misturou de verdade ou se o alarme e meu.
+      const m = marcasDeIdioma(draft.text);
+      const detalhe = `pt:${m.pt} es:${m.es} en:${m.en}`;
+      this.registrarDecisao(
+        (foraDoIdioma ? `resposta fora do idioma (${idiomaEsperado})` : `resposta misturou idiomas (${idiomaEsperado})`) + ` [${detalhe}]`,
+        {},
+      );
       const queixa = foraDoIdioma
         ? `a resposta anterior saiu no idioma ERRADO.`
         : `a resposta anterior MISTUROU idiomas — tinha trechos fora do ${nome.toLowerCase()}, como uma despedida em outra língua.`;
