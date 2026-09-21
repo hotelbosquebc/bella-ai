@@ -13,6 +13,23 @@ export class KnowledgeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * O texto do conhecimento, em memoria.
+   *
+   * Sao 57 itens, ~26 mil caracteres, buscados a CADA sugestao - 1,6s so nessa
+   * consulta, com o atendente esperando. Conhecimento muda raramente: quando
+   * alguem edita no painel (e ai limpamos o cache na hora) ou quando o seed
+   * roda num deploy (e o processo reinicia). Os 10 minutos sao rede de
+   * seguranca para edicao feita por outra instancia.
+   */
+  private cache = new Map<string, { texto: string; ts: number }>();
+
+  /** Chamado por quem altera conhecimento, para a proxima resposta ja ver. */
+  invalidarCache(hotelId?: string) {
+    if (hotelId) this.cache.delete(hotelId);
+    else this.cache.clear();
+  }
+
   list(hotelId: string) {
     return this.prisma.knowledgeDocument.findMany({
       where: { hotelId },
@@ -38,16 +55,19 @@ export class KnowledgeService {
         embeddingStatus: content ? 'INDEXED' : 'PENDING',
       },
     });
+    this.invalidarCache();
     this.logger.log(`Documento "${title}" registrado (hotel ${hotelId})`);
     return doc;
   }
 
   /** Edita um documento de conhecimento (título, conteúdo, ativo). */
   async updateDocument(id: string, data: { title?: string; content?: string; active?: boolean }) {
+    this.invalidarCache();
     return this.prisma.knowledgeDocument.update({ where: { id }, data });
   }
 
   async deleteDocument(id: string) {
+    this.invalidarCache();
     return this.prisma.knowledgeDocument.delete({ where: { id } });
   }
 
@@ -64,6 +84,8 @@ export class KnowledgeService {
    * o limite subiu. O Gemini aguenta folgado; o risco real era o corte mudo.
    */
   async getKnowledgeContext(hotelId: string, maxChars = 60000): Promise<string> {
+    const guardado = this.cache.get(hotelId);
+    if (guardado && Date.now() - guardado.ts < 600000) return guardado.texto;
     const docs = await this.prisma.knowledgeDocument.findMany({
       where: { hotelId, active: true, content: { not: null } },
       orderBy: { createdAt: 'asc' },
@@ -86,7 +108,10 @@ export class KnowledgeService {
         `Base de conhecimento excedeu ${maxChars} caracteres; ${cortados.length} item(ns) FORA do prompt: ${cortados.join(', ')}`,
       );
     }
-    return out.trim();
+    // Guarda o mesmo texto que devolve - senao a 1a resposta sai diferente das seguintes.
+    const texto = out.trim();
+    this.cache.set(hotelId, { texto, ts: Date.now() });
+    return texto;
   }
 
   /** Busca semântica (RAG) — reservado para múltiplos hotéis/documentos grandes. */
