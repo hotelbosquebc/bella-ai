@@ -629,7 +629,8 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   } else if (mPessoas && !temCrianca) {
     adultos = Number(mPessoas[1]);
   } else if (!temCrianca && adultosDeCasal(semPref)) {
-    adultos = 2;
+    // O numero vem da propria funcao: "2 casais" sao 4 adultos, nao 2.
+    adultos = adultosDeCasal(semPref);
   }
   if (!adultos || adultos < 1 || adultos > 15) return null;
 
@@ -704,7 +705,14 @@ export function semPrefixos(texto: string): string {
  */
 export function adultosDeCasal(texto: string): number | null {
   const t = semPrefixos(texto);
-  if (/\bcasais\b/i.test(t)) return null;
+  // (?<![\d\/]) impede que o numero venha de uma data: em "17/10 casal" o "10"
+  // nao e quantidade de casais.
+  const comNumero = t.match(/(?<![\d\/])(\d{1,2})[ \t]*casa(?:l|is)\b/i);
+  if (comNumero) {
+    const n = Number(comNumero[1]);
+    return n >= 1 && n <= 8 ? n * 2 : null;
+  }
+  if (/\bcasais\b/i.test(t)) return null; // plural sem numero: nao da para contar
   const pessoas = /(?<!cama\s(?:de\s)?|quarto\s(?:de\s)?|apartamento\s(?:de\s)?|apto\.?\s(?:de\s)?|su[íi]te\s(?:de\s)?)\bcasal\b/i;
   return pessoas.test(t) ? 2 : null;
 }
@@ -734,16 +742,21 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
   const adultosDeclarados = mAdultos ? Number(mAdultos[1]) : adultosDeCasal(t);
   if (!adultosDeclarados) return null;
 
-  const palavraDeCrianca = PALAVRA_DE_CRIANCA;
   const idades: number[] = [];
+  const palavraDeCrianca = PALAVRA_DE_CRIANCA;
+  // Linha que e SO idade ("14 /16/7 anos") conta quando a conversa fala de
+  // crianca em outro balao: o hospede responde a pergunta das idades numa
+  // mensagem separada. Mesmo padrao de "dia 21 a 23" + "Novembro".
+  const falaDeCrianca = palavraDeCrianca.test(t);
+  const soIdades = /^[\s\d,;\/e-]*\s*(?:anos?|años?|years?)\s*[.!]?$/i;
   for (const linha of t.split(/\r?\n/)) {
-    if (!palavraDeCrianca.test(linha)) continue;
+    if (!palavraDeCrianca.test(linha) && !(falaDeCrianca && soIdades.test(linha))) continue;
     // "5 e 10 anos", "5, 7 e 10 anos", "20 15 14 10 años" - a hospede paraguaia
     // separou so por espaco, e nos tres idiomas o "anos" muda de grafia.
-    const lista = /((?:\d{1,2}[\s,]*(?:e|y|and)?[\s,]*)*\d{1,2})\s*(?:anos?|años?|years?)\b/gi;
+    const lista = /((?:\d{1,2}[\s,\/]*(?:e|y|and)?[\s,\/]*)*\d{1,2})\s*(?:anos?|años?|years?)\b/gi;
     let m: RegExpExecArray | null;
     while ((m = lista.exec(linha)) !== null) {
-      for (const n of m[1].split(/[\s,]+|\s*(?:e|y|and)\s*/i)) {
+      for (const n of m[1].split(/[\s,\/]+|\s*(?:e|y|and)\s*/i)) {
         if (!/^\d{1,2}$/.test(n)) continue; // "y", "e" e vazios viravam idade 0
         const idade = Number(n);
         // Ate 30: "mis 4 hijos de 20 15 14 10 años" - o filho de 20 e filho, e
@@ -1693,12 +1706,26 @@ export class AssistController {
       );
     }
 
+    // Mais de 6 pessoas: nao cabe num apartamento so.
+    //
+    // O dono ensinou pela conversa de 22/09/2026 ("6 adulto e um crianca de 7
+    // anos"): a Bella deve DIZER de quantos apartamentos precisa e perguntar
+    // como o hospede quer dividir. Antes ela so perguntava a divisao, sem o
+    // numero - e o atendente teve que escrever "sao necessarios 2 apartamentos"
+    // na mao. O limite e 6 por apartamento, entao o minimo e o total dividido
+    // por 6, arredondado para cima.
     if (totalNoPedido > 6 && !(detalhe.length > 1)) {
+      const minimo = Math.ceil(totalNoPedido / 6);
+      this.registrarDecisao(`${totalNoPedido} pessoas: pedir a divisao em ${minimo} apartamentos`, stay);
       return (
         `\n\nOCUPAÇÃO ACIMA DO LIMITE (${totalNoPedido} pessoas): cada apartamento acomoda no MÁXIMO 6 pessoas, ` +
-        `então isso não cabe num apartamento só e um link único não serve. NÃO envie link agora. ` +
-        `Confirme o total e pergunte como ele prefere dividir — quantas pessoas em cada apartamento — ` +
-        `para você montar um orçamento por apartamento. Se preferir, ofereça que a equipe de reservas monte a divisão.`
+        `então isso não cabe num apartamento só e um link único não serve. NÃO envie link agora.\n` +
+        `DIGA AO HÓSPEDE, com naturalidade, que para ${totalNoPedido} pessoas são necessários no mínimo ` +
+        `${minimo} apartamentos — esse número é a informação que ele precisa para se organizar, não omita. ` +
+        `Em seguida pergunte como ele prefere dividir os hóspedes em cada apartamento (quantas pessoas em cada, ` +
+        `e a idade das crianças de cada um, se houver), porque é isso que permite montar um orçamento por apartamento.\n` +
+        `Se ele preferir, ofereça que a equipe de reservas monte a divisão.` +
+        ofertaAtendimento
       );
     }
 
