@@ -638,7 +638,14 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   // ficam em cada quarto, sem gastar IA. Caso real (17/09/2026): "13/11 a 14/11
   // / 4 pessoas 2 quartos com 2 camas de solteiro" ficou sem resposta porque a
   // leitura desistia aqui e a IA estava sem cota.
-  const mQuartos = semPref.match(/\b(\d{1,2})[ \t]*(?:apartamentos?|quartos?|apt[os]?\.?|su[íi]tes?)\b/i);
+  //
+  // "familias" e "casais" contam como apartamentos: "Sao 3 familias" (21/09)
+  // significa tres apartamentos separados, um por familia. "casal" no singular
+  // NAO entra aqui - aquilo e a ocupacao de um apartamento so (ver
+  // adultosDeCasal).
+  const mQuartos = semPref.match(
+    /\b(\d{1,2})[ \t]*(?:apartamentos?|quartos?|apt[os]?\.?|su[íi]tes?|fam[íi]lias|casais|habitaciones)\b/i,
+  );
   const apartamentos = mQuartos ? Number(mQuartos[1]) : 1;
   if (apartamentos < 1 || apartamentos > 8) return null;
 

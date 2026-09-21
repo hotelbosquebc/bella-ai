@@ -231,8 +231,11 @@ export const STAY_EXTRACTION_TOOL = {
         description:
           'Um item por APARTAMENTO pedido, na ordem em que o hóspede listou. Preencha SEMPRE que ele pedir mais de um apartamento, ' +
           'mesmo que as composições sejam iguais — é o que permite gerar um orçamento separado para cada um. ' +
+          'FAMÍLIA = APARTAMENTO: "São 3 famílias" seguido de uma lista com três composições são TRÊS apartamentos, um por linha da lista — ' +
+          'nunca some as pessoas num apartamento só. O mesmo vale para "3 casais" e para listas com hífen ou numeradas. ' +
           'Converta a descrição em números: "1 casal" = 2 adultos; "3 adultos" = 3 adultos; "casal + 1 criança de 8" = 2 adultos e 1 criança de 7 a 9. ' +
-          'PET NÃO É PESSOA: "1 casal + 1 pet" = 2 adultos. Criança de 10 anos ou mais conta como ADULTO.',
+          'PET NÃO É PESSOA: "1 casal + 1 pet" = 2 adultos. Criança de 10 anos ou mais conta como ADULTO. ' +
+          'Pessoa sem idade citada ("uma criança", "uma moça") vai em adultos SOMENTE se o hóspede a chamou de adulto; se for criança sem idade, deixe fora e o sistema pede a idade.',
         items: {
           type: 'object',
           properties: {
