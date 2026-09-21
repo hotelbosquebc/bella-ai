@@ -267,6 +267,19 @@ const REVISAR_ATALHO =
 const ATALHOS_A_REMOVER = ['24', 'banco', 'bomdia', 'confirmacao', 'confirmar', 'endereco', 'financeiro', 'ingressos'];
 
 const respostasRapidas = [
+  {
+    // Pedida pelo dono em 21/09/2026: "uma das mensagens que mais usamos".
+    // Digitada como /dados na Caixa de Entrada e disponivel como botao no
+    // painel da Bella dentro do WhatsApp Web.
+    shortcut: 'dados',
+    title: 'Pedir dados para orçamento',
+    content:
+      'Olá! Sou a Bella, assistente online do Hotel do Bosque.\n\n' +
+      'Para verificarmos os valores e disponibilidade por gentileza me informe:\n\n' +
+      '• 📅 Período da estadia (data de entrada e saída);\n' +
+      '• 👨‍👩‍👧‍👦 Quantidade total de pessoas;\n' +
+      '• 👶 Caso tenha crianças menores de 10 anos, gentileza informar as idades.',
+  },
 ];
 
 /**
