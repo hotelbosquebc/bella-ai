@@ -26,8 +26,8 @@ No **GitHub Desktop**: repositório `bella-ai` → **"Publish repository"** → 
    - `DATABASE_URL` = connection string do Neon
    - `GOOGLE_API_KEY` = a mesma chave gratuita do Gemini já usada localmente
    - (os tokens dos canais podem ficar em branco agora e ser preenchidos no Passo 6)
-4. Aguardar o deploy. A API ficará em `https://bella-api.onrender.com`.
-5. Testar: `https://bella-api.onrender.com/api/health` deve responder `{"status":"ok"}`.
+4. Aguardar o deploy. A API ficará em `https://bella-api-nh3h.onrender.com`.
+5. Testar: `https://bella-api-nh3h.onrender.com/api/health` deve responder `{"status":"ok"}`.
 
 > O `render.yaml` já roda as migrações e o seed automaticamente no deploy, então
 > o Passo 2.4 (rodar migrate/seed do seu PC) é opcional — útil só se quiser
@@ -38,7 +38,7 @@ No **GitHub Desktop**: repositório `bella-ai` → **"Publish repository"** → 
 1. Criar conta em https://vercel.com (entrar com GitHub).
 2. **Add New → Project** → importar o repositório `bella-ai`.
 3. Em **Root Directory**, selecionar `apps/web`.
-4. Em **Environment Variables**, adicionar: `API_URL` = `https://bella-api.onrender.com`.
+4. Em **Environment Variables**, adicionar: `API_URL` = `https://bella-api-nh3h.onrender.com`.
 5. Deploy. O painel ficará em `https://bella-ai.vercel.app` (ou similar).
 
 ## Passo 5 — Manter a API acordada
@@ -47,11 +47,11 @@ O plano Free do Render "adormece" a API após 15 minutos sem uso (a primeira vis
 depois disso demora ~50s). Para evitar:
 
 1. Criar conta em https://cron-job.org.
-2. Criar um cron job: URL `https://bella-api.onrender.com/api/health`, a cada **5 minutos**.
+2. Criar um cron job: URL `https://bella-api-nh3h.onrender.com/api/health`, a cada **5 minutos**.
 
 ## Passo 6 — Conectar os canais
 
-Com a API pública no ar (`https://bella-api.onrender.com`), configure cada canal.
+Com a API pública no ar (`https://bella-api-nh3h.onrender.com`), configure cada canal.
 A inteligência da Bella (Gemini) e as respostas automáticas já funcionam assim que
 os tokens forem preenchidos no Render (**Environment → Save** reinicia a API sozinho).
 
@@ -61,7 +61,7 @@ os tokens forem preenchidos no Render (**Environment → Save** reinicia a API s
 2. Copie o **token** que ele fornece e coloque em `TELEGRAM_BOT_TOKEN` no Render.
 3. Registre o webhook (uma vez), trocando `<TOKEN>` pelo seu:
    ```
-   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://bella-api.onrender.com/api/channels/telegram/webhook
+   https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://bella-api-nh3h.onrender.com/api/channels/telegram/webhook
    ```
    Abra essa URL no navegador — deve responder `{"ok":true}`. Pronto, é só mandar
    mensagem para o bot.
@@ -79,8 +79,8 @@ profissional vinculado a ela).
 4. Definir um `META_WEBHOOK_VERIFY_TOKEN` (uma senha qualquer que você inventa) —
    a mesma no Render e no painel da Meta.
 5. Configurar os webhooks na Meta:
-   - **Messenger** → Callback URL: `https://bella-api.onrender.com/api/channels/facebook/webhook`
-   - **Instagram** → Callback URL: `https://bella-api.onrender.com/api/channels/instagram/webhook`
+   - **Messenger** → Callback URL: `https://bella-api-nh3h.onrender.com/api/channels/facebook/webhook`
+   - **Instagram** → Callback URL: `https://bella-api-nh3h.onrender.com/api/channels/instagram/webhook`
    - Verify Token: o mesmo `META_WEBHOOK_VERIFY_TOKEN`
    - Assinar o evento **messages**.
 6. (Produção) Enviar o app para **App Review** pedindo as permissões
@@ -90,7 +90,7 @@ profissional vinculado a ela).
 ### WhatsApp Business (opcional, mesmo app da Meta)
 
 - `WHATSAPP_ACCESS_TOKEN` e `WHATSAPP_PHONE_NUMBER_ID` (produto WhatsApp no app Meta).
-- Webhook: `https://bella-api.onrender.com/api/channels/whatsapp/webhook` (mesmo verify token).
+- Webhook: `https://bella-api-nh3h.onrender.com/api/channels/whatsapp/webhook` (mesmo verify token).
 
 ## Depois da publicação
 
