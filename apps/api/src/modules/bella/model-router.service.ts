@@ -54,34 +54,39 @@ export class ModelRouterService {
   }
 
   /**
-   * Modelos por tarefa, escolhidos pela COTA DIARIA do nivel gratuito.
+   * Modelos por tarefa, em ordem de VELOCIDADE - com a cota como rede.
    *
-   * Medido no painel do AI Studio em 17/09/2026 (Limite de taxa, projeto
-   * AI-Studio-Free):
+   * Medido em 22/09/2026, 5 chamadas de cada, prompt real:
    *
-   *   gemini-3.5-flash-lite   15/min   500/dia
-   *   gemini-3.1-flash-lite   15/min   500/dia
-   *   gemini-2.5-flash-lite   10/min    20/dia
-   *   gemini-2.5-flash         5/min    20/dia
-   *   3.5 / 3.6 / 3.7 / 3.8 flash       20/dia
+   *   gemini-2.5-flash        ~600ms    5/5 respondeu     20/dia
+   *   gemini-2.5-flash-lite   ~22s                        20/dia
+   *   gemini-3.6-flash        ~16s                        20/dia
+   *   gemini-3.5-flash-lite   22 a 35s  e as vezes 503    500/dia
+   *   gemini-3.1-flash-lite   5/5 FORA DO AR (503)        500/dia
    *
-   * A Bella rodava nos de 20 POR DIA - o atendimento de uma tarde. O "limit:
-   * 20" que aparecia no 429 era a cota diaria, e eu a li como se fosse por
-   * minuto: os flash-lite da linha 3.x dao 25 vezes mais, de graca, no mesmo
-   * projeto. Trocar de modelo aqui vale mais do que qualquer chave nova.
+   * Em 17/09 eu ordenei por cota diaria e coloquei os "lite 3.x" na frente:
+   * resolveu as quedas por cota e trocou por 30 segundos de espera em toda
+   * resposta - foi a reclamacao do dono em 22/09. O tamanho do prompt nao tem
+   * culpa: 26 mil caracteres e 150 dao o MESMO tempo nesses modelos, porque o
+   * que pesa e o "pensamento" deles, que o 3.5-flash-lite nao deixa desligar
+   * (recusa thinkingBudget=0 e nao aceita thinkingLevel "none").
    *
-   * Ao mexer nesta lista, confira a cota no painel antes - nao adianta pegar o
-   * modelo mais novo se ele vier com teto de 20 por dia.
+   * Agora: o rapido primeiro; quando a cota dele acaba (20/dia), o proximo; e
+   * o de 500/dia no fim, lento mas sempre disponivel. Assim o atendimento do
+   * dia comeca rapido e, no pior caso, fica lento - em vez de lento sempre.
+   *
+   * Ao mexer aqui, MEDIR antes: cota e velocidade sao coisas diferentes e
+   * nenhuma das duas se deduz do nome ou da geracao do modelo.
    */
   private modelosPara(task: AiTask): string[] {
     const env = process.env;
     const lista = (v?: string) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null);
-    const altaCota = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-flash-lite-latest'];
+    const porVelocidade = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'];
 
     if (task === 'booking_extraction') {
-      return lista(env.GEMINI_MODEL_FAST) ?? altaCota;
+      return lista(env.GEMINI_MODEL_FAST) ?? porVelocidade;
     }
-    return lista(env.GEMINI_MODEL_PRECISE) ?? altaCota;
+    return lista(env.GEMINI_MODEL_PRECISE) ?? porVelocidade;
   }
 
   /** Modelo por tarefa, configurável por env conforme o provedor */
@@ -152,10 +157,13 @@ export class ModelRouterService {
               this.marcarChaveInvalida();
               break;
             }
-            // 429 e cota do PROJETO por minuto, compartilhada por TODOS os
-            // modelos: tentar o proximo nao ajuda e ainda gasta o pouco que
-            // resta da janela. Para o laco aqui.
-            if (motivo.includes('429')) break;
+            // 429 e cota DIARIA e POR MODELO (medido no painel: 20/dia no
+            // 2.5-flash, 500/dia no 3.5-flash-lite). Entao o proximo modelo tem
+            // balde proprio e vale tentar - era o contrario do que eu fazia
+            // aqui, de quando eu achava que o teto era por minuto e
+            // compartilhado: naquela leitura, insistir so gastava a janela.
+            // Com a ordem por velocidade, e isto que faz o atendimento
+            // continuar depois das primeiras 20 respostas do dia.
           }
         }
         // Trocar de chave so ajuda quando o problema e da chave: cota estourada
