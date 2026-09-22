@@ -59,7 +59,8 @@ const conhecimentos = [
   {
     title: 'Capacidade do apartamento',
     content:
-      'Cada apartamento acomoda no máximo 6 pessoas. O valor da diária é calculado conforme a quantidade de pessoas no apartamento.',
+      'Cada apartamento acomoda no máximo 6 pessoas, e esse limite vale INDEPENDENTE DA IDADE: bebê, criança e adulto ocupam lugar igual, mesmo quem tem cortesia ou meia diária. Nunca diga que criança não conta para a capacidade. '
+      + 'O valor da diária é calculado conforme a quantidade de pessoas no apartamento, e quanto mais pessoas dividem o MESMO apartamento, menor fica o valor POR PESSOA. Use isso só como orientação — quem informa valores é o site, pelo link com as datas e a ocupação.',
   },
   {
     title: 'Localização e endereço',
@@ -106,6 +107,14 @@ const conhecimentos = [
     title: 'Camas e acomodação no apartamento',
     content:
       'Acomodamos até 6 pessoas no máximo por apartamento. Cada apartamento tem 1 cama de casal e 2 de solteiro; as demais pessoas ficam em colchão extra. Se o hóspede pedir camas separadas, informe essa composição.',
+  },
+  {
+    title: 'Dois dormitórios em todos os apartamentos',
+    content:
+      'TODOS os apartamentos do hotel, em todas as categorias, têm 2 DORMITÓRIOS: um com cama de casal queen e outro com duas camas de solteiro. Um único apartamento acomoda até 6 pessoas. '
+      + 'Quando o hóspede pedir "2 quartos" (ou mais de um quarto) e o grupo couber em um apartamento, informe que os nossos apartamentos já têm dois dormitórios e PERGUNTE se preferem ficar todos no mesmo apartamento ou em apartamentos separados — sem escolher por ele, porque a opção muda o valor da diária. '
+      + 'Vale dizer que, em geral, quanto mais pessoas dividem o mesmo apartamento, MENOR fica o valor POR PESSOA — ou seja, ficar todos juntos costuma sair mais em conta do que dois apartamentos. É orientação: a Bella não cita valores nem calcula a diferença, quem mostra o preço é o link do site. '
+      + 'O limite é 6 pessoas por apartamento INDEPENDENTE DA IDADE: bebês e crianças ocupam lugar como qualquer pessoa, mesmo tendo cortesia ou meia diária. Acima de 6 é necessário mais de um apartamento; nesse caso apenas confirme a composição.',
   },
   {
     title: 'Cozinha no apartamento',
