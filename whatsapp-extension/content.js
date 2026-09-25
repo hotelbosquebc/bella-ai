@@ -711,6 +711,210 @@
     }
   }
 
+  function mostrarAnexos(lista) {
+    const box = panel.querySelector('#bella-anexos');
+    box.innerHTML = '';
+    if (!lista || !lista.length) {
+      box.style.display = 'none';
+      return;
+    }
+    box.style.display = 'block';
+    lista.forEach((a) => {
+      const b = document.createElement('button');
+      b.className = 'bella-btn';
+      b.textContent = '📎 Anexar: ' + a.title;
+      b.onclick = () => anexar(a);
+      box.appendChild(b);
+    });
+  }
+
+
+
+  /* ---------- audios ---------- */
+
+  /**
+   * A Bella lia apenas .copyable-text, que so existe em mensagem de TEXTO.
+   * Audio chegava invisivel para ela: nem sabia que o hospede tinha falado, e
+   * parecia estar ignorando. Aqui detectamos o balao de audio, capturamos o
+   * arquivo e mandamos transcrever no servidor (que ja sabia fazer isso).
+   *
+   * Cache por src: o mesmo audio nao e transcrito duas vezes.
+   */
+  const transcricoes = new Map();
+
+  /**
+   * Por que este balao e uma mensagem de voz - ou null se nao for.
+   *
+   * Devolve o MOTIVO, e nao so sim/nao, porque "Recebi seus audios" sem audio
+   * nenhum na conversa aconteceu duas vezes (08 e 18/09/2026) e na segunda eu
+   * nao tinha como saber o que tinha sido confundido. O motivo segue para o
+   * servidor e aparece no diagnostico: da proxima vez, ha prova.
+   *
+   * So conta MENSAGEM de verdade (com identificador de enviada/recebida). A
+   * varredura passa por todas as linhas da conversa, inclusive o aviso de
+   * criptografia, o cartao "Nao esta nos seus contatos" e os divisores de data
+   * - e um icone qualquer num desses virava "audio".
+   */
+  function motivoAudio(row) {
+    if (!direcaoPeloId(row)) return null; // nao e mensagem
+    if (row.querySelector('audio')) return 'elemento <audio>';
+    const icones = [...row.querySelectorAll('[data-icon]')].map((e) => e.getAttribute('data-icon') || '');
+    const icone = icones.find((ic) => /^ptt|^audio-play$|voice/i.test(ic));
+    if (icone) return 'data-icon=' + icone;
+    const rotulos = [...row.querySelectorAll('[aria-label]')].map((e) => e.getAttribute('aria-label') || '');
+    // "Gravar mensagem de voz" e a barra do microfone, nao um balao recebido.
+    const rotulo = rotulos.find(
+      (r) => /mensagem de voz|recado de voz|voice message|mensaje de voz/i.test(r) && !/gravar|record|cancelar/i.test(r),
+    );
+    if (rotulo) return 'aria-label=' + rotulo;
+    return null;
+  }
+
+  function ehAudio(row) {
+    return Boolean(motivoAudio(row));
+  }
+
+  /** Motivos dos audios achados na ultima leitura, para o diagnostico. */
+  let sinaisDeAudio = [];
+
+  /** Duracao que aparece no player ("0:07"), quando houver. */
+  function duracaoDoAudio(row) {
+    const m = (row.innerText || '').match(/\b(\d{1,2}:\d{2})\b/);
+    return m ? m[1] : null;
+  }
+
+  /**
+   * Converte o audio em base64 - so funciona se o WhatsApp JA tiver carregado o
+   * arquivo (ou seja, se alguem tocou o audio nesta sessao).
+   */
+  async function audioEmBase64(row) {
+    const el = row.querySelector('audio');
+    const src = el && el.src;
+    if (!src) return null;
+    try {
+      const resp = await fetch(src);
+      const buf = await resp.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i += 8192) {
+        bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+      }
+      return { base64: btoa(bin), mimeType: resp.headers.get('Content-Type') || 'audio/ogg', src: src };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
+   * Texto do audio para a conversa.
+   *
+   * Se o arquivo estiver carregado, transcreve. Se nao estiver - o caso comum,
+   * porque o WhatsApp so baixa ao tocar - devolve um marcador com a duracao. O
+   * importante e que a Bella SAIBA que houve um audio: antes ele era invisivel e
+   * ela respondia como se o hospede nao tivesse falado nada.
+   */
+  async function textoDoAudio(row) {
+    const dur = duracaoDoAudio(row);
+    const dados = await audioEmBase64(row);
+
+    if (!dados) {
+      return '[mensagem de voz' + (dur ? ' de ' + dur : '') + ' — conteúdo não disponível]';
+    }
+    if (transcricoes.has(dados.src)) return transcricoes.get(dados.src);
+
+    const r = await send('TRANSCREVER', { base64: dados.base64, mimeType: dados.mimeType });
+    const texto =
+      r && r.ok && r.data && r.data.texto
+        ? '[áudio transcrito] ' + r.data.texto
+        : '[mensagem de voz' + (dur ? ' de ' + dur : '') + ' — não foi possível transcrever]';
+    transcricoes.set(dados.src, texto);
+    return texto;
+  }
+
+  /**
+   * Texto dos audios que estao na tela, indexado pelo BALAO.
+   *
+   * WeakMap, e nao Map, de proposito: o WhatsApp Web destroi e recria os baloes
+   * o tempo todo ao rolar a conversa. Um Map guardaria referencia forte a cada
+   * balao ja descartado, e a aba fica aberta o dia inteiro na recepcao - o
+   * navegador nunca recuperaria essa memoria. Com WeakMap, o balao sai da
+   * memoria junto com o DOM.
+   */
+  const audiosLidos = new WeakMap();
+
+  async function incluirAudios() {
+    const main = document.querySelector('#main');
+    if (!main) return;
+    const rows = [...main.querySelectorAll('div[role="row"]')];
+    sinaisDeAudio = [];
+    for (const row of rows) {
+      if (row.querySelector('.copyable-text[data-pre-plain-text]')) continue; // e texto
+      const motivo = motivoAudio(row);
+      if (!motivo) continue;
+      sinaisDeAudio.push(motivo);
+      if (audiosLidos.has(row)) continue;
+      audiosLidos.set(row, await textoDoAudio(row));
+    }
+  }
+
+  /**
+   * Escuta junto com o atendente.
+   *
+   * O WhatsApp so baixa a mensagem de voz quando alguem aperta play - por isso
+   * nao ha <audio> no balao ate esse momento. Em vez de forcar a reproducao (o
+   * que faria barulho no computador de quem atende), pegamos carona: quando o
+   * atendente toca o audio para ouvir, o arquivo passa a existir e nos o
+   * capturamos ali mesmo e mandamos transcrever.
+   *
+   * Ou seja: o atendente ouve, a Bella ouve junto. Nada e reproduzido sozinho.
+   */
+  document.addEventListener(
+    'play',
+    async function (e) {
+      const el = e.target;
+      if (!el || el.tagName !== 'AUDIO' || !el.src) return;
+      const row = el.closest('div[role="row"]');
+      if (!row) return;
+
+      const jaTemTexto = audiosLidos.get(row);
+      if (jaTemTexto && jaTemTexto.indexOf('[áudio transcrito]') === 0) return;
+
+      status('Ouvindo o áudio junto com você…');
+      const dados = await audioEmBase64(row);
+      if (!dados) {
+        status('');
+        return;
+      }
+      const r = await send('TRANSCREVER', { base64: dados.base64, mimeType: dados.mimeType });
+      if (r && r.ok && r.data && r.data.texto) {
+        const texto = '[áudio transcrito] ' + r.data.texto;
+        transcricoes.set(dados.src, texto);
+        audiosLidos.set(row, texto);
+        status('Áudio entendido — clique em Sugerir para a Bella responder.');
+      } else {
+        status('Não consegui transcrever este áudio.', true);
+      }
+    },
+    true,
+  );
+  /* ---------- aprendizado: sugerido x enviado ---------- */
+
+  /**
+   * Guarda o que a Bella sugeriu e compara com o que o atendente realmente
+   * mandou. E o retorno mais honesto que existe: quando o humano reescreve
+   * antes de enviar, a diferenca aponta onde ela erra - sem depender de alguem
+   * notar e avisar.
+   *
+   * Nada e enviado ao hospede por causa disso. Vai para a nossa API apenas o
+   * par de textos e uma etiqueta da conversa, que o servidor guarda em hash.
+   */
+  let sugestaoPendente = null; // { texto, inserida, modelo }
+  let ultimaNossaConhecida = null;
+
+  function normalizarTexto(t) {
+    return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
   /** Quanto do texto sugerido sobreviveu ao que foi enviado (0 a 1). */
   function semelhanca(a, b) {
     const A = new Set(normalizarTexto(a).split(' ').filter(Boolean));

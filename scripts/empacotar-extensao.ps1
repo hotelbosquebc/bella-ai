@@ -14,6 +14,11 @@ $destino = Join-Path ([Environment]::GetFolderPath('Desktop')) "$nome.zip"
 $temp    = Join-Path $env:TEMP "bella-pacote-$(Get-Random)"
 $pasta   = Join-Path $temp $nome
 
+# Nao empacota extensao quebrada: em 23/09/2026 uma edicao apagou 213 linhas
+# do content.js e foi para a maquina do hotel sem ninguem perceber.
+node (Join-Path $PSScriptRoot "verificar-extensao.js")
+if ($LASTEXITCODE -ne 0) { throw "Extensao com problema - veja acima. Nada foi empacotado." }
+
 New-Item -ItemType Directory -Force -Path $pasta | Out-Null
 Copy-Item "$origem\*" -Destination $pasta -Recurse
 
