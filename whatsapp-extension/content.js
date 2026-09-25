@@ -374,6 +374,8 @@
       const msgs = [];
       const estruturado = [];
       let lastIn = '';
+      let ultimaOrdConhecida = null;
+      let semDataSeguidas = 0;
 
       for (const row of linhasDaConversa) {
         const el = row.querySelector('.copyable-text[data-pre-plain-text]');
@@ -404,7 +406,40 @@
         if (!t || t.length > 4000) continue;
         const ehHoje = m && m[2] === hoje;
         msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
-        estruturado.push({ linha: msgs[msgs.length - 1], ord: ordemDe(m ? m[2] : null, m ? m[1] : null) });
+
+        // Ordem cronologica de uma mensagem SEM data legivel - o caso do audio,
+        // que nao tem data-pre-plain-text.
+        //
+        // Antes ela recebia '999999999999', ou seja, era ordenada como a
+        // mensagem mais recente que existe - e continuava sendo, para sempre.
+        // Caso real (25/09/2026): a hospede so escreveu "Holaaa", mas o
+        // historico guardado tinha um marcador de audio antigo que, por esse
+        // '999...', chegou ao servidor como a ULTIMA fala dela. A Bella
+        // respondeu "Recebi seus audios" sem haver audio nenhum na tela.
+        //
+        // Os baloes sao lidos na ordem da tela, que e cronologica: entao uma
+        // mensagem sem data fica logo DEPOIS da ultima com data, e nao no fim
+        // do tempo. O sufixo preserva a ordem entre varias seguidas.
+        let ord;
+        if (m) {
+          ord = ordemDe(m[2], m[1]);
+          ultimaOrdConhecida = ord;
+          semDataSeguidas = 0;
+        } else {
+          semDataSeguidas++;
+          ord = (ultimaOrdConhecida || '000000000000') + String(semDataSeguidas).padStart(3, '0');
+        }
+
+        // Marcador de audio que NAO foi transcrito nao entra no historico.
+        //
+        // Ele so diz "chegou uma voz agora" - informacao que vale enquanto o
+        // balao esta na tela. Guardado, vira uma frase que reaparece todo dia
+        // afirmando que o hospede mandou audio. Audio transcrito, esse sim,
+        // tem conteudo e fica.
+        const audioSemConteudo = !m && /\[mensagem de voz/.test(t);
+        if (!audioSemConteudo) {
+          estruturado.push({ linha: msgs[msgs.length - 1], ord: ord });
+        }
         if (isIn) lastIn = t;
       }
 
@@ -1189,6 +1224,36 @@
 
   // Remove o balde comum criado pelo bug da 1.1.5, que misturava conversas.
   try { chrome.storage.local.remove('hist:desconhecida'); } catch (_) {}
+
+  /**
+   * Limpeza unica do historico guardado (1.9.5).
+   *
+   * Ate a 1.9.4, um audio sem transcricao entrava no historico com ordem
+   * '999999999999' - o fim do tempo. Ele nunca saia e sempre aparecia como a
+   * fala mais recente do hospede. Em 25/09/2026 uma hospede escreveu so
+   * "Holaaa" e a Bella respondeu "Recebi seus audios".
+   *
+   * O arquivo novo nao grava mais esses marcadores, mas os que ja estao no
+   * disco da recepcao continuariam envenenando as conversas. Aqui eles saem,
+   * uma vez so.
+   */
+  try {
+    chrome.storage.local.get(null, function (tudo) {
+      if (!tudo) return;
+      const limpar = {};
+      Object.keys(tudo).forEach(function (chave) {
+        if (chave.indexOf('hist:') !== 0 || !Array.isArray(tudo[chave])) return;
+        const antes = tudo[chave];
+        const depois = antes.filter(function (m) {
+          if (!m || !m.linha) return false;
+          if (/\[mensagem de voz/.test(m.linha)) return false;
+          return m.ord !== '999999999999';
+        });
+        if (depois.length !== antes.length) limpar[chave] = depois;
+      });
+      if (Object.keys(limpar).length) chrome.storage.local.set(limpar);
+    });
+  } catch (_) {}
 
   loadQuickReplies();
 })();

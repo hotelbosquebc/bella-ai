@@ -893,7 +893,12 @@ export function criancaSemIdade(falasDoHospede: string): boolean {
  * Aqui a decisao sai do modelo e vira codigo, olhando so as falas do hospede.
  */
 export function idiomaDoHospede(falasDoHospede: string): 'es' | 'en' | 'pt' {
-  const t = (falasDoHospede || '').toLowerCase();
+  const tCru = (falasDoHospede || '').toLowerCase();
+
+  // "Holaaa" nao casava com hola e a hospede recebeu resposta em portugues
+  // portugues (25/09/2026). Saudacao esticada e comum no WhatsApp: tres letras
+  // iguais ou mais viram uma so antes de procurar os sinais.
+  const t = tCru.replace(/(.)\1{2,}/g, '$1');
   if (!t.trim()) return 'pt';
 
   // Sinais de cada lingua. Vale a pena repetir por que cada palavra esta aqui:
@@ -1007,6 +1012,49 @@ export function pareceEscritoEm(texto: string, idioma: 'pt' | 'es' | 'en'): bool
   const m = marcasDeIdioma(t);
   const outros = (['pt', 'es', 'en'] as const).filter((i) => i !== idioma).map((i) => m[i]);
   return m[idioma] >= Math.max(...outros);
+}
+
+/**
+ * A conversa tem algum audio do hospede?
+ *
+ * So conta marcador em linha DELE: a transcricao de um audio nosso nao
+ * autoriza a Bella a dizer que recebeu voz.
+ */
+export function temAudioDoHospede(conversation: string): boolean {
+  return /\[(mensagem de voz|áudio transcrito)/i.test(apenasFalasDoHospede(conversation || ''));
+}
+
+/** A frase fala de audio recebido? */
+export function fraseFalaDeAudio(frase: string): boolean {
+  return /(á|a)udios?\b|mensagens? de voz|nota de voz|mensajes? de voz|voice (message|note)/i.test(frase || '');
+}
+
+/**
+ * Tira da resposta as frases que afirmam ter recebido audio quando nao houve
+ * audio nenhum.
+ *
+ * Caso real (25/09/2026): a hospede escreveu apenas "Holaaa" e a sugestao
+ * comecou com "Olá! Recebi seus áudios." Era a terceira vez que a Bella
+ * inventava audio; das outras duas, a causa estava na leitura da tela, e ja
+ * foi corrigida. Esta trava e a ultima: mesmo que algo volte a sujar a
+ * conversa, a frase nao chega ao hospede.
+ *
+ * Recorte por FRASE, e nao refacao pelo modelo: gasta cota, demora, e o
+ * resultado nao e garantido. "Olá! Recebi seus áudios. Para eu poder..." sem a
+ * frase do meio continua uma mensagem inteira.
+ */
+export function semFraseDeAudioInventada(texto: string, conversation: string): string {
+  if (!texto || temAudioDoHospede(conversation)) return texto;
+  if (!fraseFalaDeAudio(texto)) return texto;
+  const linhas = texto.split(/\r?\n/).map((linha) => {
+    const frases = linha.split(/(?<=[.!?])\s+/);
+    const ficam = frases.filter((f) => !fraseFalaDeAudio(f));
+    // Se a linha inteira falava de audio, ela some; se nao sobrou nada em
+    // NENHUMA linha, devolvemos o texto original la embaixo.
+    return ficam.join(' ').trim();
+  });
+  const limpo = linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  return limpo || texto;
 }
 
 /**
@@ -2487,6 +2535,15 @@ ${url}`;
       });
       if (segunda.text && segunda.model !== 'mock') draft.text = segunda.text;
       marcos.refacaoIdioma = Date.now() - tRefacao;
+    }
+
+    // Audio que nunca existiu: corta a frase, sem gastar refacao.
+    if (draft.text) {
+      const semAudio = semFraseDeAudioInventada(draft.text, conversation);
+      if (semAudio !== draft.text) {
+        this.registrarDecisao('resposta falava de audio sem audio na conversa', {});
+        draft.text = semAudio;
+      }
     }
 
 
