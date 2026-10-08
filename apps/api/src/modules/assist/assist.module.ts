@@ -1073,6 +1073,80 @@ export function respostaMisturada(texto: string, idioma: 'pt' | 'es' | 'en'): bo
   return (['pt', 'es', 'en'] as const).some((i) => i !== idioma && m[i] > 0);
 }
 /**
+ * O que ha de errado com a resposta que o atendente recusou.
+ *
+ * Clicar em "Sugerir" de novo, sem a conversa ter mudado, e o atendente
+ * dizendo que a anterior nao serviu. Pedido do dono em 08/10/2026.
+ *
+ * O caminho facil seria mandar ao modelo "a anterior estava ruim, tente de
+ * novo" - e ele devolveria quase a mesma coisa com outras palavras. Entao
+ * primeiro conferimos AQUI o que da para conferir sozinho, e entregamos a
+ * falha com nome: faltou o link, inventou audio, saiu em outro idioma. Com a
+ * falha concreta na mao, a refacao tem o que consertar.
+ *
+ * Quando nada e detectado, a lista volta vazia - e o pedido fica sendo "o
+ * atendente recusou", que ja e informacao de verdade.
+ */
+export function criticasDaResposta(
+  anterior: string,
+  conversation: string,
+  linkEsperado?: string | null,
+): string[] {
+  const criticas: string[] = [];
+  const texto = anterior || '';
+  if (!texto.trim()) return criticas;
+
+  if (linkEsperado && !/https?:\/\//i.test(texto)) {
+    criticas.push(
+      'NÃO trazia o link da reserva, mesmo já havendo período e número de pessoas na conversa. ' +
+        'Desta vez o link é obrigatório.',
+    );
+  }
+
+  if (fraseFalaDeAudio(texto) && !temAudioDoHospede(conversation)) {
+    criticas.push('Afirmava ter recebido áudio, e o hóspede não mandou áudio nenhum.');
+  }
+
+  const idioma = idiomaDoHospede(apenasFalasDoHospede(conversation));
+  const nome = idioma === 'es' ? 'espanhol' : idioma === 'en' ? 'inglês' : 'português';
+  if (!pareceEscritoEm(texto, idioma)) {
+    criticas.push(`Estava no idioma errado: o hóspede escreve em ${nome}.`);
+  } else if (respostaMisturada(texto, idioma)) {
+    criticas.push(`Misturava idiomas: deveria estar inteira em ${nome}.`);
+  }
+
+  // Pergunta de novo o que o hospede ja respondeu. So o caso seguro: a resposta
+  // termina perguntando quantas pessoas sao, e a ocupacao ja esta extraida.
+  if (/quantas pessoas|quantos h[óo]spedes|quantas seriam/i.test(texto) && /\badultos?=\d/.test(conversation)) {
+    criticas.push('Perguntava de novo quantas pessoas são — isso o hóspede já respondeu.');
+  }
+
+  return criticas;
+}
+
+/**
+ * O pedido de refacao que vai junto do prompt.
+ *
+ * Entregamos o texto recusado INTEIRO. Sem ele o modelo nao tem como evitar
+ * repetir o que escreveu - e repetir e o fracasso mais provavel aqui.
+ */
+export function contextoDeRefacao(anterior: string, criticas: string[]): string {
+  if (!anterior || !anterior.trim()) return '';
+  const lista = criticas.length
+    ? `\nProblemas JÁ identificados nela:\n` + criticas.map((c) => `- ${c}`).join('\n')
+    : `\nO atendente não disse o motivo. Procure o que ficou faltando: uma pergunta do hóspede sem resposta, ` +
+      `uma informação pela metade, ou uma frase genérica no lugar do que ele pediu.`;
+  return (
+    `\n\nREFAÇÃO (o atendente RECUSOU a resposta anterior e pediu outra).\n` +
+    `Esta foi a resposta recusada, entre as marcas:\n---\n${anterior.trim()}\n---` +
+    lista +
+    `\n\nEscreva uma resposta DIFERENTE e MELHOR. Não repita a anterior com outras palavras: ` +
+    `releia a última pergunta do hóspede e responda o que ela pede, com a informação que falta. ` +
+    `Se a anterior estava correta mas incompleta, mantenha o que estava certo e ACRESCENTE o que faltou.`
+  );
+}
+
+/**
  * "de 21/11 a 23/11, para 1 adulto" - lido do proprio link, nao inventado.
  *
  * O dono pediu que acima do link fosse dito para quem ele e (quantas pessoas,
@@ -2354,7 +2428,7 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number> }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; anterior?: string }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     // Cronometro das etapas. "Esta demorando muito" precisa virar numero: sem
     // isso a gente otimiza no escuro. Nenhum texto entra aqui, so tempos.
@@ -2494,6 +2568,18 @@ ${url}`;
       contextoDaPergunta(conversation) +
       contextoDeHorario() +
       reserva +
+      (() => {
+        // Refacao: so quando o atendente clicou em Sugerir de novo.
+        const anterior = typeof body.anterior === 'string' ? body.anterior.slice(0, 4000) : '';
+        if (!anterior.trim()) return '';
+        const linkEsperado = (reserva.match(/https?:\/\/\S+/) || [null])[0];
+        const criticas = criticasDaResposta(anterior, conversation, linkEsperado);
+        this.registrarDecisao(
+          'refacao pedida pelo atendente' + (criticas.length ? ` (${criticas.length} problema(s) achado(s))` : ' (sem motivo detectado)'),
+          {},
+        );
+        return contextoDeRefacao(anterior, criticas);
+      })() +
       (anexos.length
         ? `\n\nANEXO: o atendente vai enviar junto o arquivo "${anexos.map((a) => a.title).join('", "')}". ` +
           `Mencione que está enviando esse material em anexo, de forma natural, e NÃO repita todo o conteúdo dele na mensagem.`
@@ -2507,6 +2593,28 @@ ${url}`;
       temperature: settings?.temperature ?? 0.7,
     });
     marcos.geracao = Date.now() - t0 - marcos.contexto;
+
+    // Refacao que saiu igual a anterior nao serve de nada.
+    //
+    // E o fracasso mais provavel deste recurso: o modelo reescreve a mesma
+    // mensagem com outras palavras e o atendente clica de novo, sem fim. Uma
+    // tentativa a mais, dizendo com todas as letras que repetir nao e opcao.
+    const pedidoAnterior = typeof body.anterior === 'string' ? body.anterior : '';
+    if (pedidoAnterior.trim() && draft.text && parecenca(draft.text, pedidoAnterior) >= 0.85) {
+      this.registrarDecisao('refacao saiu igual a anterior - tentando outra vez', {});
+      const outra = await this.ai.complete({
+        task: 'sales',
+        system:
+          `${system}\n\nATENÇÃO: você acabou de reescrever praticamente a MESMA mensagem que já tinha sido ` +
+          `recusada. Isso não resolve nada. Releia a última pergunta do hóspede e responda OUTRA COISA: ` +
+          `a informação que falta, a pergunta que ficou sem resposta, o dado concreto que ele pediu.`,
+        messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
+        temperature: Math.min(1, (settings?.temperature ?? 0.7) + 0.2),
+      });
+      if (outra.text && outra.model !== 'mock' && parecenca(outra.text, pedidoAnterior) < 0.85) {
+        draft.text = outra.text;
+      }
+    }
 
     // Se ha datas mas ninguem consultou a disponibilidade, pedimos que a
     // extensao consulte e chame de novo. O servidor nao consegue: o Cloudflare

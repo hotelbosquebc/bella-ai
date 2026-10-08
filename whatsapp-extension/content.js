@@ -1105,13 +1105,32 @@
       }
       return;
     }
+    // Clicar em "Sugerir" de novo, com a mesma fala do hospede na tela, quer
+    // dizer que a resposta anterior nao serviu - pedido do dono em 08/10/2026.
+    // Mandamos o texto recusado junto; o servidor confere o que da para
+    // conferir sozinho (link faltando, idioma errado, audio inventado) e pede
+    // ao modelo uma resposta DIFERENTE, nao a mesma com outras palavras.
+    //
+    // So no clique: a sugestao automatica dispara sozinha e nao e recusa de
+    // ninguem. E so com a MESMA fala: se o hospede escreveu de novo, a
+    // pergunta mudou e a resposta anterior nao foi recusada - ficou velha.
+    let anterior = '';
+    if (!automatica && lastMessage && ultimaFalaDaSugestao === lastMessage) {
+      const caixa = panel.querySelector('#bella-sugtext');
+      const visivel = panel.querySelector('#bella-suggestion').style.display !== 'none';
+      if (visivel && caixa && caixa.value.trim()) anterior = caixa.value.trim();
+    }
+
     sugerindo = true;
     status(
-      (automatica ? 'Bella preparando sugestão…' : 'Pensando… (pode levar alguns segundos)') +
-        (lidas ? ` (${lidas} msgs)` : ''),
+      (anterior
+        ? 'Refazendo — a anterior não serviu…'
+        : automatica
+          ? 'Bella preparando sugestão…'
+          : 'Pensando… (pode levar alguns segundos)') + (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: chrome.runtime.getManifest().version, sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao });
+      const r = await send('SUGGEST', { conversation, lastMessage, versao: chrome.runtime.getManifest().version, sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, anterior: anterior || undefined });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
@@ -1128,6 +1147,7 @@
           disponibilidadeHtml: html || undefined,
           // Se a consulta falhou, escreve mesmo assim - sem falar de procura.
           pularDisponibilidade: html ? undefined : true,
+          anterior: anterior || undefined,
         });
         if (r2 && r2.ok && r2.data) r.data = r2.data;
       }
@@ -1151,6 +1171,7 @@
       status(automatica ? 'Sugestão pronta — revise antes de enviar.' : '');
       panel.querySelector('#bella-suggestion').style.display = 'block';
       panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
+      ultimaFalaDaSugestao = lastMessage || null;
       // Guarda para comparar depois com o que o atendente realmente enviar.
       sugestaoPendente = r.data.suggestion
         ? { texto: r.data.suggestion, inserida: false, modelo: r.data.model }
@@ -1200,6 +1221,8 @@
   let tituloAnterior = null;
   /** Ultima fala do hospede que ja rendeu sugestao automatica. */
   let ultimaFalaSugerida = null;
+  /** Fala do hospede que gerou a sugestao que esta na caixa agora. */
+  let ultimaFalaDaSugestao = null;
   let ultimaSugestaoAutomatica = 0;
   async function aoTrocarDeConversa() {
     const lido = scrapeConversation();
@@ -1224,6 +1247,7 @@
       // Conversa nova: descarta rastreamento da anterior para nao cruzar dados.
       sugestaoPendente = null;
       ultimaNossaConhecida = null;
+      ultimaFalaDaSugestao = null;
       panel.querySelector('#bella-suggestion').style.display = 'none';
       panel.querySelector('#bella-sugtext').value = '';
       mostrarAnexos([]);
