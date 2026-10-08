@@ -303,6 +303,54 @@
    * qualquer mensagem, fazendo a Bella nunca ser consultada. Aqui vamos por
    * camadas: se uma estratégia falhar, a próxima assume.
    */
+  /**
+   * Quem mandou este balao - e por qual sinal.
+   *
+   * Em 08/10/2026 uma conversa com contato NAO SALVO (+55 18 99703-7741)
+   * chegou ao servidor com 40 linhas nossas e ZERO do hospede. Sem fala dela,
+   * o codigo conclui que ninguem pediu orcamento e nao gera o link - foi assim
+   * que a hospede respondeu "1 por quarto" e recebeu uma confirmacao sem link.
+   *
+   * A causa e sempre a mesma familia de problema: a direcao dependia de
+   * COMPARAR NOMES (o remetente do balao com o titulo da conversa), e nome e a
+   * parte mais instavel do WhatsApp Web - muda de formato, ganha marcas
+   * invisiveis, e some quando o contato nao esta salvo.
+   *
+   * Agora o nome e o ULTIMO recurso. Antes dele vem tudo que e estrutural:
+   *
+   *   1. data-id: "true_" e nossa, "false_" e do hospede. O mais confiavel.
+   *   2. classes message-in / message-out, quando esta versao as usa.
+   *   3. status de entrega (os tiquinhos): so mensagem NOSSA tem.
+   *   4. comparacao de nomes - o que havia antes, agora como rede.
+   *
+   * Devolve tambem a fonte, que vai no diagnostico. Sem isso, decidir qual
+   * sinal falhou na maquina do hotel vira adivinhacao.
+   */
+  function direcaoDoBalao(row, titulo, remetente) {
+    const porId = direcaoPeloId(row);
+    if (porId) return { isIn: porId === 'hospede', fonte: 'data-id' };
+
+    if (row.classList && row.classList.contains('message-in')) return { isIn: true, fonte: 'classe' };
+    if (row.classList && row.classList.contains('message-out')) return { isIn: false, fonte: 'classe' };
+    if (row.querySelector('.message-in')) return { isIn: true, fonte: 'classe' };
+    if (row.querySelector('.message-out')) return { isIn: false, fonte: 'classe' };
+    if (row.closest && row.closest('.message-in')) return { isIn: true, fonte: 'classe' };
+    if (row.closest && row.closest('.message-out')) return { isIn: false, fonte: 'classe' };
+
+    // Os tiquinhos de entrega so existem no que NOS mandamos.
+    if (row.querySelector('[data-icon^="msg-"], [aria-label*="Entregue"], [aria-label*="Lida"]')) {
+      return { isIn: false, fonte: 'status-entrega' };
+    }
+
+    if (titulo && remetente) {
+      return { isIn: mesmoContato(remetente, titulo), fonte: 'nome' };
+    }
+    return { isIn: !/hotel do bosque|recep|reserva/i.test(remetente || ''), fonte: 'chute' };
+  }
+
+  /** De onde veio a direcao dos baloes na ultima leitura, para o diagnostico. */
+  let fontesDeDirecao = {};
+
   function scrapeConversation() {
     // #main é o painel da conversa aberta; evita varrer a lista de contatos
     // e o próprio painel da Bella.
@@ -374,6 +422,7 @@
       const msgs = [];
       const estruturado = [];
       let lastIn = '';
+      fontesDeDirecao = {};
       let ultimaOrdConhecida = null;
       let semDataSeguidas = 0;
 
@@ -389,12 +438,9 @@
           m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
           const remetente = m ? m[3] : '';
           t = (el.innerText || '').replace(/ /g, ' ').trim();
-          const direcao = direcaoPeloId(row);
-          isIn = direcao
-            ? direcao === 'hospede'
-            : titulo
-              ? mesmoContato(remetente, titulo)
-              : !/hotel do bosque|recep|reserva/i.test(remetente);
+          const d = direcaoDoBalao(row, titulo, remetente);
+          isIn = d.isIn;
+          fontesDeDirecao[d.fonte] = (fontesDeDirecao[d.fonte] || 0) + 1;
         } else if (audiosLidos.has(row)) {
           t = audiosLidos.get(row);
           // Sem data-pre-plain-text no audio: quem envia e identificado pelo
@@ -995,12 +1041,8 @@
     const m = attr.match(/\]\s*(.*?):\s*$/);
     const remetente = m ? m[1] : '';
     const titulo = tituloDaConversa();
-    const direcao = direcaoPeloId(el.closest('[data-id]') || el.closest('div[role="row"]'));
-    const nossa = direcao
-      ? direcao === 'nossa'
-      : titulo
-        ? !mesmoContato(remetente, titulo)
-        : /hotel do bosque|recep|reserva/i.test(remetente);
+    const linha = el.closest('div[role="row"]') || el.closest('[data-id]');
+    const nossa = linha ? !direcaoDoBalao(linha, titulo, remetente).isIn : !mesmoContato(remetente, titulo);
     if (!nossa) return null;
     return (el.innerText || '').trim() || null;
   }
@@ -1069,7 +1111,7 @@
         (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: chrome.runtime.getManifest().version, sinaisAudio: sinaisDeAudio.slice(0, 5) });
+      const r = await send('SUGGEST', { conversation, lastMessage, versao: chrome.runtime.getManifest().version, sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do

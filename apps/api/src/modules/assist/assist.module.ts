@@ -1406,6 +1406,7 @@ export class AssistController {
     versao: string | null;
     sinaisAudio: string[];
     marcadorDeAudioNaConversa: boolean;
+    fontesDirecao?: Record<string, number>;
     formato?: Record<string, number | boolean>;
   }[] = [];
 
@@ -2353,7 +2354,7 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[] }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number> }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     // Cronometro das etapas. "Esta demorando muito" precisa virar numero: sem
     // isso a gente otimiza no escuro. Nenhum texto entra aqui, so tempos.
@@ -2380,9 +2381,22 @@ ${url}`;
       versao: typeof body.versao === 'string' ? body.versao.slice(0, 20) : null,
       sinaisAudio: Array.isArray(body.sinaisAudio) ? body.sinaisAudio.map((s) => String(s).slice(0, 80)).slice(0, 5) : [],
       marcadorDeAudioNaConversa: /\[(mensagem de voz|áudio transcrito)/i.test(conversation),
+      fontesDirecao: body.fontesDirecao && typeof body.fontesDirecao === 'object' ? body.fontesDirecao : undefined,
       formato,
     });
     if (this.clientes.length > 20) this.clientes.shift();
+
+    // Conversa inteira sem UMA linha do hospede e leitura quebrada, nao hospede
+    // calado. Em 08/10/2026 chegaram 40 linhas, todas marcadas como nossas, de
+    // um contato nao salvo - e a Bella confirmou a estadia sem mandar o link,
+    // porque para o codigo ninguem tinha pedido nada. Fica registrado com nome
+    // proprio: o motivo "sem assunto de estadia" escondia isso.
+    if (formato.linhasNossas >= 3 && formato.linhasHospede === 0) {
+      this.registrarDecisao(
+        `LEITURA SUSPEITA: ${formato.linhasNossas} linhas nossas e nenhuma do hospede`,
+        {},
+      );
+    }
     const focus = body.lastMessage || conversation;
 
     // Pede a disponibilidade ANTES de escrever qualquer coisa.

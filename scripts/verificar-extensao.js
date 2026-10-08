@@ -28,6 +28,7 @@ const OBRIGATORIOS = [
   'mostrarAnexos', 'anexar', 'inserirArquivo', 'campoAceitaDocumento',
   'ultimaNossaConhecida', 'verificarEnvio', 'registrarEnvio',
   'scrapeConversation', 'sugerir', 'carregarModo', 'mesmoContato', 'direcaoPeloId',
+  'direcaoDoBalao',
 ];
 
 for (const arquivo of ['content.js', 'background.js', 'options.js']) {
