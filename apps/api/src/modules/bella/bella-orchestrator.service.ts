@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NormalizedInboundMessage } from '../channels/channel.types';
 import { MemoryService } from './memory.service';
 import { ModelRouterService } from './model-router.service';
+import { normalizar } from '../attachments/attachments.module';
 import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -179,6 +180,7 @@ export class BellaOrchestratorService {
       this.logger.warn(`Escalado para humano: ${motivoHumano}`);
     } else {
       await this.sendReply(conversation.id, inbound, draft.text);
+      await this.enviarAnexos(conversation.id, inbound);
     }
 
     // 11. Auditoria total
@@ -193,6 +195,51 @@ export class BellaOrchestratorService {
       guardrailLevel: verdict.level,
       escalated: Boolean(motivoHumano),
     });
+  }
+
+  /**
+   * Anexos que combinam com o que o hospede perguntou.
+   *
+   * Casamento por palavra-chave, igual ao caminho da extensao: e previsivel,
+   * nao gasta chamada de IA e o dono controla exatamente o que dispara cada
+   * arquivo, pelo painel.
+   *
+   * Vao por LINK publico (/api/attachments/:id/file) - a Meta busca o arquivo
+   * direto, sem upload a cada envio.
+   */
+  private async enviarAnexos(conversationId: string, inbound: NormalizedInboundMessage): Promise<void> {
+    const alvo = normalizar(inbound.content || '');
+    if (!alvo.trim()) return;
+
+    const todos = await this.prisma.attachment.findMany({
+      where: { hotelId: inbound.hotelId, active: true },
+      select: { id: true, title: true, mimeType: true, keywords: true },
+    });
+    const combinam = todos.filter((a) =>
+      a.keywords
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean)
+        .some((k) => alvo.includes(k)),
+    );
+    if (!combinam.length) return;
+
+    const base = (process.env.API_PUBLIC_URL || '').replace(/\/+$/, '');
+    if (!base) {
+      // Sem endereco publico a Meta nao consegue buscar o arquivo. Melhor nao
+      // enviar e dizer por que do que mandar um link quebrado ao hospede.
+      this.logger.warn('API_PUBLIC_URL nao configurada — anexos nao enviados');
+      return;
+    }
+
+    for (const a of combinam) {
+      const url = `${base}/api/attachments/${a.id}/file`;
+      const entregue = await this.outbound.sendArquivo(inbound.channel, inbound.senderExternalId, url, a.mimeType, a.title);
+      await this.prisma.message.create({
+        data: { conversationId, sender: MessageSender.BELLA, content: `[anexo] ${a.title}`, type: 'document' },
+      });
+      this.logger.log(`Anexo "${a.title}" ${entregue ? 'entregue' : 'NAO entregue'} via ${inbound.channel}`);
+    }
   }
 
   private async sendReply(conversationId: string, inbound: NormalizedInboundMessage, content: string) {

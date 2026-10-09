@@ -30,6 +30,103 @@ export class OutboundService {
     }
   }
 
+  /**
+   * Tipo de midia a partir do mimeType.
+   *
+   * WhatsApp e Messenger usam nomes diferentes para a mesma coisa, mas a
+   * decisao e a mesma, entao fica num lugar so. PDF e "document" no WhatsApp e
+   * "file" no Messenger - quem traduz e quem envia.
+   */
+  static tipoDeMidia(mimeType: string): 'image' | 'video' | 'audio' | 'document' {
+    const m = (mimeType || '').toLowerCase();
+    if (m.startsWith('image/')) return 'image';
+    if (m.startsWith('video/')) return 'video';
+    if (m.startsWith('audio/')) return 'audio';
+    return 'document';
+  }
+
+  /**
+   * Envia um arquivo ao hospede.
+   *
+   * Por LINK, nao por upload: os anexos ja tem endereco publico
+   * (/api/attachments/:id/file), entao a Meta busca o arquivo direto e nos
+   * poupamos o upload de cada envio. O nome do arquivo importa - e o que o
+   * hospede ve no balao antes de abrir.
+   */
+  async sendArquivo(
+    channel: Channel,
+    recipientExternalId: string,
+    url: string,
+    mimeType: string,
+    titulo: string,
+  ): Promise<boolean> {
+    const tipo = OutboundService.tipoDeMidia(mimeType);
+    switch (channel) {
+      case Channel.WHATSAPP: {
+        const token = process.env.WHATSAPP_ACCESS_TOKEN;
+        const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+        if (!token || !phoneNumberId) {
+          this.logger.warn('WhatsApp nao configurado — anexo ignorado');
+          return false;
+        }
+        const midia: Record<string, unknown> =
+          tipo === 'document' ? { link: url, filename: nomeDeArquivo(titulo, mimeType) } : { link: url };
+        return this.post(
+          `https://graph.facebook.com/${GRAPH_VERSION}/${phoneNumberId}/messages`,
+          { Authorization: `Bearer ${token}` },
+          { messaging_product: 'whatsapp', to: recipientExternalId, type: tipo, [tipo]: midia },
+          'WhatsApp (anexo)',
+        );
+      }
+      case Channel.INSTAGRAM:
+      case Channel.FACEBOOK: {
+        const token =
+          channel === Channel.INSTAGRAM
+            ? process.env.INSTAGRAM_PAGE_ACCESS_TOKEN ?? process.env.FACEBOOK_PAGE_ACCESS_TOKEN
+            : process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+        if (!token) {
+          this.logger.warn(`${channel} nao configurado — anexo ignorado`);
+          return false;
+        }
+        const pageId = process.env.FACEBOOK_PAGE_ID;
+        return this.post(
+          `https://graph.facebook.com/${GRAPH_VERSION}/${pageId ? pageId : 'me'}/messages?access_token=${encodeURIComponent(token)}`,
+          {},
+          {
+            recipient: { id: recipientExternalId },
+            messaging_type: 'RESPONSE',
+            message: {
+              attachment: {
+                // Messenger chama de "file" o que o WhatsApp chama de "document".
+                type: tipo === 'document' ? 'file' : tipo,
+                payload: { url, is_reusable: true },
+              },
+            },
+          },
+          `${channel} (anexo)`,
+        );
+      }
+      case Channel.TELEGRAM: {
+        const token = process.env.TELEGRAM_BOT_TOKEN;
+        if (!token) {
+          this.logger.warn('Telegram nao configurado — anexo ignorado');
+          return false;
+        }
+        const metodo = tipo === 'image' ? 'sendPhoto' : tipo === 'video' ? 'sendVideo' : tipo === 'audio' ? 'sendAudio' : 'sendDocument';
+        const campo = tipo === 'image' ? 'photo' : tipo === 'video' ? 'video' : tipo === 'audio' ? 'audio' : 'document';
+        return this.post(
+          `https://api.telegram.org/bot${token}/${metodo}`,
+          {},
+          { chat_id: recipientExternalId, [campo]: url },
+          'Telegram (anexo)',
+        );
+      }
+      default:
+        this.logger.warn(`Anexo para canal ${channel} ainda nao implementado`);
+        return false;
+    }
+  }
+
   private async sendWhatsApp(to: string, text: string): Promise<boolean> {
     const token = process.env.WHATSAPP_ACCESS_TOKEN;
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -102,4 +199,13 @@ export class OutboundService {
       return false;
     }
   }
+}
+
+
+/** Nome que o hospede ve no balao do anexo. */
+export function nomeDeArquivo(titulo: string, mimeType: string): string {
+  // Caracteres que o Windows e o WhatsApp recusam em nome de arquivo.
+  const base = (titulo || 'arquivo').replace(/[\\/:*?"<>|]/g, '-').trim().slice(0, 60) || 'arquivo';
+  const ext = { 'application/pdf': '.pdf', 'image/png': '.png', 'image/jpeg': '.jpg' }[(mimeType || '').toLowerCase()] || '';
+  return base.toLowerCase().endsWith(ext) ? base : base + ext;
 }
