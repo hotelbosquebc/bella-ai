@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { CHANNEL_LABELS, SENDER_LABELS } from '../../lib/config';
 import { apiFetch } from '../../lib/api';
 
@@ -12,6 +12,8 @@ type Conversation = {
   status: string;
   guest: Guest;
   messages: Message[];
+  /** Preenchido quando foi a BELLA que pediu ajuda (null se o atendente assumiu). */
+  escalationReason?: string | null;
 };
 type ConversationDetail = Conversation & {
   guest: Guest & { reservations?: any[]; leads?: any[] };
@@ -28,6 +30,9 @@ export default function InboxPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [quickReplies, setQuickReplies] = useState<{ id: string; shortcut: string; title: string; content: string }[]>([]);
+  // Em ref, e nao em estado: o temporizador e criado uma vez e precisa enxergar
+  // a conversa ATUAL, nao a que estava aberta quando ele nasceu.
+  const selectedId = useRef<string | null>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -44,6 +49,27 @@ export default function InboxPage() {
   useEffect(() => {
     loadList();
   }, [loadList]);
+
+  // A lista so carregava ao abrir a pagina e no botao Atualizar: mensagem
+  // nova NAO aparecia sozinha. Numa recepcao isso significa hospede
+  // esperando sem ninguem saber. De 15 em 15 segundos a lista se refaz, e
+  // a conversa aberta junto.
+  useEffect(() => {
+    const t = setInterval(() => {
+      loadList();
+      if (selectedId.current) refreshSelected(selectedId.current);
+    }, 15000);
+    return () => clearInterval(t);
+  }, [loadList]);
+
+  // Quantas conversas a Bella passou para a recepcao e ainda ninguem tocou.
+  const aguardando = conversations.filter((c) => c.escalationReason).length;
+
+  // O numero no titulo da aba: e o unico aviso que funciona com a aba em
+  // segundo plano, que e exatamente onde o painel vai ficar o dia todo.
+  useEffect(() => {
+    document.title = (aguardando > 0 ? `(${aguardando}) ` : '') + 'Caixa de Entrada — Bella';
+  }, [aguardando]);
 
   useEffect(() => {
     apiFetch('/api/quick-replies?hotelId=hotel-do-bosque', { cache: 'no-store' })
@@ -62,6 +88,12 @@ export default function InboxPage() {
       : [];
 
   async function openConversation(id: string) {
+    selectedId.current = id;
+    await refreshSelected(id);
+  }
+
+  /** Recarrega a conversa aberta. Nao toca no campo de digitacao. */
+  async function refreshSelected(id: string) {
     const res = await apiFetch(`/api/conversations/${id}`, { cache: 'no-store' });
     if (res.ok) setSelected(await res.json());
   }
@@ -112,6 +144,11 @@ export default function InboxPage() {
           ))}
         </select>
         <button className="btn ghost" onClick={loadList}>Atualizar</button>
+        {aguardando > 0 && (
+          <span className="badge amber">
+            {aguardando} {aguardando === 1 ? 'conversa esperando você' : 'conversas esperando você'}
+          </span>
+        )}
       </div>
 
       <div className="inbox">
@@ -135,6 +172,11 @@ export default function InboxPage() {
                   <span>{c.guest?.name || c.guest?.phone || 'Hóspede'}</span>
                   <span className="badge">{CHANNEL_LABELS[c.channel] ?? c.channel}</span>
                 </div>
+                {c.escalationReason && (
+                  <div className="badge amber" style={{ marginTop: 4 }}>
+                    🔔 a Bella pediu ajuda — {c.escalationReason}
+                  </div>
+                )}
                 <div className="conv-preview">{c.messages?.[0]?.content ?? '—'}</div>
               </div>
             ))}
@@ -149,7 +191,11 @@ export default function InboxPage() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
                 <strong>
                   {selected.guest?.name || selected.guest?.phone}
-                  {selected.status === 'PENDING_HUMAN' && <span className="badge amber" style={{ marginLeft: 8 }}>Você no controle</span>}
+                  {selected.status === 'PENDING_HUMAN' && (
+                    <span className="badge amber" style={{ marginLeft: 8 }}>
+                      {selected.escalationReason ? 'A Bella pediu ajuda' : 'Você no controle'}
+                    </span>
+                  )}
                 </strong>
                 {selected.status === 'PENDING_HUMAN' ? (
                   <button className="btn ghost" onClick={release} title="A Bella volta a responder automaticamente">

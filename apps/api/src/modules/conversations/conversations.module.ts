@@ -67,7 +67,7 @@ export class ConversationsController {
     // Atendente assumiu → conversa fica sob controle humano
     await this.prisma.conversation.update({
       where: { id: body.conversationId },
-      data: { status: 'PENDING_HUMAN', assignedUserId: body.userId ?? undefined },
+      data: { status: 'PENDING_HUMAN', assignedUserId: body.userId ?? undefined, escalationReason: null },
     });
 
     return { ...message, delivered };
@@ -78,7 +78,8 @@ export class ConversationsController {
   takeover(@Param('id') id: string, @Body() body: { userId?: string }) {
     return this.prisma.conversation.update({
       where: { id },
-      data: { status: 'PENDING_HUMAN', assignedUserId: body?.userId ?? undefined },
+      // Quem assumiu foi o atendente - sai da fila de 'a Bella pediu ajuda'.
+      data: { status: 'PENDING_HUMAN', assignedUserId: body?.userId ?? undefined, escalationReason: null },
     });
   }
 
@@ -87,7 +88,8 @@ export class ConversationsController {
   release(@Param('id') id: string) {
     return this.prisma.conversation.update({
       where: { id },
-      data: { status: 'OPEN', assignedUserId: null },
+      // Volta para a Bella: o pedido de ajuda deixa de estar pendente.
+      data: { status: 'OPEN', assignedUserId: null, escalationReason: null },
     });
   }
 }

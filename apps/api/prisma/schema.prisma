@@ -147,6 +147,8 @@ model Conversation {
   status         ConversationStatus @default(OPEN)
   assignedUserId String?
   summary        String? // memória de médio prazo (resumo gerado por LLM)
+  /// Por que a Bella passou a conversa para um humano. NULL quando foi o atendente que assumiu.
+  escalationReason String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 

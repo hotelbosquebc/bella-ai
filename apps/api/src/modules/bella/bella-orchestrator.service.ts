@@ -174,7 +174,7 @@ export class BellaOrchestratorService {
     if (motivoHumano) {
       await this.prisma.conversation.update({
         where: { id: conversation.id },
-        data: { status: ConversationStatus.PENDING_HUMAN },
+        data: { status: ConversationStatus.PENDING_HUMAN, escalationReason: motivoHumano },
       });
       await this.sendReply(conversation.id, inbound, this.humanHandoffMessage());
       this.logger.warn(`Escalado para humano: ${motivoHumano}`);
