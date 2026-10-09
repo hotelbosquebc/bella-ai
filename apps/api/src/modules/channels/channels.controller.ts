@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { Channel } from '@prisma/client';
 import { ChannelsService } from './channels.service';
 import { Public } from '../auth/public.decorator';
+import { MetaWebhookGuard } from './meta-webhook.guard';
 
 /**
  * Webhooks de entrada de cada canal. Cada handler normaliza o payload
@@ -26,6 +27,7 @@ export class ChannelsController {
     return 'forbidden';
   }
 
+  @UseGuards(MetaWebhookGuard)
   @Post('whatsapp/webhook')
   async whatsapp(@Body() payload: any) {
     await this.channels.ingestMetaWebhook(Channel.WHATSAPP, payload);
@@ -47,6 +49,7 @@ export class ChannelsController {
     return this.verifyMeta(mode, token, challenge);
   }
 
+  @UseGuards(MetaWebhookGuard)
   @Post('instagram/webhook')
   async instagram(@Body() payload: any) {
     await this.channels.ingestMetaWebhook(Channel.INSTAGRAM, payload);
@@ -63,6 +66,7 @@ export class ChannelsController {
     return this.verifyMeta(mode, token, challenge);
   }
 
+  @UseGuards(MetaWebhookGuard)
   @Post('facebook/webhook')
   async facebook(@Body() payload: any) {
     await this.channels.ingestMetaWebhook(Channel.FACEBOOK, payload);

@@ -7,7 +7,16 @@ async function bootstrap() {
   // Anexos da Bella (regras de pets, catálogo de ingressos) sobem em base64 e
   // passam de 10 MB — o limite padrão de 100 kb rejeitaria o upload.
   const { json, urlencoded } = require('express');
-  app.use(json({ limit: '25mb' }));
+  // O corpo CRU fica guardado: a assinatura dos webhooks da Meta e o HMAC dos
+  // bytes originais, e o JSON remontado nunca bate (ordem de chaves, espacos).
+  app.use(
+    json({
+      limit: '25mb',
+      verify: (req: any, _res: unknown, buf: Buffer) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(urlencoded({ extended: true, limit: '25mb' }));
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
