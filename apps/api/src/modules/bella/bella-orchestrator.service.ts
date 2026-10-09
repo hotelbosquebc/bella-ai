@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { NormalizedInboundMessage } from '../channels/channel.types';
 import { MemoryService } from './memory.service';
 import { ModelRouterService } from './model-router.service';
+import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
 import { ReservationEngineService } from '../reservations/reservation-engine.service';
@@ -154,14 +155,28 @@ export class BellaOrchestratorService {
       hasPolicySource: relevantPolicies.length > 0,
     });
 
+    // 9b. Casos em que ela não responde sozinha (regras em código, não no
+    // prompt): pedido de atendente, reclamação, idioma que ela não atende,
+    // preço escrito, promessa que depende de gente, e resposta repetida.
+    const motivoHumano =
+      verdict.requiresHuman
+        ? verdict.reason ?? 'bloqueado pelo anti-prejuízo'
+        : motivoParaHumano({
+            falaDoHospede: inbound.content,
+            resposta: draft.text,
+            respostasAnteriores: mem.recentMessages
+              .filter((m) => m.sender === MessageSender.BELLA)
+              .map((m) => m.content),
+          });
+
     // 10. Enviar ou escalar para humano
-    if (verdict.requiresHuman) {
+    if (motivoHumano) {
       await this.prisma.conversation.update({
         where: { id: conversation.id },
         data: { status: ConversationStatus.PENDING_HUMAN },
       });
       await this.sendReply(conversation.id, inbound, this.humanHandoffMessage());
-      this.logger.warn(`Escalado para humano: ${verdict.reason}`);
+      this.logger.warn(`Escalado para humano: ${motivoHumano}`);
     } else {
       await this.sendReply(conversation.id, inbound, draft.text);
     }
@@ -170,13 +185,13 @@ export class BellaOrchestratorService {
     await this.audit.log({
       conversationId: conversation.id,
       question: inbound.content,
-      response: verdict.requiresHuman ? `[ESCALADO] ${verdict.reason}` : draft.text,
+      response: motivoHumano ? `[ESCALADO] ${motivoHumano}` : draft.text,
       sources: knowledgeText ? ['base-de-conhecimento'] : [],
       policyUsed: relevantPolicies[0]?.title ?? null,
       confidence: draft.confidence,
       model: draft.model,
       guardrailLevel: verdict.level,
-      escalated: verdict.requiresHuman,
+      escalated: Boolean(motivoHumano),
     });
   }
 
