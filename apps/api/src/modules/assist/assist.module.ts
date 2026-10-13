@@ -1629,7 +1629,10 @@ export class AssistController {
       // leu sem gastar chamada de IA? serve para medir a economia
       semIA: Boolean(stay.semIA),
     });
-    if (this.decisoesLink.length > 20) this.decisoesLink.shift();
+    // 20 decisoes cobriam menos de uma hora de movimento - nao dava para ver
+    // padrao nenhum. 300 cabem numa semana e continuam sendo so motivo e
+    // numeros, sem texto de conversa.
+    if (this.decisoesLink.length > 300) this.decisoesLink.shift();
   }
 
   /**
@@ -2529,7 +2532,83 @@ ${url}`;
   @Public()
   @Get('diagnostico-link')
   diagnosticoLink() {
-    return { decisoes: this.decisoesLink.slice(-10), clientes: this.clientes.slice(-10), tempos: this.tempos.slice(-10) };
+    return { decisoes: this.decisoesLink.slice(-40), clientes: this.clientes.slice(-10), tempos: this.tempos.slice(-10) };
+  }
+
+  /**
+   * O PLACAR da meta principal: a Bella entregou o link?
+   *
+   * O dono disse em 13/10/2026 que ela estava falhando no que mais importa, e
+   * ate aqui eu so tinha caso isolado - um print por vez. Aqui sai o numero.
+   *
+   * A fonte e real: a tabela de feedback guarda, lado a lado, o que ela
+   * SUGERIU e o que a recepcao de fato ENVIOU. A pergunta que interessa e uma
+   * so - quantas vezes o atendente teve que por o link na mao porque ela nao
+   * pos. Essa e a falha que o hospede sente.
+   *
+   * Devolve apenas CONTAGENS. Nenhum texto de conversa sai daqui.
+   */
+  @Public()
+  @Get('diagnostico-orcamento')
+  async diagnosticoOrcamento(@Query('dias') dias?: string) {
+    const janela = Math.min(Math.max(Number(dias) || 30, 1), 180);
+    const desde = new Date(Date.now() - janela * 24 * 60 * 60 * 1000);
+
+    const linhas = await this.prisma.suggestionFeedback.findMany({
+      where: { createdAt: { gte: desde } },
+      select: { acao: true, sugestao: true, enviado: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 2000,
+    });
+
+    const temLink = (t: string) => /sbreserva\.silbeck\.com\.br/i.test(t || '');
+    const placar = {
+      janelaEmDias: janela,
+      total: linhas.length,
+      sugestaoComLink: 0,
+      enviadoComLink: 0,
+      /** A falha que importa: foi enviado link, e a sugestao nao tinha. */
+      atendentePosOLinkNaMao: 0,
+      /** O contrario: ela mandou link e o atendente tirou. */
+      atendenteTirouOLink: 0,
+      porAcao: {} as Record<string, number>,
+    };
+
+    for (const l of linhas) {
+      const s = temLink(l.sugestao);
+      const e = temLink(l.enviado);
+      if (s) placar.sugestaoComLink++;
+      if (e) placar.enviadoComLink++;
+      if (e && !s) placar.atendentePosOLinkNaMao++;
+      if (s && !e) placar.atendenteTirouOLink++;
+      placar.porAcao[l.acao] = (placar.porAcao[l.acao] || 0) + 1;
+    }
+
+    // A conta que responde "ela esta falhando?": entre as conversas que
+    // TERMINARAM com link indo ao hospede, em quantas ela entregou sozinha.
+    const comLinkNoFim = placar.enviadoComLink;
+    const acerto = comLinkNoFim ? Math.round(((comLinkNoFim - placar.atendentePosOLinkNaMao) / comLinkNoFim) * 100) : null;
+
+    return {
+      ...placar,
+      acertoDaBellaEmPorcento: acerto,
+      leitura:
+        acerto === null
+          ? 'Sem envios com link na janela — nada a medir ainda.'
+          : `De cada 100 mensagens com link que o hospede recebeu, a Bella entregou ${acerto} sozinha.`,
+      motivosRecentes: this.contarMotivos(),
+    };
+  }
+
+  /** Quantas vezes cada motivo de decisao apareceu, desde que a API subiu. */
+  private contarMotivos(): Record<string, number> {
+    const conta: Record<string, number> = {};
+    for (const d of this.decisoesLink) {
+      // Sem os numeros variaveis, senao cada data vira um motivo diferente.
+      const chave = (d.motivo || '').replace(/\d+/g, 'N').slice(0, 60);
+      conta[chave] = (conta[chave] || 0) + 1;
+    }
+    return conta;
   }
 
   /**
