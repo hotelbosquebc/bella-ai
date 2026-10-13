@@ -303,6 +303,51 @@
    * qualquer mensagem, fazendo a Bella nunca ser consultada. Aqui vamos por
    * camadas: se uma estratégia falhar, a próxima assume.
    */
+
+  /**
+   * A extensao ainda esta viva nesta pagina?
+   *
+   * Quando a extensao e atualizada ou recarregada com o WhatsApp Web aberto, o
+   * script que JA esta na pagina perde a ligacao com ela: chrome.runtime vira
+   * indefinido e qualquer chamada estoura "Extension context invalidated".
+   *
+   * O problema nao e o erro em si - e o que vinha depois. O observador de DOM
+   * continuava rodando a cada 1,2s, e cada ciclo estourava de novo. Ficava um
+   * script morto se debatendo dentro da pagina do hospede, enchendo o console
+   * e consumindo o navegador. O dono relatou o WhatsApp Web "caindo" em
+   * 13/10/2026; era isto.
+   *
+   * Agora a gente percebe, para tudo e avisa com uma frase. F5 resolve.
+   */
+  function extensaoViva() {
+    try {
+      return Boolean(chrome && chrome.runtime && chrome.runtime.id);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  let avisouQueMorreu = false;
+  function pararPorExtensaoAtualizada() {
+    if (avisouQueMorreu) return;
+    avisouQueMorreu = true;
+    try { if (window.__bellaObservador) window.__bellaObservador.disconnect(); } catch (_) {}
+    try { clearInterval(window.__bellaTimerModo); } catch (_) {}
+    try {
+      status('A Bella foi atualizada — atualize esta página (F5) para voltar a usar.', true);
+      const botao = panel.querySelector('#bella-suggest');
+      if (botao) botao.disabled = true;
+    } catch (_) {}
+  }
+
+  /** Versao da extensao, sem estourar quando ela ja foi descarregada. */
+  function versaoDaExtensao() {
+    try {
+      return chrome.runtime.getManifest().version;
+    } catch (_) {
+      return null;
+    }
+  }
   /**
    * Quem mandou este balao - e por qual sinal.
    *
@@ -1130,7 +1175,7 @@
           : 'Pensando… (pode levar alguns segundos)') + (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: chrome.runtime.getManifest().version, sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, anterior: anterior || undefined });
+      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, anterior: anterior || undefined });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
@@ -1275,13 +1320,15 @@
 
   // O WhatsApp Web troca de conversa sem recarregar a página; observamos o DOM.
   let debounce;
-  new MutationObserver(() => {
+  window.__bellaObservador = new MutationObserver(() => {
     clearTimeout(debounce);
     debounce = setTimeout(function () {
+      if (!extensaoViva()) return pararPorExtensaoAtualizada();
       verificarEnvio();
       aoTrocarDeConversa();
     }, 1200);
-  }).observe(document.body, { childList: true, subtree: true });
+  });
+  window.__bellaObservador.observe(document.body, { childList: true, subtree: true });
 
   carregarModo().then(() => aoTrocarDeConversa());
   // O modo muda no painel a qualquer momento — reconsulta de minuto em minuto,

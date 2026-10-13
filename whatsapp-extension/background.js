@@ -192,18 +192,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         });
         sendResponse({ ok: true });
       } else if (msg.type === 'SUGGEST') {
+        // Repassa TUDO que o content.js mandou, menos o rotulo da acao.
+        //
+        // Antes este trecho remontava o corpo campo a campo - e era preciso
+        // lembrar de acrescentar cada campo novo aqui. Em 13/10/2026 custou
+        // caro: 'fontesDirecao' (o diagnostico de quem mandou cada mensagem) e
+        // 'anterior' (a resposta recusada, que faz a Bella refazer em vez de
+        // repetir) foram implementados nas duas pontas e descartados no meio.
+        // A refacao parecia pronta e nunca funcionou.
+        const { type, ...campos } = msg;
         const out = await authed(`/api/assist/suggest`, {
           method: 'POST',
-          body: JSON.stringify({
-            hotelId: HOTEL_ID,
-            conversation: msg.conversation,
-            lastMessage: msg.lastMessage,
-            disponibilidadeHtml: msg.disponibilidadeHtml,
-            pularDisponibilidade: msg.pularDisponibilidade,
-            // diagnostico: qual versao da extensao e o que ela achou que era audio
-            versao: msg.versao,
-            sinaisAudio: msg.sinaisAudio,
-          }),
+          body: JSON.stringify({ hotelId: HOTEL_ID, ...campos }),
         });
         sendResponse({ ok: true, data: out });
       } else {

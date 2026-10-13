@@ -1073,6 +1073,60 @@ export function respostaMisturada(texto: string, idioma: 'pt' | 'es' | 'en'): bo
   return (['pt', 'es', 'en'] as const).some((i) => i !== idioma && m[i] > 0);
 }
 /**
+ * A frase informa um PRECO?
+ *
+ * A Bella nunca cota valor - manda o link, e o link mostra o preco real do
+ * motor de reservas. Numero em dinheiro na resposta so pode ter vindo de
+ * invencao do modelo.
+ */
+export function fraseTemPreco(frase: string): boolean {
+  const t = frase || '';
+  if (/R\$\s*\d/.test(t)) return true;
+  if (/\b\d{2,4}[.,]\d{2}\s*(reais|por noite|a di[áa]ria)\b/i.test(t)) return true;
+  if (/\b(valor|pre[çc]o|di[áa]ria|tarifa)\b[^.!?]{0,40}\b\d{2,4}\b/i.test(t)) return true;
+  return false;
+}
+
+/**
+ * Tira da resposta qualquer frase que informe preco.
+ *
+ * Caso real (13/10/2026): a Bella sugeriu "o valor da diária é de R$ 430,00.
+ * Temos disponibilidade para essas datas." Inventou o preco E a
+ * disponibilidade - e o valor estava errado. Bastava o atendente clicar em
+ * inserir para o hospede receber um orcamento falso do hotel.
+ *
+ * Por que recorte em codigo e nao instrucao no prompt: a regra de nao cotar
+ * preco esta no prompt desde o inicio, e mesmo assim ele cotou. Prompt e
+ * pedido; funcao e garantia.
+ *
+ * Se depois do corte nao sobrar mensagem de pe, devolvemos uma frase segura
+ * que aponta para o link - nunca o texto com preco.
+ */
+export function semPrecoInventado(texto: string, link?: string | null): string {
+  const original = texto || '';
+  if (!original.trim() || !fraseTemPreco(original)) return original;
+
+  const limpo = original
+    .split(/\r?\n/)
+    .map((linha) =>
+      linha
+        .split(/(?<=[.!?])\s+/)
+        .filter((f) => !fraseTemPreco(f))
+        .join(' ')
+        .trim(),
+    )
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  if (limpo.length >= 40) return limpo;
+
+  return link
+    ? `Segue o link com os valores e a disponibilidade para o seu período. Por ele você já consegue concluir a sua reserva:\n\n${link}`
+    : 'Para eu verificar os valores e a disponibilidade, me confirme por gentileza o período da estadia e quantas pessoas seriam.';
+}
+
+/**
  * O que ha de errado com a resposta que o atendente recusou.
  *
  * Clicar em "Sugerir" de novo, sem a conversa ter mudado, e o atendente
@@ -2471,6 +2525,26 @@ ${url}`;
         {},
       );
     }
+
+    // Leitura quebrada: nao sugerir NADA.
+    //
+    // Conversa com varias linhas e nenhuma do hospede significa que a extensao
+    // nao conseguiu distinguir quem falou o que. Ate 13/10/2026 isso so virava
+    // registro no diagnostico, e a sugestao seguia: o modelo lia o texto cru,
+    // nao sabia de quem era cada frase, e improvisava. Foi assim que saiu "o
+    // valor da diária é de R$ 430,00. Temos disponibilidade para essas datas" -
+    // preco inventado, errado, e disponibilidade que ninguem consultou.
+    //
+    // Sem saber quem falou, qualquer resposta e chute. Melhor devolver a
+    // verdade ao atendente do que um texto convincente.
+    if (formato.linhasNossas >= 3 && formato.linhasHospede === 0) {
+      return {
+        suggestion: '',
+        model: 'mock',
+        erro: 'Não consegui identificar as mensagens do hóspede nesta conversa — não vou arriscar uma resposta. Atualize a página (F5) e tente de novo; se continuar, me avise.',
+        attachments: [],
+      };
+    }
     const focus = body.lastMessage || conversation;
 
     // Pede a disponibilidade ANTES de escrever qualquer coisa.
@@ -2666,6 +2740,20 @@ ${url}`;
         this.registrarDecisao('resposta falava de audio sem audio na conversa', {});
         draft.text = semAudio;
       }
+
+    // Preco inventado NUNCA chega ao campo de digitacao.
+    //
+    // A regra de nao cotar valor esta no prompt desde o inicio e mesmo assim
+    // ele cotou (13/10/2026, R$ 430,00 inventados e errados). Prompt e
+    // pedido; funcao e garantia.
+    if (draft.text) {
+      const oficial = (reserva.match(/https?:\/\/\S+/) || [null])[0];
+      const semPreco = semPrecoInventado(draft.text, oficial);
+      if (semPreco !== draft.text) {
+        this.registrarDecisao('resposta trazia PRECO - frase removida', {});
+        draft.text = semPreco;
+      }
+    }
     }
 
 
