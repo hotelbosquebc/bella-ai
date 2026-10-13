@@ -490,7 +490,17 @@ const MESES: Record<string, number> = {
  * dois, nao colapsado num so.
  */
 export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: string; checkout: string }[] {
-  const t = texto || '';
+  // Data escrita com PONTO: "21.11 a 24.11".
+  //
+  // So convertemos quando os DOIS lados sao pares pontuados ligados por "a" /
+  // "ate" / "-". Assim um valor solto como "1.500" nunca vira data: ele nao
+  // tem o outro lado do intervalo. O resto da leitura continua enxergando
+  // apenas o formato com barra, que e o unico que ela conhece.
+  const t = (texto || '').replace(
+    /\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s*(a|até|ate|-|–)\s*(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b/gi,
+    (_todo, d1, m1, a1, sep, d2, m2, a2) =>
+      `${d1}/${m1}${a1 ? '/' + a1 : ''} ${sep} ${d2}/${m2}${a2 ? '/' + a2 : ''}`,
+  );
   const mes = (p: string) => MESES[(p || '').slice(0, 3).toLowerCase()] || 0;
 
   const brutos: { d1: number; m1: number; a1?: string; d2: number; m2: number; a2?: string }[] = [];
@@ -690,7 +700,24 @@ const PALAVRA_DE_IDADE = /(anos?|años?|years?|yo\b)/i;
  * de quantidade passa por aqui antes.
  */
 export function semPrefixos(texto: string): string {
-  return (texto || '').replace(/^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:[ \t]*/gim, '');
+  return (
+    (texto || '')
+      .replace(/^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:[ \t]*/gim, '')
+      // Pontuacao grudada entre o numero e a palavra.
+      //
+      // Caso real (13/10/2026): "13/10/26 a 15/10/26" e "1.pessoa". As datas
+      // saiam certas, a ocupacao voltava vazia, e a Bella pediu de volta a
+      // quantidade de hospedes que o hospede acabara de escrever. Era o PONTO:
+      // "1 pessoa" e "1pessoa" funcionavam, "1.pessoa" nao.
+      //
+      // Corrigido aqui, e nao em cada regex: toda leitura de quantidade passa
+      // por esta funcao, entao um lugar so resolve para adultos, pessoas,
+      // criancas, casais e apartamentos de uma vez.
+      //
+      // Numero-pontuacao-NUMERO fica intacto: "1.500" e "21.11" nao sao
+      // quantidade grudada e nao podem virar duas coisas.
+      .replace(/(\d)[.\-:;](?=[A-Za-zÀ-ÿ])/g, '$1 ')
+  );
 }
 
 /**
