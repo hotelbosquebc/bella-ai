@@ -694,6 +694,43 @@ export function semPrefixos(texto: string): string {
 }
 
 /**
+ * "4 casais" = 4 apartamentos de 2 adultos.
+ *
+ * O gerador de um link por apartamento ja existia, mas dependia de o extrator
+ * (IA) devolver a lista de apartamentos. Para "4 casais (8 pessoas)" ele nao
+ * devolveu, e o pedido caiu na regra generica de "mais de 6 pessoas, pergunte
+ * como dividir" - quando a divisao JA estava dita. O dono mostrou em
+ * 13/10/2026 como a resposta deveria ser: um link numerado por apartamento.
+ *
+ * Casal e duas pessoas, e dois e o que vai no link de cada apartamento. No
+ * modelo que o dono escreveu os links saíram com um adulto cada; seria o preco
+ * de uma pessoa so aparecendo para ele.
+ *
+ * Devolve null quando houver qualquer ambiguidade - e o extrator segue
+ * mandando. Melhor nao decidir do que decidir errado.
+ */
+export function apartamentosDeCasais(
+  falasDoHospede: string,
+): { adultos: number; criancas0_6: number; criancas7_9: number }[] | null {
+  const t = semPrefixos(falasDoHospede || '');
+
+  // Mesma guarda de adultosDeCasal: em "17/10 casal" o 10 nao e quantidade.
+  const m = t.match(/(?<![\d\/])(\d{1,2})[ \t]*casa(?:l|is)\b/i);
+  if (!m) return null;
+
+  const n = Number(m[1]);
+  if (n < 2 || n > 8) return null; // 1 casal e um apartamento so; acima de 8 e grupo
+
+  // Crianca junto torna a divisao ambigua: em que apartamento ela fica?
+  if (PALAVRA_DE_CRIANCA.test(t)) return null;
+
+  // "4 casais em 2 apartamentos" é o hospede dizendo outra coisa.
+  if (/\bapartamento|\bapto|\bquarto|\bsu[íi]te/i.test(t)) return null;
+
+  return Array.from({ length: n }, () => ({ adultos: 2, criancas0_6: 0, criancas7_9: 0 }));
+}
+
+/**
  * "casal" como PESSOAS, e nao como tipo de cama.
  *
  * E uma das palavras mais comuns do atendimento - "casal e 1 menina 13 anos",
@@ -1859,7 +1896,24 @@ export class AssistController {
       return { adultos: Math.max(1, adultos), criancas0_6, criancas7_9, descricao: partes.join(' e ') };
     };
 
-    const detalhe: any[] = Array.isArray(stay.apartamentos_detalhe) ? stay.apartamentos_detalhe : [];
+    let detalhe: any[] = Array.isArray(stay.apartamentos_detalhe) ? stay.apartamentos_detalhe : [];
+
+    // "4 casais" ja E a divisao: 4 apartamentos de 2 pessoas.
+    //
+    // Sem isto o pedido caia na regra generica de "mais de 6 pessoas, pergunte
+    // como dividir" - perguntando o que o hospede acabou de dizer. So entra
+    // quando o extrator NAO trouxe a composicao, e so quando as contas batem:
+    // se o total nao for exatamente o dobro do numero de casais, ha mais gente
+    // na conversa e quem decide continua sendo o extrator.
+    if (detalhe.length <= 1) {
+      const porCasais = apartamentosDeCasais(falasDoHospede);
+      const totalDito =
+        (Number(stay.adults) || 0) + (Number(stay.children0_6) || 0) + (Number(stay.children7_9) || 0);
+      if (porCasais && totalDito === porCasais.length * 2) {
+        detalhe = porCasais;
+        this.registrarDecisao(`${porCasais.length} casais: um apartamento duplo para cada`, stay);
+      }
+    }
     // Grupo e ocupacao impossivel — antes de montar qualquer link.
     //
     // Caso real: pedido para 30 pessoas gerou um link com "adultos=30" num
