@@ -755,6 +755,46 @@ export function adultosDeCasal(texto: string): number | null {
 }
 
 /**
+ * Idades escritas SEM a palavra "anos".
+ *
+ * Caso real (13/10/2026): "2 adultos e 2 crianças (3/9)". As datas foram
+ * lidas, a ocupacao nao, e a Bella pediu de volta tudo que a hospede acabara
+ * de escrever - inclusive as idades, que estavam ali entre parenteses.
+ * Reconheciamos apenas "3 e 9 anos"; sem a palavra "anos", nada.
+ *
+ * O risco obvio e confundir com data: "2 criancas 21/11" nao pode virar duas
+ * criancas de 21 e 11 anos. Tres guardas, juntas:
+ *
+ *  1. os numeros vem logo DEPOIS de "N criancas", a poucos caracteres;
+ *  2. a QUANTIDADE de numeros bate com o N declarado;
+ *  3. todo numero e <= 17 - crianca, por definicao, e menor de idade. E o que
+ *     descarta "21/11": 21 nao e idade de crianca.
+ *
+ * Devolve null em qualquer duvida; quem le "anos" continua sendo o caminho
+ * principal.
+ */
+export function idadesSemAPalavraAnos(linha: string): number[] | null {
+  const m = (linha || '').match(
+    /(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores?|ni[ñn][oa]s?|kids?|children)\b[^\d\n]{0,14}(\d{1,2}(?:\s*(?:[\/,;e-]|y|and)\s*\d{1,2})*)/i,
+  );
+  if (!m) return null;
+
+  const quantas = Number(m[1]);
+  if (!quantas || quantas > 10) return null;
+
+  const numeros = m[2]
+    .split(/\s*(?:[\/,;-]|\be\b|\by\b|\band\b)\s*/i)
+    .map((x) => x.trim())
+    .filter((x) => /^\d{1,2}$/.test(x))
+    .map(Number);
+
+  if (numeros.length !== quantas) return null;
+  if (numeros.some((n) => n > 17)) return null;
+
+  return numeros;
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -788,6 +828,8 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
   const soIdades = /^[\s\d,;\/e-]*\s*(?:anos?|años?|years?)\s*[.!]?$/i;
   for (const linha of t.split(/\r?\n/)) {
     if (!palavraDeCrianca.test(linha) && !(falaDeCrianca && soIdades.test(linha))) continue;
+    // Reinicia a cada linha: uma linha com "anos" nao pode calar a seguinte.
+    let achouNaLinha = false;
     // "5 e 10 anos", "5, 7 e 10 anos", "20 15 14 10 años" - a hospede paraguaia
     // separou so por espaco, e nos tres idiomas o "anos" muda de grafia.
     const lista = /((?:\d{1,2}[\s,\/]*(?:e|y|and)?[\s,\/]*)*\d{1,2})\s*(?:anos?|años?|years?)\b/gi;
@@ -798,8 +840,14 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
         const idade = Number(n);
         // Ate 30: "mis 4 hijos de 20 15 14 10 años" - o filho de 20 e filho, e
         // pela regra da casa conta como adulto. O limite de 17 o descartava.
-        if (idade >= 0 && idade <= 30) idades.push(idade);
+        if (idade >= 0 && idade <= 30) { idades.push(idade); achouNaLinha = true; }
       }
+    }
+    // Nenhuma idade com a palavra "anos" nesta linha? Tenta a forma curta,
+    // "2 crianças (3/9)", que e como muita gente escreve no WhatsApp.
+    if (!achouNaLinha) {
+      const curtas = idadesSemAPalavraAnos(linha);
+      if (curtas) idades.push(...curtas);
     }
   }
   if (!idades.length) return null;
@@ -915,7 +963,10 @@ export function criancaSemIdade(falasDoHospede: string): boolean {
   const t = semPrefixos(falasDoHospede);
   if (!PALAVRA_DE_CRIANCA.test(t)) return false;
   if (/\b(sem|nenhuma?|n[ãa]o\s+(tem|temos|vai|vao|vão)|sin|no\s+hay)\s+(crian|filh|beb|ni[ñn]|hij|menor|child|kid)/i.test(t)) return false;
-  return !/\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(t);
+  if (/\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(t)) return false;
+  // "2 crianças (3/9)": a idade ESTA dita, so nao com a palavra "anos". Sem
+  // isto a Bella pedia de volta a idade que a hospede acabara de escrever.
+  return !t.split(/\r?\n/).some((linha) => idadesSemAPalavraAnos(linha));
 }
 
 /**
