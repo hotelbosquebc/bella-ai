@@ -512,7 +512,7 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   // sobrevivem intactas e o que se le aqui e o que roda.
   //
   // 10/10 a 12/10  |  16/01/2027 a 20/01/2027
-  const rNumerico = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+  const rNumerico = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
   // Prefixos de mes escolhidos para NAO colidir com palavra comum. Com o
   // prefixo de tres letras de antes, "2 a 3 mais ou menos" virava maio, "2 a 3
   // juntos" virava junho, "2 a 3 outros" outubro, e "dia 21 a 23 agora em
@@ -521,11 +521,11 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   // porque e onde o hospede erra a grafia ("janwiro").
   //
   // 28 janeiro a 02 fevereiro  |  28 de janeiro até 2 de fevereiro
-  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
+  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 14 a 19 janeiro  |  de 8 a 13 de setembro
-  const rUmMes = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
+  const rUmMes = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 15 a 17/10  |  15 a 17/10/2026 - o mes vem so na segunda data
-  const rUmMesNumerico = /\b(\d{1,2})\s*(?:a|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+  const rUmMesNumerico = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
 
   let m: RegExpExecArray | null;
   while ((m = rNumerico.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
@@ -549,7 +549,16 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   // "2 a 3 pessoas" viraria periodo) e ha UM mes citado, por extenso, na fala
   // dele. Dois meses citados, ou nenhum, e ambiguo - fica com a IA.
   if (!brutos.length) {
-    const rSoDias = /\bdias?\s*(\d{1,2})\s*(?:a|até|ate|-|–)\s*(?:dia\s*)?(\d{1,2})\b/gi;
+    const rSoDias = /\bdias?\s*(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(?:dia\s*)?(\d{1,2})\b/gi;
+    // Outras formas de dizer o mesmo intervalo, todas vistas em atendimento:
+    // "entre 21 e 24", "do dia 21 ao dia 24", "entrando dia 21 e saindo dia 24".
+    // "entre 21 e 24". O que vem DEPOIS do segundo numero decide se sao datas:
+    // "entre 2 e 3 pessoas" e "entre 2 e 3 noites" sao quantidade, nao periodo,
+    // e viravam 02 a 03 do mes citado - um orcamento para as datas erradas.
+    const rEntre =
+      /\bentre\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\s*e\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\b(?!\s*(?:pessoas?|adultos?|crian|h[óo]spedes?|noites?|di[áa]rias?|di[áa]rias|quartos?|apartamentos?|anos?))/gi;
+    const rDoDiaAo = /\bdo\s*dia\s*(\d{1,2})\s*(?:a|ao|at[ée])\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\b/gi;
+    const rEntrandoSaindo = /\bentrando\s*(?:no\s*)?(?:dia\s*)?(\d{1,2})\b[^\d\n]{0,20}\bsaindo\s*(?:no\s*)?(?:dia\s*)?(\d{1,2})\b/gi;
     const rMesSolto = /\b(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/gi;
     const citados = new Set<number>();
     let mm: RegExpExecArray | null;
@@ -557,7 +566,36 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
     if (citados.size === 1) {
       const unico = [...citados][0];
       while ((m = rSoDias.exec(t)) !== null) push(m[1], unico, m[2], unico);
+        while ((m = rEntre.exec(t)) !== null) push(m[1], unico, m[2], unico);
+        while ((m = rDoDiaAo.exec(t)) !== null) push(m[1], unico, m[2], unico);
+        while ((m = rEntrandoSaindo.exec(t)) !== null) push(m[1], unico, m[2], unico);
     }
+  }
+
+  // Mes abreviado: "21 nov a 24 nov", "21 nov. a 24 nov.".
+  //
+  // O \b depois da abreviacao e o que torna isso seguro: "3 novamente" nao
+  // casa, porque depois de "nov" vem letra. Sem ele, voltariamos ao bug que
+  // fez "dia 21 a 23 agora em novembro" virar agosto.
+  if (!brutos.length) {
+    const rDoisAbrev = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b/gi;
+    while ((m = rDoisAbrev.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
+    if (!brutos.length) {
+      const rUmAbrev = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b/gi;
+      while ((m = rUmAbrev.exec(t)) !== null) push(m[1], mes(m[3]), m[2], mes(m[3]));
+    }
+  }
+
+  // Duas datas completas ligadas por PALAVRAS, e nao por "a":
+  //   "entrada 21/11 saída 24/11", "check in 21/11 check out 24/11",
+  //   "chegando 21/11 e saindo 24/11".
+  //
+  // So entra se nada acima achou periodo, e o que separa as duas datas nao
+  // pode conter digito - assim tres datas soltas na conversa nao viram um
+  // intervalo inventado.
+  if (!brutos.length) {
+    const rDuasDatas = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b[^\d\n]{1,25}\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+    while ((m = rDuasDatas.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
   }
 
   const hojeUTC = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()));
@@ -641,6 +679,9 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   } else if (!temCrianca && adultosDeCasal(semPref)) {
     // O numero vem da propria funcao: "2 casais" sao 4 adultos, nao 2.
     adultos = adultosDeCasal(semPref);
+  } else if (!temCrianca && adultosDeFrase(semPref)) {
+    // "somos 2", "so nos dois", "eu e minha esposa".
+    adultos = adultosDeFrase(semPref);
   }
   if (!adultos || adultos < 1 || adultos > 15) return null;
 
@@ -704,6 +745,11 @@ const PALAVRA_DE_IDADE = /(anos?|años?|years?|yo\b)/i;
  * inventaria uma ocupacao que ninguem pediu. Espanhol com numero por extenso
  * continua com a IA - errar calado numa ocupacao e pior do que nao saber.
  */
+/** "vinte e um" -> 21. Feito antes das unidades, senao sobraria "20 e 1". */
+const DEZENA_COMPOSTA = /\b(vinte|trinta)\s+e\s+(um|uma|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove)\b/gi;
+const UNIDADE: Record<string, number> = {
+  um: 1, uma: 1, dois: 2, duas: 2, tres: 3, três: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9,
+};
 const NUMERO_POR_EXTENSO: [RegExp, string][] = [
   [/\b(uma?|un|one)\b/gi, '1'],
   [/\b(duas|dois|two)\b/gi, '2'],
@@ -726,6 +772,9 @@ const NUMERO_POR_EXTENSO: [RegExp, string][] = [
 
 export function numerosPorExtenso(texto: string): string {
   let t = texto || '';
+  t = t.replace(DEZENA_COMPOSTA, (_todo, dezena, unidade) =>
+    String((String(dezena).toLowerCase() === 'vinte' ? 20 : 30) + (UNIDADE[String(unidade).toLowerCase()] || 0)),
+  );
   for (const [r, n] of NUMERO_POR_EXTENSO) t = t.replace(r, n);
   return t;
 }
@@ -908,6 +957,42 @@ export function formatosDeNumero(falasDoHospede: string): string[] {
 }
 
 /**
+ * Quantas pessoas, quando a frase nao traz "N adultos".
+ *
+ * Formas reais que a leitura nao entendia (corpus de 14/10/2026):
+ * "somos 2", "só nós dois", "eu e minha esposa".
+ *
+ * "sao N" ficou de FORA de proposito: "são 2 noites" e "são 3 diarias" viriam
+ * junto e inventariam hospedes a partir da quantidade de dias. "somos" e
+ * "seremos" falam de gente e so de gente.
+ *
+ * O casal por parentesco vale 2 e so entra com conjuge - "eu e minha filha"
+ * NAO entra, porque ali ha um adulto e uma crianca de idade desconhecida, e
+ * chutar dois adultos erraria a categoria no site.
+ */
+export function adultosDeFrase(texto: string): number | null {
+  const t = semPrefixos(texto || '');
+
+  const somos = t.match(/\b(?:somos|seremos|vamos\s+ser)\s*(?:em\s*)?(\d{1,2})\b/i);
+  if (somos) {
+    const n = Number(somos[1]);
+    if (n >= 1 && n <= 15) return n;
+  }
+
+  const nos = t.match(/\bn[óo]s\s*(\d{1,2})\b/i);
+  if (nos) {
+    const n = Number(nos[1]);
+    if (n >= 1 && n <= 15) return n;
+  }
+
+  if (/\beu\s+e\s+(?:a\s+|o\s+)?(?:minha|meu)\s+(?:esposa|esposo|marido|mulher|namorad[oa]|companheir[oa]|noiv[oa])\b/i.test(t)) {
+    return 2;
+  }
+
+  return null;
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -929,7 +1014,7 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
 
   const mAdultos = t.match(/\b(\d{1,2})[ \t]*adultos?\b/i);
   // Quantidade escrita vence; sem ela, "casal" (pessoas, nao cama) vale 2.
-  const adultosDeclarados = mAdultos ? Number(mAdultos[1]) : adultosDeCasal(t);
+  const adultosDeclarados = mAdultos ? Number(mAdultos[1]) : adultosDeCasal(t) ?? adultosDeFrase(t);
   if (!adultosDeclarados) return null;
 
   const idades: number[] = [];
