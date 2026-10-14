@@ -822,6 +822,46 @@ export function idadesSemAPalavraAnos(linha: string): number[] | null {
 }
 
 /**
+ * O FORMATO em que o hospede escreveu numeros - sem os numeros.
+ *
+ * "faltam dados" e a maior causa de nao sair link (14 das 40 decisoes de
+ * 14/10/2026), e na maioria delas a DATA foi lida e a quantidade de pessoas
+ * nao. Para consertar isso eu preciso saber COMO as pessoas escrevem - foi
+ * assim que apareceram "1.pessoa" e "2 crianças (3/9)", um print de cada vez.
+ *
+ * Mas nao posso guardar o que o hospede escreve: o diagnostico e publico e a
+ * conversa e dele. Entao guardamos so a FORMA: cada numero vira "N" e fica o
+ * que vem logo depois, no maximo 12 letras.
+ *
+ *   "1.pessoa"            -> "N.pessoa"
+ *   "somos 4 adultos"     -> "N adultos"
+ *   "2 crianças (3/9)"    -> "N criancas", "N/N"
+ *
+ * Nenhum numero real, nenhum nome, nenhuma data - so o molde, que e
+ * exatamente o que falta para eu escrever a leitura certa.
+ */
+export function formatosDeNumero(falasDoHospede: string): string[] {
+  // Texto CRU, sem a normalizacao de pontuacao: aqui eu quero justamente ver
+  // o ponto de "1.pessoa". Tira so o prefixo de quem falou.
+  const t = (falasDoHospede || '').replace(/^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:[ \t]*/gim, '');
+  const achados = new Set<string>();
+
+  // Separador e so PONTUACAO: antes era "qualquer coisa que nao seja digito",
+  // e letras entravam nele - "1.pessoa" saia como "N ssoa".
+  const r = /(\d{1,2})([ \t]*[.\-:;,\/()]*[ \t]*)([A-Za-zÀ-ÿ]{1,12}|\d{1,2})/g;
+  let m: RegExpExecArray | null;
+  while ((m = r.exec(t)) !== null) {
+    const separador = (m[2] || '').replace(/[^.-:;,/()]/g, '');
+    const seguinte = /^\d+$/.test(m[3]) ? 'N' : (m[3] || '').toLowerCase();
+    if (!seguinte) continue;
+    const forma = 'N' + (separador || ' ') + seguinte;
+    achados.add(forma.slice(0, 18));
+    if (achados.size >= 8) break;
+  }
+  return [...achados];
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -1925,7 +1965,12 @@ export class AssistController {
         adults: 'quantidade de adultos',
         idades: 'idade de cada criança (define a categoria no site)',
       };
-      this.registrarDecisao('faltam dados (checkin/checkout/adultos)', stay);
+      // O FORMATO em que ele escreveu (sem os numeros) entra no motivo: e o
+      // que me permite escrever a leitura certa sem pedir print a cada caso.
+      this.registrarDecisao(
+        'faltam dados (' + faltam.join('/') + ') formatos: ' + formatosDeNumero(falasDoHospede).join(' '),
+        stay,
+      );
       const avisoVago = stay.periodoVago
         ? ` O hóspede deu um período VAGO (ex.: "final de novembro"): NÃO afirme um mês, ` +
           `uma semana ou datas específicas que ele não disse — foi assim que "final de novembro" ` +
