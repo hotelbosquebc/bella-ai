@@ -29,6 +29,7 @@ const OBRIGATORIOS = [
   'ultimaNossaConhecida', 'verificarEnvio', 'registrarEnvio',
   'scrapeConversation', 'sugerir', 'carregarModo', 'mesmoContato', 'direcaoPeloId',
   'direcaoDoBalao',
+  'direcaoPelaPosicao',
 ];
 
 for (const arquivo of ['content.js', 'background.js', 'options.js']) {

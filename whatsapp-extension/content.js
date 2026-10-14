@@ -349,6 +349,45 @@
     }
   }
   /**
+   * De que LADO o balao esta na tela.
+   *
+   * Nossa mensagem fica a direita, a do hospede a esquerda. E o sinal que o
+   * atendente usa sem pensar, e o unico que nao depende de marcacao interna do
+   * WhatsApp nem do nome de ninguem.
+   *
+   * Por que ele virou necessario: o diagnostico de 14/10/2026 mostrou que, das
+   * quatro formas de decidir, so duas disparam nesta versao do WhatsApp Web -
+   * o status de entrega (que so identifica as NOSSAS) e a comparacao de nomes.
+   * E a comparacao de nomes quebra exatamente nos contatos NAO SALVOS: o balao
+   * traz o nome de perfil que a pessoa escolheu ("~Rafael") e o cabecalho traz
+   * o numero (+55 47 9685-5409). Nunca batem, e TODAS as mensagens dela viram
+   * nossas - 40 linhas nossas, zero do hospede, nenhuma resposta possivel.
+   *
+   * Comparamos as folgas: quanto sobra a esquerda e quanto sobra a direita
+   * dentro do painel da conversa. Encostado a direita e nosso.
+   *
+   * Exige folga clara (40px) para nao chutar em aviso centralizado, e desiste
+   * quando a conversa nao esta visivel - com a janela escondida os retangulos
+   * vem zerados e qualquer leitura seria invencao.
+   */
+  function direcaoPelaPosicao(row) {
+    const main = document.querySelector('#main');
+    if (!main || !row) return null;
+    const balao = row.querySelector('.copyable-text') || row.firstElementChild || row;
+    try {
+      const r = balao.getBoundingClientRect();
+      const c = main.getBoundingClientRect();
+      if (!r.width || !c.width) return null;
+      const folgaEsquerda = r.left - c.left;
+      const folgaDireita = c.right - r.right;
+      if (Math.abs(folgaEsquerda - folgaDireita) < 40) return null; // centralizado: nao da para dizer
+      return folgaEsquerda > folgaDireita ? 'nossa' : 'hospede';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /**
    * Quem mandou este balao - e por qual sinal.
    *
    * Em 08/10/2026 uma conversa com contato NAO SALVO (+55 18 99703-7741)
@@ -386,6 +425,10 @@
     if (row.querySelector('[data-icon^="msg-"], [aria-label*="Entregue"], [aria-label*="Lida"]')) {
       return { isIn: false, fonte: 'status-entrega' };
     }
+
+    // Antes do nome: a posicao na tela nao depende de contato salvo.
+    const pelaPosicao = direcaoPelaPosicao(row);
+    if (pelaPosicao) return { isIn: pelaPosicao === 'hospede', fonte: 'posicao' };
 
     if (titulo && remetente) {
       return { isIn: mesmoContato(remetente, titulo), fonte: 'nome' };
