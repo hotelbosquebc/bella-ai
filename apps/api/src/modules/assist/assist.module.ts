@@ -692,6 +692,45 @@ const PALAVRA_DE_PESSOA = /(pessoa|persona|adulto|adult|h[óo]spede|hu[ée]sped|
 const PALAVRA_DE_IDADE = /(anos?|años?|years?|yo\b)/i;
 
 /**
+ * Numero escrito por extenso vira digito.
+ *
+ * Caso real (14/10/2026): "29/12 a 02/01" e "Dois adultos, um bebê de dois
+ * anos". Estava tudo dito - periodo, adultos e a idade da crianca - e a Bella
+ * pediu a idade de volta. As datas ela leu; a ocupacao, nada: TODA leitura de
+ * quantidade procura digito, e ali nao havia nenhum.
+ *
+ * "dos" fica de FORA de proposito. Em espanhol e dois, mas em portugues e
+ * contracao: "o valor dos hospedes adicionais" viraria "2 hospedes" e
+ * inventaria uma ocupacao que ninguem pediu. Espanhol com numero por extenso
+ * continua com a IA - errar calado numa ocupacao e pior do que nao saber.
+ */
+const NUMERO_POR_EXTENSO: [RegExp, string][] = [
+  [/\b(uma?|un|one)\b/gi, '1'],
+  [/\b(duas|dois|two)\b/gi, '2'],
+  [/\b(tr[êe]s|three)\b/gi, '3'],
+  [/\b(quatro|cuatro|four)\b/gi, '4'],
+  [/\b(cinco|five)\b/gi, '5'],
+  [/\b(seis|six)\b/gi, '6'],
+  [/\b(sete|siete|seven)\b/gi, '7'],
+  [/\b(oito|ocho|eight)\b/gi, '8'],
+  [/\b(nove|nueve|nine)\b/gi, '9'],
+  [/\b(dez|diez|ten)\b/gi, '10'],
+  [/\b(onze|once|eleven)\b/gi, '11'],
+  [/\b(doze|doce|twelve)\b/gi, '12'],
+  [/\b(treze|trece|thirteen)\b/gi, '13'],
+  [/\b(ca?torze|catorce|fourteen)\b/gi, '14'],
+  [/\b(quinze|fifteen)\b/gi, '15'],
+  [/\b(dezesseis|sixteen)\b/gi, '16'],
+  [/\b(dezessete|seventeen)\b/gi, '17'],
+];
+
+export function numerosPorExtenso(texto: string): string {
+  let t = texto || '';
+  for (const [r, n] of NUMERO_POR_EXTENSO) t = t.replace(r, n);
+  return t;
+}
+
+/**
  * Tira os prefixos de quem falou ("Hospede:", "Nos (hoje):").
  *
  * A conversa chega com um prefixo por linha, e a leitura de ocupacao casava o
@@ -700,24 +739,31 @@ const PALAVRA_DE_IDADE = /(anos?|años?|years?|yo\b)/i;
  * de quantidade passa por aqui antes.
  */
 export function semPrefixos(texto: string): string {
-  return (
-    (texto || '')
-      .replace(/^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:[ \t]*/gim, '')
-      // Pontuacao grudada entre o numero e a palavra.
-      //
-      // Caso real (13/10/2026): "13/10/26 a 15/10/26" e "1.pessoa". As datas
-      // saiam certas, a ocupacao voltava vazia, e a Bella pediu de volta a
-      // quantidade de hospedes que o hospede acabara de escrever. Era o PONTO:
-      // "1 pessoa" e "1pessoa" funcionavam, "1.pessoa" nao.
-      //
-      // Corrigido aqui, e nao em cada regex: toda leitura de quantidade passa
-      // por esta funcao, entao um lugar so resolve para adultos, pessoas,
-      // criancas, casais e apartamentos de uma vez.
-      //
-      // Numero-pontuacao-NUMERO fica intacto: "1.500" e "21.11" nao sao
-      // quantidade grudada e nao podem virar duas coisas.
-      .replace(/(\d)[.\-:;](?=[A-Za-zÀ-ÿ])/g, '$1 ')
+  const semQuemFalou = (texto || '').replace(
+    /^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:[ \t]*/gim,
+    '',
   );
+
+  // Pontuacao grudada entre o numero e a palavra.
+  //
+  // Caso real (13/10/2026): "13/10/26 a 15/10/26" e "1.pessoa". As datas saiam
+  // certas, a ocupacao voltava vazia, e a Bella pediu de volta a quantidade de
+  // hospedes que ele acabara de escrever. Era o PONTO: "1 pessoa" e "1pessoa"
+  // funcionavam, "1.pessoa" nao.
+  //
+  // Numero-pontuacao-NUMERO fica intacto: "1.500" e "21.11" nao sao quantidade
+  // grudada e nao podem virar duas coisas.
+  const semPontoGrudado = semQuemFalou.replace(/(\d)[.\-:;](?=[A-Za-zÀ-ÿ])/g, '$1 ');
+
+  // Numero por extenso vira digito.
+  //
+  // Caso real (14/10/2026): "Dois adultos, um bebê de dois anos" - tudo dito,
+  // nenhum digito, e toda leitura de quantidade procura digito.
+  //
+  // As duas correcoes ficam AQUI, e nao em cada regex: toda leitura de
+  // quantidade passa por esta funcao, entao um lugar so resolve adultos,
+  // pessoas, criancas, casais, apartamentos e idades de uma vez.
+  return numerosPorExtenso(semPontoGrudado);
 }
 
 /**
