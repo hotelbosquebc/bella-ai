@@ -1037,6 +1037,51 @@ export function criancaSemIdade(falasDoHospede: string): boolean {
 }
 
 /**
+ * Quantas vezes JA pedimos esclarecimento nesta conversa.
+ *
+ * Regra do dono (14/10/2026): quando o hospede nao e claro, a Bella tenta
+ * entender; se depois da explicacao dele ela ainda nao entender, passa para
+ * atendimento humano. Sem contar as tentativas, ela ficaria repetindo a mesma
+ * pergunta em volta - que e justamente o que faz o hospede desistir.
+ *
+ * Conta so as NOSSAS falas. A primeira mensagem automatica do hotel ja pede os
+ * dados, e conta como a primeira tentativa: do ponto de vista do hospede,
+ * perguntaram uma vez.
+ */
+export function tentativasDeEsclarecimento(conversation: string): number {
+  const nossas = apenasNossasFalas(conversation || '');
+  const pedido =
+    /me informe|por gentileza|n[ãa]o entendi|pode (me )?explicar|poderia (me )?esclarecer|me confirme|qual seria|quantas pessoas|per[íi]odo da estadia/i;
+  return nossas.split(/\r?\n/).filter((l) => pedido.test(l)).length;
+}
+
+/**
+ * Ja insistimos o bastante - hora de chamar gente.
+ *
+ * Duas tentativas: a Bella pergunta, o hospede responde, e se ainda nao deu
+ * para entender, insistir uma terceira vez nao melhora nada. Quem resolve
+ * ambiguidade de verdade e uma pessoa.
+ */
+export function devePassarParaHumano(conversation: string): boolean {
+  return tentativasDeEsclarecimento(conversation) >= 2;
+}
+
+/** O texto que manda a Bella entregar a conversa, respeitando o horario. */
+export function contextoDeEntregaAoHumano(dentroDoHorario: boolean): string {
+  return (
+    `\n\nJÁ PEDIMOS ESCLARECIMENTO DUAS VEZES E AINDA NÃO ENTENDEMOS O PEDIDO. ` +
+    `NÃO pergunte de novo: repetir a mesma pergunta pela terceira vez faz o hóspede desistir.\n` +
+    `Reconheça, com simpatia e sem culpar ninguém, que é melhor alguém da equipe olhar o caso dele, ` +
+    `e diga que está encaminhando para o nosso setor de reservas. NÃO envie link e NÃO tente adivinhar ` +
+    `o que ele quis dizer.` +
+    (dentroDoHorario
+      ? ` O setor está atendendo AGORA: diga que um atendente assume em instantes.`
+      : ` O setor NÃO está atendendo agora: informe o horário de atendimento e ofereça a recepção 24h pelo telefone, ` +
+        `sem prometer retorno imediato.`)
+  );
+}
+
+/**
  * Em que idioma o HOSPEDE escreveu.
  *
  * Caso real (08/09/2026): "Buenas noches! Queria saber que tienen disponible en
@@ -1813,6 +1858,11 @@ export class AssistController {
         this.registrarDecisao(temAutoria(conversation) ? 'sem assunto de estadia' : 'sem assunto de estadia (conversa sem autoria)', stay);
         return '';
       }
+      // Ja tentamos entender duas vezes: quem resolve ambiguidade e gente.
+      if (devePassarParaHumano(conversation)) {
+        this.registrarDecisao('passou para humano: 2 pedidos de esclarecimento sem entender', stay);
+        return contextoDeEntregaAoHumano(isWithinBusinessHours());
+      }
       this.registrarDecisao('dados incompletos apesar de falar de estadia', stay);
       return (
         `\n\nSEM LINK NESTA MENSAGEM: não consegui montar o link porque falta dado do período ou da ocupação. ` +
@@ -1965,6 +2015,11 @@ export class AssistController {
         adults: 'quantidade de adultos',
         idades: 'idade de cada criança (define a categoria no site)',
       };
+      // Ja tentamos entender duas vezes: quem resolve ambiguidade e gente.
+      if (devePassarParaHumano(conversation)) {
+        this.registrarDecisao('passou para humano: 2 pedidos de dados sem sucesso', stay);
+        return contextoDeEntregaAoHumano(isWithinBusinessHours());
+      }
       // O FORMATO em que ele escreveu (sem os numeros) entra no motivo: e o
       // que me permite escrever a leitura certa sem pedir print a cada caso.
       this.registrarDecisao(
