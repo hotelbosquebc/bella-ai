@@ -2586,6 +2586,24 @@ ${url}`;
 
     // A conta que responde "ela esta falhando?": entre as conversas que
     // TERMINARAM com link indo ao hospede, em quantas ela entregou sozinha.
+    // O que ela disse NO LUGAR do link?
+    //
+    // Saber que falha em 62% nao diz o que consertar. Se a maioria das vezes
+    // ela PEDIU os dados - periodo, pessoas, idades - entao o problema e a
+    // LEITURA do que o hospede escreveu, e nao a inteligencia do modelo: ela
+    // perguntou o que ja estava na tela. Essa e a hipotese que este numero
+    // confirma ou derruba.
+    //
+    // Classificacao so do texto DELA. Nada do hospede entra aqui.
+    const pediuDados = /me informe|por gentileza|quantidade total de pessoas|per[íi]odo da estadia|informar as idades|quantas pessoas/i;
+    const prometeu = /vou verificar|retorno|aguarde|em breve|consultar/i;
+    const noLugarDoLink = { pediuDadosQueTalvezJaTivesse: 0, prometeuRetorno: 0, outraCoisa: 0 };
+    for (const l of linhas) {
+      if (!(temLink(l.enviado) && !temLink(l.sugestao))) continue;
+      if (pediuDados.test(l.sugestao)) noLugarDoLink.pediuDadosQueTalvezJaTivesse++;
+      else if (prometeu.test(l.sugestao)) noLugarDoLink.prometeuRetorno++;
+      else noLugarDoLink.outraCoisa++;
+    }
     const comLinkNoFim = placar.enviadoComLink;
     const acerto = comLinkNoFim ? Math.round(((comLinkNoFim - placar.atendentePosOLinkNaMao) / comLinkNoFim) * 100) : null;
 
@@ -2596,6 +2614,7 @@ ${url}`;
         acerto === null
           ? 'Sem envios com link na janela — nada a medir ainda.'
           : `De cada 100 mensagens com link que o hospede recebeu, a Bella entregou ${acerto} sozinha.`,
+      noLugarDoLink,
       motivosRecentes: this.contarMotivos(),
     };
   }
