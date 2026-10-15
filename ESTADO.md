@@ -359,3 +359,42 @@ já está implementado e ativa sozinho no 429.
 
 ⚠️ **PENDENTE — backup:** `DATABASE_URL="..." node scripts/backup.js` antes de o
 Postgres grátis expirar (~12/09/2026). `scripts/restore.js` recoloca em outro banco.
+
+---
+
+## PEDIDOS DO DONO — fazer DEPOIS que o WhatsApp estiver no ar (15/10/2026)
+
+Ele pediu para ser lembrado quando terminarmos a integração. Estão aqui, e não
+na memória, porque é aqui que eu procuro ao retomar.
+
+### 1. Pedido de atendente → horário + telefone fixo
+
+A Bella deve reconhecer quando o hóspede quer falar com uma pessoa e, junto do
+encaminhamento, **informar o horário de atendimento e o telefone fixo
+(47) 3367-0211**.
+
+**O que JÁ existe:** `motivoParaHumano()` detecta o pedido ("falar com um
+atendente", "isso é um robô?", espanhol e inglês) e escala; e
+`contextoDeEntregaAoHumano()` já distingue dentro/fora do expediente.
+
+**O que FALTA:** o telefone não é garantido — hoje ele só aparece se o modelo
+resolver tirar da base de conhecimento. Precisa virar texto pronto na entrega,
+como fizemos com o link: a regra escrita longe não basta.
+
+### 2. Baixar os contatos da agenda do Google para o app
+
+Importar a agenda vinculada ao Google (Google Contacts) para dentro do painel,
+para o hotel ter os contatos junto das conversas.
+
+**Caminho provável:** exportar do Google Contacts em vCard/CSV e importar pela
+tela de Contatos — sem OAuth do Google, que exigiria verificação do app e
+traria custo de manutenção para um hotel.
+
+**Lembrar:** a coexistência do WhatsApp **já sincroniza todos os contatos** com
+número de WhatsApp. Conferir se o do Google ainda é necessário depois disso, ou
+se vira só complemento de quem não tem WhatsApp. Perguntar ao dono antes de
+construir.
+
+### 3. "mais alguns detalhes" — ele disse que lembrará depois
+
+Perguntar quando retomarmos.
