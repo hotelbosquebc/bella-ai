@@ -2955,6 +2955,76 @@ ${url}`;
       ),
     };
   }
+
+  /**
+   * O QUE a recepcao corrige quando reescreve a resposta da Bella.
+   *
+   * Em 15/10/2026 o diagnostico mostrou 5 refacoes pedidas pelo atendente com
+   * "sem motivo detectado": ele recusou a resposta e as minhas conferencias
+   * automaticas nao acharam nada de errado. Ou seja, ha um erro que a recepcao
+   * ve todo dia e eu nao vejo.
+   *
+   * A tabela de feedback guarda, lado a lado, o que ela SUGERIU e o que foi
+   * ENVIADO. Comparar os dois diz o que foi corrigido sem ninguem precisar
+   * relatar nada.
+   *
+   * So contagem - nenhum texto de conversa sai daqui.
+   */
+  @Public()
+  @Get('diagnostico-correcoes')
+  async diagnosticoCorrecoes(@Query('dias') dias?: string) {
+    const janela = Math.min(Math.max(Number(dias) || 30, 1), 180);
+    const desde = new Date(Date.now() - janela * 24 * 60 * 60 * 1000);
+
+    const linhas = await this.prisma.suggestionFeedback.findMany({
+      where: { createdAt: { gte: desde }, acao: { in: ['editada', 'descartada'] } },
+      select: { acao: true, sugestao: true, enviado: true },
+      orderBy: { createdAt: 'desc' },
+      take: 1500,
+    });
+
+    const temLink = (t: string) => /sbreserva\.silbeck\.com\.br/i.test(t || '');
+    const temTelefone = (t: string) => /3367-?0211|9\s?9690-?4414/i.test(t || '');
+    const temPreco = (t: string) => /R\$\s*\d/i.test(t || '');
+    const palavras = (t: string) => (t || '').trim().split(/\s+/).filter(Boolean).length;
+
+    const conta = {
+      total: linhas.length,
+      acrescentouLink: 0,
+      tirouLink: 0,
+      acrescentouTelefone: 0,
+      acrescentouPreco: 0,
+      encurtouMuito: 0,
+      alongouMuito: 0,
+      reescreveuDoZero: 0,
+      soAjusteFino: 0,
+    };
+
+    for (const l of linhas) {
+      const s = l.sugestao || '';
+      const e = l.enviado || '';
+      if (temLink(e) && !temLink(s)) conta.acrescentouLink++;
+      if (temLink(s) && !temLink(e)) conta.tirouLink++;
+      if (temTelefone(e) && !temTelefone(s)) conta.acrescentouTelefone++;
+      if (temPreco(e) && !temPreco(s)) conta.acrescentouPreco++;
+
+      const ps = palavras(s);
+      const pe = palavras(e);
+      if (ps && pe < ps * 0.5) conta.encurtouMuito++;
+      else if (ps && pe > ps * 1.8) conta.alongouMuito++;
+
+      if (l.acao === 'descartada') conta.reescreveuDoZero++;
+      else conta.soAjusteFino++;
+    }
+
+    return {
+      janelaEmDias: janela,
+      ...conta,
+      leitura:
+        'acrescentouPreco é o mais importante: significa que a recepção precisou informar um valor que a Bella, por regra, não dá. ' +
+        'encurtouMuito costuma ser resposta prolixa; alongouMuito, resposta incompleta.',
+    };
+  }
   @Public()
   @Get('diagnostico-orcamento')
   async diagnosticoOrcamento(@Query('dias') dias?: string) {
