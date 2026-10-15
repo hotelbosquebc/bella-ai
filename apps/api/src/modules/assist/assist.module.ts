@@ -502,13 +502,17 @@ const MESES: Record<string, number> = {
  * dois, nao colapsado num so.
  */
 export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: string; checkout: string }[] {
-  // Data escrita com PONTO: "21.11 a 24.11".
+  // Tira os prefixos de quem falou ANTES de qualquer leitura de data.
   //
-  // So convertemos quando os DOIS lados sao pares pontuados ligados por "a" /
-  // "ate" / "-". Assim um valor solto como "1.500" nunca vira data: ele nao
-  // tem o outro lado do intervalo. O resto da leitura continua enxergando
-  // apenas o formato com barra, que e o unico que ela conhece.
-  const t = (texto || '').replace(
+  // Alguns chamadores ja passavam o texto limpo e outros nao, e isso decidia o
+  // resultado sem ninguem perceber: a distancia maxima entre duas datas soltas
+  // e de 25 caracteres, e o prefixo "Hóspede (hoje): " come 16 deles. Por isso
+  // "Entrada 15/10/26 / Saida 16/10/26" era lido (23 caracteres) e "check in
+  // 20/11 / check out 23/11" nao (27). O primeiro funcionava por sorte.
+  //
+  // semPrefixos tambem normaliza pontuacao e numero por extenso, e aplicar
+  // duas vezes nao muda nada - entao quem ja limpava continua igual.
+  const t = semPrefixos(texto || '').replace(
     /\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s*(a|até|ate|-|–)\s*(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b/gi,
     (_todo, d1, m1, a1, sep, d2, m2, a2) =>
       `${d1}/${m1}${a1 ? '/' + a1 : ''} ${sep} ${d2}/${m2}${a2 ? '/' + a2 : ''}`,
