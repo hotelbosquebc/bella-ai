@@ -258,6 +258,34 @@ export function ultimaFalaDoHospede(conversation: string): string {
 }
 
 /**
+ * TUDO que o hospede falou desde a nossa ultima resposta.
+ *
+ * Caso real (15/10/2026): a hospede mandou tres mensagens seguidas - "o
+ * pagamento a gente faz no ato?", "caso de cancelamento tem taxa? como
+ * funciona a reserva" e "tem cafe da manha?". A instrucao mandava responder "a
+ * ULTIMA mensagem", entao so o cafe entrou no pedido. A pergunta do
+ * cancelamento ficou sem resposta e o atendente teve de mandar a politica a
+ * mao.
+ *
+ * No WhatsApp as pessoas escrevem assim: varias mensagens curtas em vez de um
+ * paragrafo. Olhar so a ultima e perder metade do que foi perguntado.
+ */
+export function falasPendentesDoHospede(conversation: string): string[] {
+  const linhas = (conversation || '').split(/\r?\n/);
+  const pendentes: string[] = [];
+  for (const linha of linhas) {
+    if (/^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(linha)) {
+      // Respondemos: o que veio antes ja foi tratado.
+      pendentes.length = 0;
+      continue;
+    }
+    const m = linha.match(/^\s*H[óo]spede\s*(?:\(hoje\))?\s*:\s*(.+)$/i);
+    if (m && m[1].trim()) pendentes.push(m[1].trim());
+  }
+  return pendentes;
+}
+
+/**
  * Onde a resposta deve mirar.
  *
  * Caso real (08/09/2026): depois de varias perguntas ja respondidas, o hospede
@@ -270,12 +298,34 @@ export function ultimaFalaDoHospede(conversation: string): string {
  * mesmo mes. So "responda tudo" faz ela repetir o que ja foi respondido.
  */
 export function contextoDaPergunta(conversation: string): string {
-  const ultima = ultimaFalaDoHospede(conversation);
-  if (!ultima) return '';
+  const pendentes = falasPendentesDoHospede(conversation);
+  if (!pendentes.length) {
+    const ultima = ultimaFalaDoHospede(conversation);
+    if (!ultima) return '';
+    return (
+      `\n\nRESPONDA AGORA A ESTA MENSAGEM DO HÓSPEDE:\n"${ultima.slice(0, 600)}"\n` +
+      `Responda TUDO o que está nela — se traz duas perguntas, responda as duas. ` +
+      `E só isso: o que já foi respondido antes na conversa não se repete.`
+    );
+  }
+
+  if (pendentes.length === 1) {
+    return (
+      `\n\nRESPONDA AGORA A ESTA MENSAGEM DO HÓSPEDE:\n"${pendentes[0].slice(0, 600)}"\n` +
+      `Responda TUDO o que está nela — se traz duas perguntas, responda as duas. ` +
+      `E só isso: o que já foi respondido antes na conversa não se repete.`
+    );
+  }
+
+  // Varias mensagens seguidas sem resposta nossa: listar TODAS, numeradas.
+  // Numerada, nenhuma se perde no meio do paragrafo - foi exatamente assim que
+  // a pergunta do cancelamento ficou sem resposta em 15/10/2026.
+  const lista = pendentes.map((p, i) => `${i + 1}. "${p.slice(0, 300)}"`).join('\n');
   return (
-    `\n\nRESPONDA AGORA A ESTA MENSAGEM DO HÓSPEDE:\n"${ultima.slice(0, 600)}"\n` +
-    `Responda TUDO o que está nela — se traz duas perguntas, responda as duas. ` +
-    `E só isso: o que já foi respondido antes na conversa não se repete.`
+    `\n\nO HÓSPEDE MANDOU ${pendentes.length} MENSAGENS SEGUIDAS e nenhuma foi respondida ainda:\n${lista}\n` +
+    `Responda TODAS, uma por uma, sem pular nenhuma — inclusive as do meio, que são as que mais se perdem. ` +
+    `Se não souber alguma, diga que vai encaminhar aquele ponto à equipe, em vez de ignorá-lo. ` +
+    `Não repita o que já foi respondido antes na conversa.`
   );
 }
 
