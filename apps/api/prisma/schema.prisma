@@ -366,3 +366,30 @@ model Licao {
   @@index([hotelId, status])
   @@map("licoes")
 }
+
+/// Medicao do atendimento - NUNCA texto de conversa.
+///
+/// Ate 15/10/2026 os diagnosticos viviam so na memoria do servidor, e cada
+/// deploy apagava tudo. Como publico correcoes varias vezes por dia, eu
+/// estava medindo com uma regua que zera sozinha: nao dava para dizer se uma
+/// correcao melhorou alguma coisa.
+///
+/// O que entra aqui e so o PERCURSO: que tipo de decisao foi tomada, por qual
+/// canal, quanto tempo levou. Nada do que o hospede escreveu, nenhum nome,
+/// nenhum telefone.
+model Diagnostico {
+  id        String   @id @default(uuid())
+  /// "decisao" (caminho da extensao) ou "canal" (Instagram/Facebook/WhatsApp)
+  tipo      String
+  /// Motivo da decisao, com os numeros ja generalizados quando houver
+  motivo    String
+  canal     String?
+  /// Tempo total da etapa, em milissegundos
+  ms        Int?
+  /// Campos extras curtos (ex.: "formatos: N.pessoa"), nunca fala do hospede
+  detalhe   String?
+  createdAt DateTime @default(now())
+
+  @@index([tipo, createdAt])
+  @@map("diagnosticos")
+}

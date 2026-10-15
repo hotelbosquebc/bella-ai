@@ -3,6 +3,7 @@ import { Channel } from '@prisma/client';
 import { NormalizedInboundMessage } from './channel.types';
 import { BellaOrchestratorService } from '../bella/bella-orchestrator.service';
 import { ModelRouterService } from '../bella/model-router.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -18,6 +19,7 @@ export class ChannelsService {
   constructor(
     private readonly bella: BellaOrchestratorService,
     private readonly ai: ModelRouterService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -50,6 +52,20 @@ export class ChannelsService {
     ms?: number;
   }) {
     this.percurso.push({ quando: new Date().toISOString(), ...dados });
+    // Tambem no banco: a memoria some a cada deploy, e e por ela que eu
+    // acompanho a lentidao dos canais ao longo dos dias. Sem await, para o
+    // hospede nunca esperar por causa de um registro de diagnostico.
+    this.prisma.diagnostico
+      .create({
+        data: {
+          tipo: 'canal',
+          motivo: dados.respondeu ? 'respondeu' : String(dados.motivo || 'parou').replace(/[0-9]+/g, 'N').slice(0, 120),
+          canal: dados.canal,
+          ms: dados.ms ?? null,
+          detalhe: dados.tipo,
+        },
+      })
+      .catch(() => {});
     if (this.percurso.length > 50) this.percurso.shift();
   }
 

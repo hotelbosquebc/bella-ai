@@ -1749,7 +1749,34 @@ export class AssistController {
     semIA?: boolean;
   }[] = [];
 
+  /**
+   * Grava a medicao no banco, sem segurar a resposta ao hospede.
+   *
+   * Sem await de proposito: se o banco estiver lento ou fora, o hospede nao
+   * pode esperar por causa de um registro de diagnostico. O catch vazio e
+   * deliberado - perder uma medicao e aceitavel, atrasar um atendimento nao.
+   *
+   * Os numeros do motivo viram N para que "3 pessoas" e "8 pessoas" contem
+   * como o MESMO motivo na hora de somar; senao cada caso vira uma categoria
+   * e o agrupamento nao diz nada.
+   */
+  private gravarDiagnostico(tipo: string, motivo: string, extras: { canal?: string; ms?: number; detalhe?: string } = {}) {
+    const generico = String(motivo || '').replace(/\d+/g, 'N').slice(0, 120);
+    this.prisma.diagnostico
+      .create({
+        data: {
+          tipo,
+          motivo: generico,
+          canal: extras.canal ?? null,
+          ms: extras.ms ?? null,
+          detalhe: extras.detalhe ? String(extras.detalhe).slice(0, 180) : null,
+        },
+      })
+      .catch(() => {});
+  }
+
   private registrarDecisao(motivo: string, stay: any = {}) {
+    this.gravarDiagnostico('decisao', motivo);
     this.decisoesLink.push({
       quando: new Date().toISOString(),
       motivo,
@@ -2695,6 +2722,66 @@ ${url}`;
    *
    * Devolve apenas CONTAGENS. Nenhum texto de conversa sai daqui.
    */
+
+  /**
+   * O historico das medicoes, que sobrevive aos deploys.
+   *
+   * Os diagnosticos anteriores vivem na memoria do servidor e sao apagados a
+   * cada publicacao - e eu publico varias vezes por dia. Era uma regua que
+   * zerava sozinha: nao dava para dizer se uma correcao melhorou alguma
+   * coisa. Este le do banco.
+   *
+   * So contagem e tempo. Nenhum texto de conversa.
+   */
+  @Public()
+  @Get('diagnostico-historico')
+  async diagnosticoHistorico(@Query('dias') dias?: string) {
+    const janela = Math.min(Math.max(Number(dias) || 7, 1), 90);
+    const desde = new Date(Date.now() - janela * 24 * 60 * 60 * 1000);
+
+    const linhas = await this.prisma.diagnostico.findMany({
+      where: { createdAt: { gte: desde } },
+      select: { tipo: true, motivo: true, canal: true, ms: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+    });
+
+    const porMotivo: Record<string, number> = {};
+    const porDia: Record<string, { total: number; link: number }> = {};
+    const temposPorCanal: Record<string, number[]> = {};
+
+    for (const l of linhas) {
+      porMotivo[l.motivo] = (porMotivo[l.motivo] || 0) + 1;
+      const dia = l.createdAt.toISOString().slice(0, 10);
+      porDia[dia] = porDia[dia] || { total: 0, link: 0 };
+      if (l.tipo === 'decisao') {
+        porDia[dia].total++;
+        if (l.motivo.startsWith('link montado') || l.motivo.includes('um link para cada')) porDia[dia].link++;
+      }
+      if (l.ms && l.canal) (temposPorCanal[l.canal] = temposPorCanal[l.canal] || []).push(l.ms);
+    }
+
+    const mediana = (v: number[]) => {
+      if (!v.length) return null;
+      const s = [...v].sort((a, b) => a - b);
+      return s[Math.floor(s.length / 2)];
+    };
+
+    return {
+      janelaEmDias: janela,
+      registros: linhas.length,
+      // Quantas decisoes do dia terminaram em link - a meta principal, por dia.
+      porDia: Object.fromEntries(
+        Object.entries(porDia)
+          .sort()
+          .map(([d, v]) => [d, { decisoes: v.total, comLink: v.link, acerto: v.total ? Math.round((v.link / v.total) * 100) + '%' : '-' }]),
+      ),
+      motivosMaisComuns: Object.fromEntries(Object.entries(porMotivo).sort((a, b) => b[1] - a[1]).slice(0, 15)),
+      tempoPorCanal: Object.fromEntries(
+        Object.entries(temposPorCanal).map(([c, v]) => [c, { amostras: v.length, medianaMs: mediana(v), maximoMs: Math.max(...v) }]),
+      ),
+    };
+  }
   @Public()
   @Get('diagnostico-orcamento')
   async diagnosticoOrcamento(@Query('dias') dias?: string) {
