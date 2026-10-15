@@ -25,6 +25,33 @@ export class ChannelsService {
   }
 
   /**
+   * A mensagem foi mesmo para a NOSSA Pagina?
+   *
+   * O app da Meta pode ter mais de uma Pagina conectada - no Hotel do Bosque
+   * ha tambem a do NUT Restaurante, de outro portfolio, que o dono nem tem
+   * permissao para desvincular. Sem esta conferencia, uma mensagem enviada ao
+   * restaurante chegaria aqui e a Bella responderia como se fosse o hotel,
+   * falando de diarias e mandando link de reserva para quem perguntou de
+   * comida.
+   *
+   * Assinar o webhook so para a Pagina certa ja resolve - mas isso e
+   * configuracao, e configuracao se perde num clique. Esta trava fica no
+   * codigo.
+   *
+   * Sem FACEBOOK_PAGE_ID configurado nao filtramos nada: e melhor atender
+   * tudo do que, por falta de variavel, parar de atender em silencio.
+   */
+  private paginaCorreta(channel: Channel, entry: any, evento: any): boolean {
+    if (channel !== Channel.FACEBOOK) return true;
+    const nossa = process.env.FACEBOOK_PAGE_ID;
+    if (!nossa) return true;
+    const destino = String(evento?.recipient?.id ?? entry?.id ?? '');
+    if (!destino || destino === String(nossa)) return true;
+    this.logger.warn(`Mensagem ignorada: foi para a Pagina ${destino}, e a nossa e ${nossa}`);
+    return false;
+  }
+
+  /**
    * Webhook da Meta. Trata os DOIS formatos:
    *  - WhatsApp: entry[].changes[].value.messages[]  (remetente em msg.from)
    *  - Messenger/Instagram: entry[].messaging[]       (remetente em sender.id)
@@ -56,6 +83,7 @@ export class ChannelsService {
       // Formato Messenger / Instagram Direct (messaging)
       for (const event of entry.messaging ?? []) {
         if (!event.message || event.message.is_echo) continue; // ignora ecos do próprio bot
+        if (!this.paginaCorreta(channel, entry, event)) continue;
         await this.dispatch({
           hotelId: this.hotelId,
           channel,
