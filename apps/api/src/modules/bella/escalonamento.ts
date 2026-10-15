@@ -98,6 +98,17 @@ export function idiomaNaoAtendido(texto: string): string | null {
   return null;
 }
 
+/**
+ * O hospede PEDIU para falar com uma pessoa?
+ *
+ * Exportada sozinha porque os dois caminhos precisam dela: o automatico
+ * (canais) para escalar, e o da extensao para entregar o contato ao inves de
+ * seguir tentando resolver. Era so o caminho automatico que enxergava isso.
+ */
+export function hospedePediuAtendente(texto: string): boolean {
+  return PEDIU_HUMANO.some((r) => r.test(texto || ''));
+}
+
 export interface DadosDaDecisao {
   /** O que o hospede acabou de escrever. */
   falaDoHospede: string;

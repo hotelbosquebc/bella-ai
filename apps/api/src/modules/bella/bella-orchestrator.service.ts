@@ -6,6 +6,7 @@ import { MemoryService } from './memory.service';
 import { ModelRouterService } from './model-router.service';
 import { normalizar } from '../attachments/attachments.module';
 import { corrigirLinks, garantirLink } from '../../common/links';
+import { mensagemDeEntregaAoHumano } from '../../common/contato';
 import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -300,16 +301,9 @@ export class BellaOrchestratorService {
    * - Fora do expediente: informa o horário e orienta ligar para a recepção 24h.
    */
   private humanHandoffMessage(): string {
-    if (isWithinBusinessHours()) {
-      return 'Claro! Vou encaminhar você para um de nossos atendentes, que assumirá seu atendimento em instantes. 🌿';
-    }
-    return (
-      'No momento, nosso setor de reservas está fora do horário de atendimento ' +
-      '(segunda a sexta, das 9h às 12h e das 14h30 às 17h30). ' +
-      'Para falar agora com um atendente, ligue para nossa recepção no telefone (47) 3367-0211 — ' +
-      'temos um recepcionista pronto para ajudá-lo 24 horas por dia. ' +
-      'Se preferir, deixe sua mensagem por aqui que retornaremos no próximo horário de atendimento. 🌿'
-    );
+    // O texto vive em common/contato.ts: estava escrito a mao aqui e divergiu
+    // do atalho /dados que a recepcao manda (dizia 14h30, o certo e 14h).
+    return mensagemDeEntregaAoHumano(isWithinBusinessHours());
   }
 
   private async findOrCreateGuest(inbound: NormalizedInboundMessage) {

@@ -16,6 +16,8 @@ import { ReservationEngineService } from '../reservations/reservation-engine.ser
 import { SilbeckAvailabilityService } from '../reservations/silbeck-availability.service';
 
 import { corrigirLinks, garantirLink } from '../../common/links';
+import { blocoDeContato } from '../../common/contato';
+import { hospedePediuAtendente } from '../bella/escalonamento';
 // Reexportado para nao quebrar quem ja importava daqui (e os testes).
 export { corrigirLinks, garantirLink };
 
@@ -1113,6 +1115,7 @@ export function devePassarParaHumano(conversation: string): boolean {
   return tentativasDeEsclarecimento(conversation) >= 2;
 }
 
+
 /** O texto que manda a Bella entregar a conversa, respeitando o horario. */
 export function contextoDeEntregaAoHumano(dentroDoHorario: boolean): string {
   return (
@@ -1121,10 +1124,7 @@ export function contextoDeEntregaAoHumano(dentroDoHorario: boolean): string {
     `Reconheça, com simpatia e sem culpar ninguém, que é melhor alguém da equipe olhar o caso dele, ` +
     `e diga que está encaminhando para o nosso setor de reservas. NÃO envie link e NÃO tente adivinhar ` +
     `o que ele quis dizer.` +
-    (dentroDoHorario
-      ? ` O setor está atendendo AGORA: diga que um atendente assume em instantes.`
-      : ` O setor NÃO está atendendo agora: informe o horário de atendimento e ofereça a recepção 24h pelo telefone, ` +
-        `sem prometer retorno imediato.`)
+    blocoDeContato(dentroDoHorario)
   );
 }
 
@@ -1239,8 +1239,13 @@ export function marcasDeIdioma(texto: string): { pt: number; es: number; en: num
       /\bdisponibilidade\b/, /\bhosp[ée]d/, /\bobrigad/, /\bdi[áa]ria/,
       /\b(equipe|atendimento|feira|nossos?|nossas?|hor[á]rio|apartamentos?)\b/, /(^|[\s,.])[àé]([\s,.]|$)/,
     ],
-    // "ción" cobre disposición, habitación, información - o portugues faz "ção".
-    es: [/[¿¡ñ]/, /ci[óo]n\b/, /\b(hola|buenas|usted|ustedes|gracias|quedamos|enlace|ni[ñn]os?)\b/, /\bdisponibilidad\b/, /\bhabitaci/, /\bestad[íi]a\b/, /\ba su disposici/, /\bvalores y\b/],
+    // "estadia" e PORTUGUES e a Bella usa em quase toda resposta de orcamento
+    // ("para a sua estadia de 14 a 17"). Em espanhol a palavra leva acento:
+    // estadía. Aceitar as duas formas fazia toda resposta de orcamento marcar
+    // es=1 contra pt=2 e disparar uma REFACAO - uma segunda chamada de IA, de
+    // ~1,5s, em boa parte dos atendimentos, para "consertar" um texto que
+    // estava certo. Era a causa dos "[pt:2 es:1 en:0]" do diagnostico.
+    es: [/[¿¡ñ]/, /ci[óo]n\b/, /\b(hola|buenas|usted|ustedes|gracias|quedamos|enlace|ni[ñn]os?)\b/, /\bdisponibilidad\b/, /\bhabitaci/, /\bestadía\b/, /\ba su disposici/, /\bvalores y\b/],
     en: [/\bhello\b/, /\b(you|your)\b/, /\bavailability\b/, /\broom\b/, /\bplease\b/, /\brates\b/],
   };
   const conta = (lista: RegExp[]) => lista.filter((r) => r.test(t)).length;
@@ -2169,6 +2174,20 @@ export class AssistController {
         this.registrarDecisao(`${porCasais.length} casais: um apartamento duplo para cada`, stay);
       }
     }
+    // O hospede PEDIU uma pessoa - isso vem antes de qualquer outra coisa.
+    //
+    // Pedido do dono (15/10/2026). O caminho automatico ja escalava nesse caso;
+    // o da extensao nao enxergava, e a Bella seguia tentando resolver sozinha
+    // alguem que acabou de dizer que nao queria falar com ela.
+    if (hospedePediuAtendente(falasDoHospede)) {
+      this.registrarDecisao('hospede pediu atendente: entregar contato', stay);
+      return (
+        `\n\nO HÓSPEDE PEDIU PARA FALAR COM UMA PESSOA. NÃO insista, NÃO tente responder a dúvida ` +
+        `você mesma e NÃO envie link. Reconheça o pedido com simpatia e encaminhe.` +
+        blocoDeContato(isWithinBusinessHours())
+      );
+    }
+
     // Grupo e ocupacao impossivel — antes de montar qualquer link.
     //
     // Caso real: pedido para 30 pessoas gerou um link com "adultos=30" num
