@@ -175,7 +175,7 @@ const conhecimentos = [
   {
     title: 'Limpeza dos apartamentos',
     content:
-      'A limpeza é diária, das 8h às 15h. A louça é de responsabilidade do hóspede. A limpeza NÃO é realizada quando há pets ou hóspedes dentro do apartamento no momento.',
+      'A limpeza é DIÁRIA, das 8h às 15h, MAS só acontece quando o hóspede ENTREGA A CHAVE NA RECEPÇÃO ao sair. Essa condição é a parte mais importante da resposta e não pode ser omitida: quem não deixa a chave não tem o apartamento arrumado naquele dia, e descobrir isso no fim da tarde é motivo de reclamação. A limpeza também NÃO é feita quando há pets ou hóspedes dentro do apartamento no momento. A louça é de responsabilidade do hóspede. Independentemente da limpeza diária, as camareiras trocam a ROUPA DE CAMA a cada 3 dias e as TOALHAS quando o hóspede solicita ou quando as deixa no chão do banheiro. Se perguntarem só "a limpeza é todo dia?", responda que sim e explique a entrega da chave na mesma frase — a regra sem a condição induz ao erro.',
   },
   {
     title: 'Ingressos',
@@ -344,6 +344,14 @@ const respostasRapidas = [
  * e a Bella lendo os dois. Aqui os titulos aposentados sao removidos.
  */
 const TITULOS_OBSOLETOS = [
+  // A limpeza tinha DUAS entradas se contradizendo no banco (uma dizia "a cada
+  // 3 dias, chave na recepcao", outra "diaria das 8h as 15h"). O dono
+  // esclareceu em 15/10/2026: sao as duas coisas - diaria, MAS mediante
+  // entrega da chave; e a roupa de cama, essa sim, a cada 3 dias. A resposta
+  // unica ficou em "Limpeza dos apartamentos"; qualquer titulo antigo sai.
+  'Limpeza e arrumação',
+  'Limpeza do apartamento',
+  'Frequência de limpeza',
   // virou "Localização, praia e centro", agora com a avenida e o centro
   'Distância da praia',
 ];
