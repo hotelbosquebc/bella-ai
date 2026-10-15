@@ -203,6 +203,11 @@ const conhecimentos = [
       'O transfer é feito por uma agência parceira, pelo telefone +55 47 9634-2095. O hóspede fala diretamente com a agência.',
   },
   {
+    title: 'Diária: o que é e por que não conta da hora da chegada',
+    content:
+      'A diária do hotel vai das 14h de um dia até as 11h do dia seguinte. Pela Portaria nº 28/2025 do Ministério do Turismo (em vigor desde 16/12/2025), a diária corresponde a 24 horas, das quais até 3 horas podem ser usadas para a limpeza e a arrumação do apartamento — por isso o hóspede tem 21 horas de uso efetivo, das 14h às 11h, e o hotel cumpre integralmente a norma. DÚVIDA MUITO COMUM: quem chega tarde, à noite ou de madrugada, costuma achar que a diária conta 24 horas A PARTIR DA CHEGADA. Não é assim: quem entra às 23h30 tem a diária daquele dia, que encerra às 11h da manhã seguinte, e não às 23h30 do outro dia. Explique isso com naturalidade e sem soar burocrático — é o padrão da hotelaria, não uma regra do nosso hotel — e NÃO cite o número da portaria a menos que o hóspede pergunte da norma. Se ele precisar de mais tempo, ofereça o late check-out, lembrando que depende da disponibilidade do dia e que, para GARANTIR, só reservando uma diária adicional.',
+  },
+  {
     title: 'Early check-in e late check-out',
     content:
       'Ambos estão sujeitos à disponibilidade. Quando há disponibilidade no momento, não há custo. Mas para GARANTIR a entrada antecipada ou a saída tardia, só reservando uma diária completa adicional. Nunca prometa antecipação ou saída tardia como certa: dependem da ocupação no dia.',

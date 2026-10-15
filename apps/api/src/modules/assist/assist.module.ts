@@ -280,6 +280,50 @@ export function contextoDaPergunta(conversation: string): string {
 }
 
 /**
+ * O hospede fez uma PERGUNTA sobre como as coisas funcionam - nao pediu
+ * orcamento.
+ *
+ * Caso real (15/10/2026): "Vamos chegar por volta das 23:30. Seria uma estadia
+ * ate no outro dia as 23:30?" A palavra "estadia" fazia isso parecer pedido de
+ * orcamento; sem datas nem ocupacao, a Bella responderia PEDINDO periodo e
+ * quantidade de pessoas - quando o hospede queria saber como funciona a
+ * diaria. Foi o atendente que teve de explicar na mao.
+ *
+ * Tres condicoes juntas, porque qualquer uma sozinha erraria:
+ *
+ *  1. e pergunta (tem "?" ou comeca com palavra interrogativa);
+ *  2. NAO ha data nem quantidade de pessoas na fala - quem diz "10 a 15/11
+ *     para 2 pessoas, quanto fica?" esta pedindo orcamento, com interrogacao
+ *     e tudo;
+ *  3. o assunto e uma REGRA da casa (horario, diaria, check-in, pet, cafe...),
+ *     que e o que a base de conhecimento sabe responder.
+ */
+export function duvidaSobreRegra(falaDoHospede: string, temDados: boolean): boolean {
+  const t = semPrefixos(falaDoHospede || '').toLowerCase();
+  if (!t.trim() || temDados) return false;
+
+  const ehPergunta = /\?/.test(t) || /^\s*(qual|quais|como|quando|onde|quanto tempo|posso|pode|tem|voc[êe]s t[êe]m|at[ée] que horas|a partir de que horas)\b/i.test(t);
+  if (!ehPergunta) return false;
+
+  // Perguntou PREÇO? Entao e orcamento, por mais que fale de regra. "Quanto
+  // custa a estadia?" precisa continuar pedindo periodo e pessoas - se virasse
+  // duvida, a Bella responderia sobre a diaria e nunca mandaria o link.
+  if (/\b(quanto custa|quanto fica|quanto sai|qual o valor|valores|pre[çc]o|or[çc]amento|cota[çc][aã]o|tarifa)/i.test(t)) return false;
+
+
+  // Cada palavra traz a propria terminacao, inclusive o plural.
+  //
+  // Duas armadilhas aprendidas aqui: a borda final e (?![a-zà-ÿ]) e nao \b,
+  // porque "café" termina em acento e acento nao conta como letra para o \b do
+  // JavaScript; e os radicais precisam prever o plural, senao "berço" casa
+  // "berç" e o "o" seguinte derruba a borda. Sem borda nenhuma, "pet" casaria
+  // dentro de "petisco".
+  const assuntoDeRegra =
+    /\b(di[áa]rias?|estadias?|pernoites?|check-?ins?|check-?outs?|hor[áa]rios?|que horas|entradas?|sa[íi]das?|chegar|chegadas?|limpezas?|arruma[çc][aã]o|caf[ée]|wi-?fi|estacionamentos?|pets?|anima(?:l|is)|piscinas?|ber[çc]os?|crian[çc]as?|bagagens?|malas?|elevador(?:es)?|lavanderias?|cozinhas?|ferro|secador(?:es)?|cancelamentos?|pagamentos?|pix)(?![a-zà-ÿ])/i;
+  return assuntoDeRegra.test(t);
+}
+
+/**
  * Vale a pena gastar uma chamada de IA extraindo dados de estadia?
  *
  * Cada sugestao custava DUAS chamadas ao Gemini: uma para extrair datas e
@@ -1942,6 +1986,24 @@ export class AssistController {
         this.registrarDecisao('passou para humano: 2 pedidos de esclarecimento sem entender', stay);
         return contextoDeEntregaAoHumano(isWithinBusinessHours());
       }
+      // Pergunta sobre REGRA, sem data nem ocupacao: responda da base, nao peca
+      // os dados.
+      //
+      // Caso real (15/10/2026): "Vamos chegar por volta das 23:30. Seria uma
+      // estadia ate no outro dia as 23:30?" A palavra "estadia" fazia isso
+      // parecer pedido de orcamento e a Bella pediria periodo e quantidade de
+      // pessoas - quando o hospede queria entender como funciona a diaria.
+      // Quem explicou foi o atendente, na mao.
+      if (duvidaSobreRegra(falasDoHospede, false)) {
+        this.registrarDecisao('duvida sobre regra: responder da base, sem pedir dados', stay);
+        return (
+          `\n\nO HÓSPEDE FEZ UMA PERGUNTA sobre como as coisas funcionam, e NÃO pediu orçamento. ` +
+          `Responda a pergunta usando a base de conhecimento. NÃO peça período, quantidade de pessoas ` +
+          `nem idades, e NÃO mande link de reserva — ele não pediu valores. ` +
+          `Se depois ele quiser orçamento, aí sim você pede o que falta.`
+        );
+      }
+
       this.registrarDecisao('dados incompletos apesar de falar de estadia', stay);
       return (
         `\n\nSEM LINK NESTA MENSAGEM: não consegui montar o link porque falta dado do período ou da ocupação. ` +
