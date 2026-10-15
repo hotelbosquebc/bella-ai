@@ -2,7 +2,9 @@ import { Body, Controller, ForbiddenException, Get, Logger, Post, Query, UseGuar
 import { Channel } from '@prisma/client';
 import { ChannelsService } from './channels.service';
 import { Public } from '../auth/public.decorator';
+import { Privado } from '../auth/privado.decorator';
 import { MetaWebhookGuard } from './meta-webhook.guard';
+import { WhatsAppOnboardingService } from './whatsapp-onboarding.service';
 
 /**
  * Webhooks de entrada de cada canal. Cada handler normaliza o payload
@@ -14,7 +16,10 @@ import { MetaWebhookGuard } from './meta-webhook.guard';
 export class ChannelsController {
   private readonly logger = new Logger(ChannelsController.name);
 
-  constructor(private readonly channels: ChannelsService) {}
+  constructor(
+    private readonly channels: ChannelsService,
+    private readonly onboarding: WhatsAppOnboardingService,
+  ) {}
 
   /**
    * Verificacao do webhook, igual para os tres canais da Meta.
@@ -67,6 +72,19 @@ export class ChannelsController {
   @Get('diagnostico')
   diagnosticoCanais() {
     return { percurso: this.channels.percurso.slice(-30) };
+  }
+
+  /**
+   * Conclusao do Cadastro Incorporado (coexistencia).
+   *
+   * Recebe do painel o codigo de uso unico que a Meta devolveu e o troca por
+   * token - operacao que exige a chave secreta do app e por isso nao pode
+   * acontecer no navegador.
+   */
+  @Privado()
+  @Post('whatsapp/onboarding')
+  async whatsappOnboarding(@Body() body: { code: string; wabaId?: string; phoneNumberId?: string }) {
+    return this.onboarding.concluir(body);
   }
 
   @Get('whatsapp/status')
