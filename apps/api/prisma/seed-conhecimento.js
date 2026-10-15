@@ -213,6 +213,46 @@ const conhecimentos = [
       'Ambos estão sujeitos à disponibilidade. Quando há disponibilidade no momento, não há custo. Mas para GARANTIR a entrada antecipada ou a saída tardia, só reservando uma diária completa adicional. Nunca prometa antecipação ou saída tardia como certa: dependem da ocupação no dia.',
   },
   {
+    title: 'Nota fiscal',
+    content:
+      'O hotel emite nota fiscal. Ela é pedida na RECEPÇÃO, no momento do check-out. Se o hóspede perguntar antes da estadia, confirme que é possível e oriente a pedir na recepção ao sair. Não peça dados de faturamento pelo WhatsApp nem prometa envio por e-mail — quem trata disso é a recepção, na hora.',
+  },
+  {
+    title: 'Cofre no apartamento',
+    content:
+      'Os apartamentos NÃO possuem cofre. Responda com clareza e sem rodeios quando perguntarem, do mesmo jeito que fazemos com a piscina. Não sugira alternativas que o hotel não oferece (guarda de valores na recepção, por exemplo) — se o hóspede insistir no assunto, encaminhe para a recepção.',
+  },
+  {
+    title: 'Troca de roupa de cama e toalhas',
+    content:
+      'A roupa de cama é trocada A CADA 3 DIAS. As toalhas são trocadas QUANDO O HÓSPEDE SOLICITA ou quando ele as deixa no chão do banheiro — esse é o sinal combinado, e vale a pena explicar assim, porque é o que evita que ele fique esperando uma troca que não vem. Lembre, quando fizer sentido, que as toalhas de banho não podem sair do hotel e que não emprestamos toalhas de praia.',
+  },
+  {
+    title: 'Restaurante do hotel e refeições',
+    content:
+      'O hotel serve o CAFÉ DA MANHÃ (incluso na diária, das 7h às 10h, no restaurante do térreo) e, à NOITE, o restaurante funciona das 19h às 22h com panquecas e crepes gourmet. Fora esses dois horários não há refeição no hotel: não servimos almoço e NÃO temos serviço de quarto. Se o hóspede perguntar por almoço ou por comida fora desses horários, diga com naturalidade o que temos e, se ele quiser, fale das opções do entorno — o hotel fica no centro, com bastante coisa a pé. Nunca prometa cardápio, preço ou prato específico.',
+  },
+  {
+    title: 'Visitantes no apartamento',
+    content:
+      'Visitas são permitidas, com DUAS condições: a identificação na recepção é OBRIGATÓRIA, e a permanência é de no máximo 15 MINUTOS sem cobrança. Passando disso, há cobrança — NÃO informe valor nem condição: diga que acima de 15 minutos a recepção precisa avaliar, e encaminhe. Explique a regra com cordialidade, como procedimento de segurança do hotel e dos próprios hóspedes, e não como desconfiança.',
+  },
+  {
+    title: 'Caução e cobrança das diárias',
+    content:
+      'O hotel NÃO cobra caução nem depósito de segurança, e não bloqueia valor no cartão. As diárias são pagas INTEGRALMENTE no check-in, ou antecipadamente. Se o hóspede perguntar sobre caução, calção, depósito ou bloqueio no cartão, responda que não existe — é uma dúvida que costuma gerar receio, e a resposta tranquiliza. Sobre formas de pagamento e parcelamento, siga o que está na entrada de pagamento e encaminhe à equipe quando envolver negociação.',
+  },
+  {
+    title: 'Academia',
+    content:
+      'O hotel NÃO possui academia. Responda de forma clara e educada quando perguntarem, sem sugerir que há estrutura de ginástica e sem prometer parceria com academias da região.',
+  },
+  {
+    title: 'Day use',
+    content:
+      'O hotel NÃO trabalha com day use como padrão. Cada pedido é analisado CASO A CASO pela equipe. Isso significa que você NÃO pode aceitar, recusar, cotar nem prometer day use: diga que não é um serviço regular do hotel, que o pedido pode ser avaliado pela equipe de reservas, e encaminhe. Respeite o horário do setor: fora do expediente, informe o horário e ofereça a recepção 24h.',
+  },
+  {
     title: 'Normas da casa',
     content:
       'Regras da casa, que a Bella pode informar quando perguntarem: é PROIBIDO FUMAR no apartamento, inclusive na sacada. Não emprestamos toalhas de praia e não é permitido levar as toalhas de banho para fora do hotel. A chave deve ser deixada na recepção ao sair, e o fechamento da conta é feito na entrega da chave, com conferência do apartamento. Pessoas não hospedadas não podem entrar sem aviso prévio à recepção. Pedimos silêncio, principalmente após as 22h. A voltagem do hotel é 220V, há bebidas à venda na recepção e o ramal da recepção funciona 24h: basta discar 9. O hotel não se responsabiliza por objetos ou dinheiro deixados dentro dos apartamentos. SOBRE MULTAS: ao explicar qualquer uma dessas regras, diga apenas que o descumprimento PODE ACARRETAR MULTA — NUNCA informe valores de multa, mesmo que o hóspede insista. Se ele quiser saber o valor, encaminhe para a equipe.',
