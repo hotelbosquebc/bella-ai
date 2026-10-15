@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Channel } from '@prisma/client';
+import { dividirMensagem, LIMITE_POR_CANAL } from '../../common/dividir-mensagem';
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -14,7 +15,31 @@ const GRAPH_VERSION = 'v21.0';
 export class OutboundService {
   private readonly logger = new Logger(OutboundService.name);
 
+  /**
+   * Entrega ao hospede, respeitando o teto de tamanho do canal.
+   *
+   * O Instagram recusa mensagem acima de 1.000 bytes - e recusar significa que
+   * o hospede nao recebe NADA, nem um pedaco. Uma resposta de 6 apartamentos
+   * passa de 1.100 bytes. Entao dividimos antes de enviar, cortando onde faz
+   * sentido e sem nunca partir um link (partido, ele nao abre).
+   *
+   * Em ordem e parando no primeiro erro: nao adianta mandar a parte 3 se a 2
+   * falhou, o hospede leria a conversa fora de ordem.
+   */
   async send(channel: Channel, recipientExternalId: string, text: string): Promise<boolean> {
+    const limite = LIMITE_POR_CANAL[String(channel)];
+    const partes = limite ? dividirMensagem(text, limite) : [text];
+    if (partes.length > 1) {
+      this.logger.log(`Mensagem dividida em ${partes.length} partes para caber no limite de ${channel}`);
+    }
+    for (const parte of partes) {
+      const entregue = await this.enviarUma(channel, recipientExternalId, parte);
+      if (!entregue) return false;
+    }
+    return partes.length > 0;
+  }
+
+  private async enviarUma(channel: Channel, recipientExternalId: string, text: string): Promise<boolean> {
     switch (channel) {
       case Channel.WHATSAPP:
         return this.sendWhatsApp(recipientExternalId, text);
