@@ -17,6 +17,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { blocoDeContato } from '../../common/contato';
+import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
 import { hospedePediuAtendente } from '../bella/escalonamento';
 // Reexportado para nao quebrar quem ja importava daqui (e os testes).
 export { corrigirLinks, garantirLink };
@@ -3001,6 +3002,8 @@ ${url}`;
     };
 
     for (const l of linhas) {
+      // Mensagem automatica do hotel nao e correcao do atendente.
+      if (ehMensagemAutomatica(l.enviado)) continue;
       const s = l.sugestao || '';
       const e = l.enviado || '';
       if (temLink(e) && !temLink(s)) conta.acrescentouLink++;
@@ -3052,6 +3055,8 @@ ${url}`;
     };
 
     for (const l of linhas) {
+      // Mensagem automatica do hotel nao e correcao do atendente.
+      if (ehMensagemAutomatica(l.enviado)) continue;
       const s = temLink(l.sugestao);
       const e = temLink(l.enviado);
       if (s) placar.sugestaoComLink++;
@@ -3085,6 +3090,8 @@ ${url}`;
       aindaSemExplicacao: 0,
     };
     for (const l of linhas) {
+      // Mensagem automatica do hotel nao e correcao do atendente.
+      if (ehMensagemAutomatica(l.enviado)) continue;
       if (!(temLink(l.enviado) && !temLink(l.sugestao))) continue;
       const s = l.sugestao || '';
       if (pediuDados.test(s)) noLugarDoLink.pediuDadosQueTalvezJaTivesse++;
