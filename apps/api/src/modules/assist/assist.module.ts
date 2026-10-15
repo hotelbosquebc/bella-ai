@@ -606,7 +606,12 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   // pode conter digito - assim tres datas soltas na conversa nao viram um
   // intervalo inventado.
   if (!brutos.length) {
-    const rDuasDatas = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b[^\d\n]{1,25}\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+    // O que separa as duas datas pode incluir a QUEBRA DE LINHA: no WhatsApp
+    // as pessoas mandam "Entrada 15/10/26" e "Saida 16/10/26" em mensagens
+    // separadas. Antes exigiamos tudo na mesma linha e o periodo nao era lido.
+    // O limite de 25 caracteres continua impedindo que duas datas distantes na
+    // conversa sejam coladas num intervalo que ninguem pediu.
+    const rDuasDatas = /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b[^\d]{1,25}\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
     while ((m = rDuasDatas.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
   }
 
@@ -1005,6 +1010,32 @@ export function adultosDeFrase(texto: string): number | null {
 }
 
 /**
+ * Idades que vieram em linhas separadas da palavra "crianca".
+ *
+ * Caso real (16/10/2026): "2 crianças" numa mensagem, "Uma de 10" na seguinte
+ * e "Uma de 12" na outra. A leitura de idade olhava uma linha por vez e
+ * precisava da palavra "crianca" junto do numero - entao nao via nada, e a
+ * Bella pediu as idades que a hospede acabara de dar.
+ *
+ * O formato aceito e estreito de proposito: "<quantidade> de <idade>", com a
+ * idade ate 17. "1 de 10" e uma crianca de 10 anos; "4 pessoas" nao casa,
+ * porque nao tem o "de"; e uma linha com um numero solto tambem nao casa, para
+ * nao transformar a resposta "4" de outra pergunta em idade.
+ */
+export function idadesEmLinhaSeparada(texto: string): number[] {
+  const idades: number[] = [];
+  for (const linha of semPrefixos(texto || '').split(/\r?\n/)) {
+    const m = linha.trim().match(/^(\d{1,2})\s+de\s+(\d{1,2})\s*(?:anos?)?$/i);
+    if (!m) continue;
+    const quantas = Number(m[1]);
+    const idade = Number(m[2]);
+    if (quantas < 1 || quantas > 9 || idade > 17) continue;
+    for (let k = 0; k < quantas; k++) idades.push(idade);
+  }
+  return idades;
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -1060,6 +1091,9 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
       if (curtas) idades.push(...curtas);
     }
   }
+  // Idades que vieram em mensagens separadas ("2 crianças" / "1 de 10").
+  if (falaDeCrianca) idades.push(...idadesEmLinhaSeparada(t));
+
   if (!idades.length) return null;
 
   return { adultos: adultosDeclarados, idades };
@@ -1176,6 +1210,10 @@ export function criancaSemIdade(falasDoHospede: string): boolean {
   if (/\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(t)) return false;
   // "2 crianças (3/9)": a idade ESTA dita, so nao com a palavra "anos". Sem
   // isto a Bella pedia de volta a idade que a hospede acabara de escrever.
+  // "2 crianças" numa mensagem e "1 de 10" na seguinte: a idade ESTA dita, so
+  // que em outra linha. Sem isto a ocupacao sai certa e a Bella pede a idade
+  // assim mesmo - o link fica preso por um dado que ela ja tem.
+  if (idadesEmLinhaSeparada(t).length) return false;
   return !t.split(/\r?\n/).some((linha) => idadesSemAPalavraAnos(linha));
 }
 
