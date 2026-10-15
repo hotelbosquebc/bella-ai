@@ -398,3 +398,56 @@ construir.
 ### 3. "mais alguns detalhes" — ele disse que lembrará depois
 
 Perguntar quando retomarmos.
+
+---
+
+## INTEGRAÇÃO META — estado em 15/10/2026
+
+**Empresa:** RS HOTELARIA LTDA (nome fantasia Hotel do Bosque), CNPJ
+58.003.665/0001-39, Av. Brasil 22, Centro, Balneário Camboriú/SC.
+Natureza jurídica 206-2 (Sociedade Empresária Limitada) = "Empresa privada"
+no formulário da Meta.
+
+**App:** `Bella – Hotel do Bosque` — ID `2215365896075704`, tipo Empresa,
+**modo desenvolvimento**.
+
+**Portfólio do app:** `178424846189517` (o que tem a Página e o Instagram).
+
+⚠️ **Existe um SEGUNDO portfólio** `307228995768274`, também chamado "Hotel do
+Bosque", e é nele que está a **Conta do WhatsApp**. Os ativos estão divididos.
+Depois de tudo no ar, consolidar num só — ter Página num e WhatsApp noutro vai
+atrapalhar a cada permissão nova.
+
+**Página do Facebook:** `468053440611433`.
+
+⚠️ A Página do **NUT Restaurante** (`102729104999214`) também está conectada ao
+app e o dono **não tem permissão** para removê-la. A proteção está no código
+(`paginaCorreta()` em channels.service.ts): mensagem endereçada a outra Página
+é ignorada.
+
+**No ar (modo desenvolvimento):**
+- Messenger: webhook + campo `messages` assinados, Bella respondendo sozinha.
+- Instagram: idem, pelo caminho clássico (Página), não pela API nova de
+  "login da empresa no Instagram" — nosso código não fala aquela língua.
+- Primeiras medições: Facebook 10,1s | Instagram 5,1s e 11,9s. **Lento** perto
+  da extensão (1,3–2,5s). Falta instrumentar por etapa antes de otimizar.
+
+**Variáveis no Render:** META_APP_SECRET, META_WEBHOOK_VERIFY_TOKEN
+(`bosque-bella-2026`), FACEBOOK_PAGE_ACCESS_TOKEN, FACEBOOK_PAGE_ID,
+INSTAGRAM_PAGE_ACCESS_TOKEN, API_PUBLIC_URL.
+
+**Verificação do negócio:** ENVIADA em 15/10/2026, "Em análise" (~2 dias úteis).
+
+**Fila depois dela:**
+1. Verificação de acesso → **Provedor de Tecnologia** (requisito da coexistência)
+2. Análise do app (`pages_messaging`, `instagram_manage_messages`) para sair do
+   modo desenvolvimento e atender o público
+3. Preencher no app: **URL da Política de Privacidade** (não existe no site — eu
+   escrevo) e **Domínios do aplicativo** (`bella-ai-web.vercel.app`, exigido pelo
+   Cadastro Incorporado)
+4. Coexistência do WhatsApp pela tela `/whatsapp` do painel
+5. Token permanente de **Usuário de Sistema** (o da Meta expira em ~60 dias)
+6. Modelos de mensagem aprovados para o follow-up fora da janela de 24h
+
+⚠️ **Autenticação de dois fatores está em "Ninguém"** nos dois portfólios. Esse
+portfólio controla Página, Instagram e em breve o WhatsApp do hotel.
