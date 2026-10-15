@@ -20,6 +20,39 @@ export class ChannelsService {
     private readonly ai: ModelRouterService,
   ) {}
 
+  /**
+   * As ultimas mensagens que chegaram pelos canais - sem o texto delas.
+   *
+   * O caminho dos canais (Meta -> webhook -> Bella -> resposta) e novo e eu
+   * nao tinha NENHUMA visibilidade sobre ele: se o hospede escrevesse na
+   * Pagina e nada acontecesse, a unica saida era adivinhar. Aqui fica o
+   * registro do percurso: chegou, de qual canal, quanto tempo levou, se a
+   * Bella respondeu ou se parou antes - e por que.
+   *
+   * Nada do que o hospede escreveu entra aqui, nem quem ele e. So o caminho.
+   */
+  readonly percurso: {
+    quando: string;
+    canal: string;
+    tipo: string;
+    caracteres: number;
+    respondeu: boolean;
+    motivo?: string;
+    ms?: number;
+  }[] = [];
+
+  registrarPercurso(dados: {
+    canal: string;
+    tipo: string;
+    caracteres: number;
+    respondeu: boolean;
+    motivo?: string;
+    ms?: number;
+  }) {
+    this.percurso.push({ quando: new Date().toISOString(), ...dados });
+    if (this.percurso.length > 50) this.percurso.shift();
+  }
+
   private get hotelId() {
     return process.env.DEFAULT_HOTEL_ID ?? 'hotel-do-bosque';
   }
@@ -190,17 +223,40 @@ export class ChannelsService {
   }
 
   private async dispatch(message: NormalizedInboundMessage): Promise<void> {
+    const t0 = Date.now();
     if (!message.senderExternalId || !message.content) {
       this.logger.debug(`Evento ${message.channel} ignorado (sem remetente ou conteúdo)`);
+      this.registrarPercurso({
+        canal: String(message.channel),
+        tipo: message.contentType,
+        caracteres: (message.content || '').length,
+        respondeu: false,
+        motivo: !message.senderExternalId ? 'sem remetente' : 'sem conteudo',
+      });
       return;
     }
     this.logger.log(`Mensagem recebida via ${message.channel} de ${message.senderExternalId}`);
     try {
       // TODO: publicar em RabbitMQ (inbound.messages) e consumir no orquestrador
       await this.bella.handleInbound(message);
+      this.registrarPercurso({
+        canal: String(message.channel),
+        tipo: message.contentType,
+        caracteres: message.content.length,
+        respondeu: true,
+        ms: Date.now() - t0,
+      });
     } catch (err) {
       // Webhook nunca deve falhar para o provedor (a Meta/Telegram desativam endpoints com erro)
       this.logger.error(`Falha ao processar mensagem de ${message.senderExternalId}`, err instanceof Error ? err.stack : String(err));
+      this.registrarPercurso({
+        canal: String(message.channel),
+        tipo: message.contentType,
+        caracteres: message.content.length,
+        respondeu: false,
+        motivo: 'erro: ' + (err instanceof Error ? err.message : String(err)).slice(0, 80),
+        ms: Date.now() - t0,
+      });
     }
   }
 
