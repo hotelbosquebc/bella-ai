@@ -302,7 +302,7 @@ export class BellaOrchestratorService {
    */
   private humanHandoffMessage(): string {
     // O texto vive em common/contato.ts: estava escrito a mao aqui e divergiu
-    // do atalho /dados que a recepcao manda (dizia 14h30, o certo e 14h).
+    // do atalho /dados que a recepcao manda. O dono confirmou: 9h-12h30, 14h30-17h30.
     return mensagemDeEntregaAoHumano(isWithinBusinessHours());
   }
 

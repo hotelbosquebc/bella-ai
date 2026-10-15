@@ -2,9 +2,9 @@
  * Os dados de contato do hotel, num lugar so.
  *
  * Estavam escritos a mao em cada caminho, e divergiram: a mensagem dos canais
- * dizia que o setor atende "das 14h30 as 17h30", enquanto o atalho /dados que a
- * recepcao manda todo dia diz "das 14h as 17h30". Meia hora de diferenca indo
- * para o hospede, dependendo de por onde ele escreveu.
+ * dizia uma coisa, o atalho /dados que a recepcao manda outra, e o codigo que
+ * DECIDE o expediente uma terceira. O dono confirmou em 15/10/2026: 9h-12h30 e
+ * 14h30-17h30. Agora todos leem daqui.
  *
  * Pedido do dono (15/10/2026): quando o hospede quiser falar com uma pessoa, a
  * Bella deve informar o HORARIO e o TELEFONE FIXO. Vira texto pronto, e nao
@@ -12,7 +12,7 @@
  * aparecia quando o modelo resolvia busca-lo. Mesma licao do link e do preco.
  */
 export const TELEFONE_RECEPCAO = '(47) 3367-0211';
-export const HORARIO_RESERVAS = 'segunda a sexta, das 9h às 12h e das 14h às 17h30 (exceto feriados)';
+export const HORARIO_RESERVAS = 'segunda a sexta, das 9h às 12h30 e das 14h30 às 17h30 (exceto feriados)';
 
 /** Instrucao para o modelo incluir contato na entrega ao humano. */
 export function blocoDeContato(dentroDoHorario: boolean): string {

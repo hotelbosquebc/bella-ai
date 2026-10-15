@@ -70,7 +70,7 @@ const conhecimentos = [
   {
     title: 'Horário do setor de reservas',
     content:
-      'O setor de reservas atende das 9h às 12h e das 14h30 às 17h30. Fora desse horário a solicitação é registrada e respondida no próximo horário de atendimento.',
+      'O setor de reservas atende das 9h às 12h30 e das 14h30 às 17h30. Fora desse horário a solicitação é registrada e respondida no próximo horário de atendimento.',
   },
   {
     title: 'Formas e condições de pagamento',
