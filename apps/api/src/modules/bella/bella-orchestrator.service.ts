@@ -5,6 +5,7 @@ import { NormalizedInboundMessage } from '../channels/channel.types';
 import { MemoryService } from './memory.service';
 import { ModelRouterService } from './model-router.service';
 import { normalizar } from '../attachments/attachments.module';
+import { corrigirLinks, garantirLink } from '../../common/links';
 import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -148,6 +149,24 @@ export class BellaOrchestratorService {
       temperature: settings?.temperature ?? 0.7,
     });
 
+
+    // O link que sai TEM de ser o nosso.
+    //
+    // Primeiro teste real pelo Messenger (15/10/2026): o servidor montou o
+    // link certo e o modelo o reescreveu num formato mais curto e inventado,
+    // que nao leva a lugar nenhum. A extensao ja tinha essa trava; este
+    // caminho, nao. Agora os dois usam a mesma.
+    //
+    // Os enderecos oficiais sao os que o motor de reservas colocou no
+    // contexto - nunca os que o modelo escreveu.
+    const linksOficiais = (bookingContext.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
+    if (draft.text && linksOficiais.length) {
+      const corrigido = garantirLink(corrigirLinks(draft.text, linksOficiais), linksOficiais);
+      if (corrigido !== draft.text) {
+        this.logger.warn('Link da resposta foi corrigido para o endereco oficial');
+        draft.text = corrigido;
+      }
+    }
     // 9. Validação anti-prejuízo
     const verdict = this.guardrails.evaluate({
       intent,
