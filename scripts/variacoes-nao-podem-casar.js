@@ -1,13 +1,8 @@
-const fs = require('fs'), path = require('path');
-const ts = require(path.join(process.cwd(), 'node_modules/typescript'));
-let src = fs.readFileSync('apps/api/src/modules/assist/assist.module.ts', 'utf8');
-const corte = src.search(/^@(Controller|Module|Injectable)/m);
-if (corte > 0) src = src.slice(0, corte);
-src = src.replace(/^import .*$/gm, '');
-const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
-const mod = { exports: {} };
-new Function('exports', 'module', 'require', js)(mod.exports, mod, require);
-const M = mod.exports;
+const { carregar } = require('./carregar-funcoes.js');
+
+// As funcoes puras do modulo de atendimento, com as dependencias de
+// common/ resolvidas - sem Nest, sem Prisma, sem banco.
+const M = carregar('apps/api/src/modules/assist/assist.module.ts');
 const HOJE = new Date('2026-10-14T12:00:00');
 
 let falhas = 0;
