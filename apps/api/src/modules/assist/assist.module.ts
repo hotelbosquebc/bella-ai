@@ -2817,23 +2817,36 @@ ${url}`;
 
     // A conta que responde "ela esta falhando?": entre as conversas que
     // TERMINARAM com link indo ao hospede, em quantas ela entregou sozinha.
-    // O que ela disse NO LUGAR do link?
+    // O que ela disse no lugar do link, em mais detalhe.
     //
-    // Saber que falha em 62% nao diz o que consertar. Se a maioria das vezes
-    // ela PEDIU os dados - periodo, pessoas, idades - entao o problema e a
-    // LEITURA do que o hospede escreveu, e nao a inteligencia do modelo: ela
-    // perguntou o que ja estava na tela. Essa e a hipotese que este numero
-    // confirma ou derruba.
+    // A primeira medicao dividiu em "pediu dados" / "prometeu" / "outra
+    // coisa", e "outra coisa" ficou com 43 de 76 - ou seja, a maior parte da
+    // falha estava num balde sem nome. Consertar sem saber o que ha ali seria
+    // chute. Estas categorias nasceram dessa duvida.
     //
-    // Classificacao so do texto DELA. Nada do hospede entra aqui.
+    // Continua sendo so o texto DELA, e so contagem.
     const pediuDados = /me informe|por gentileza|quantidade total de pessoas|per[íi]odo da estadia|informar as idades|quantas pessoas/i;
     const prometeu = /vou verificar|retorno|aguarde|em breve|consultar/i;
-    const noLugarDoLink = { pediuDadosQueTalvezJaTivesse: 0, prometeuRetorno: 0, outraCoisa: 0 };
+    const respondeuDuvida = /caf[ée]|wi-?fi|estacionamento|pet|animal|check-?in|check-?out|piscina|praia|ar-condicionado|estrutura|quarto/i;
+    const soSaudacao = /^[^.!?\n]{0,120}(bem-?vindo|boa tarde|bom dia|boa noite|ol[áa])[^.!?\n]{0,120}$/i;
+    const passouParaHumano = /equipe de reservas|especialista|encaminh|atendente/i;
+    const noLugarDoLink = {
+      pediuDadosQueTalvezJaTivesse: 0,
+      prometeuRetorno: 0,
+      respondeuOutraDuvida: 0,
+      soCumprimentou: 0,
+      encaminhouParaEquipe: 0,
+      aindaSemExplicacao: 0,
+    };
     for (const l of linhas) {
       if (!(temLink(l.enviado) && !temLink(l.sugestao))) continue;
-      if (pediuDados.test(l.sugestao)) noLugarDoLink.pediuDadosQueTalvezJaTivesse++;
-      else if (prometeu.test(l.sugestao)) noLugarDoLink.prometeuRetorno++;
-      else noLugarDoLink.outraCoisa++;
+      const s = l.sugestao || '';
+      if (pediuDados.test(s)) noLugarDoLink.pediuDadosQueTalvezJaTivesse++;
+      else if (passouParaHumano.test(s)) noLugarDoLink.encaminhouParaEquipe++;
+      else if (prometeu.test(s)) noLugarDoLink.prometeuRetorno++;
+      else if (respondeuDuvida.test(s)) noLugarDoLink.respondeuOutraDuvida++;
+      else if (soSaudacao.test(s.trim())) noLugarDoLink.soCumprimentou++;
+      else noLugarDoLink.aindaSemExplicacao++;
     }
     const comLinkNoFim = placar.enviadoComLink;
     const acerto = comLinkNoFim ? Math.round(((comLinkNoFim - placar.atendentePosOLinkNaMao) / comLinkNoFim) * 100) : null;
