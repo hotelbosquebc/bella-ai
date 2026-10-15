@@ -1994,7 +1994,7 @@ export class AssistController {
       // parecer pedido de orcamento e a Bella pediria periodo e quantidade de
       // pessoas - quando o hospede queria entender como funciona a diaria.
       // Quem explicou foi o atendente, na mao.
-      if (duvidaSobreRegra(falasDoHospede, false)) {
+      if (duvidaSobreRegra(falasParaTriagem, false)) {
         this.registrarDecisao('duvida sobre regra: responder da base, sem pedir dados', stay);
         return (
           `\n\nO HÓSPEDE FEZ UMA PERGUNTA sobre como as coisas funcionam, e NÃO pediu orçamento. ` +
