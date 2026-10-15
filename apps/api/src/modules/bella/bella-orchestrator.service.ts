@@ -7,6 +7,7 @@ import { ModelRouterService } from './model-router.service';
 import { normalizar } from '../attachments/attachments.module';
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { mensagemDeEntregaAoHumano } from '../../common/contato';
+import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -166,6 +167,19 @@ export class BellaOrchestratorService {
       if (corrigido !== draft.text) {
         this.logger.warn('Link da resposta foi corrigido para o endereco oficial');
         draft.text = corrigido;
+      }
+    }
+
+    // Nao garantir vaga que ninguem consultou.
+    //
+    // checkAvailability() neste caminho e um esqueleto que devolve sempre
+    // "tem vaga". O link do motor mostra a disponibilidade de verdade, entao
+    // a resposta certa e mandar o link - nunca afirmar que ha apartamento.
+    if (draft.text) {
+      const semGarantia = semGarantiaDeVaga(draft.text, false);
+      if (semGarantia !== draft.text) {
+        this.logger.warn('Resposta afirmava disponibilidade sem consulta - frase removida');
+        draft.text = semGarantia;
       }
     }
     // 9. Validação anti-prejuízo
