@@ -918,8 +918,12 @@ export function adultosDeCasal(texto: string): number | null {
  * principal.
  */
 export function idadesSemAPalavraAnos(linha: string): number[] | null {
+  // O PONTO entra como separador: "4 niños (9.9.10.10)" sao quatro criancas
+  // de 9, 9, 10 e 10 anos - formato de uma hospede argentina em 16/10/2026.
+  // A guarda da quantidade protege o resto: em "2 crianças, custa 1.500" os
+  // numeros lidos seriam 1 e 500, e 500 nao e idade de crianca.
   const m = (linha || '').match(
-    /(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores?|ni[ñn][oa]s?|kids?|children)\b[^\d\n]{0,14}(\d{1,2}(?:\s*(?:[\/,;e-]|y|and)\s*\d{1,2})*)/i,
+    /(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores?|ni[ñn][oa]s?|kids?|children)\b[^\d\n]{0,14}(\d{1,2}(?:\s*(?:[\/,;.e-]|y|and)\s*\d{1,2})*)/i,
   );
   if (!m) return null;
 
@@ -927,7 +931,7 @@ export function idadesSemAPalavraAnos(linha: string): number[] | null {
   if (!quantas || quantas > 10) return null;
 
   const numeros = m[2]
-    .split(/\s*(?:[\/,;-]|\be\b|\by\b|\band\b)\s*/i)
+    .split(/\s*(?:[\/,;.-]|\be\b|\by\b|\band\b)\s*/i)
     .map((x) => x.trim())
     .filter((x) => /^\d{1,2}$/.test(x))
     .map(Number);
