@@ -525,3 +525,42 @@ disparo na Etapa 1 e esperar mais.
 
 ⚠️ Um token temporário do número de teste apareceu num print durante a sessão e
 foi regenerado em seguida. Não reaproveitar prints antigos dessa tela.
+
+---
+
+## Segurança dos portfólios — faxina de 16/10/2026
+
+**Correção:** a verificação do negócio foi aprovada em **15/10/2026** (a tela da
+Central de Segurança mostra "Verificada originalmente em Oct 15, 2026"), não 17.
+
+**2FA ativada** na conta do dono (Victor Bosque) por app de autenticação, com
+códigos de recuperação impressos. Exigência ligada nos dois portfólios:
+`178424846189517` em "Somente administradores", `307228995768274` em "Todos",
+nenhuma pessoa pendente.
+
+**Acessos removidos do portfólio `178424846189517`:**
+- Convite pendente de `victor.ras@hotmail.com` (acesso total + Finanças, nunca
+  aceito) — cancelado.
+- Conta "Bosque Apart H. Balneário Camboriú" (acesso total, inativa, sem 2FA,
+  e que **podia excluir o portfólio**) — removida. Os ativos pertencem ao
+  portfólio, não a ela, então nada se perdeu.
+
+Sobraram duas contas, ambas do dono e ambas com 2FA: Victor Bosque e
+Hotel do Bosque (@hotelbosquebc).
+
+**O "administrador antigo da agência" era alarme falso.** Nenhuma agência tem
+acesso aos ativos do hotel: zero parceiros no portfólio e zero na Página. O que
+existia era o inverso — a conta do dono aparece como pessoa de **acesso básico,
+sem nenhum ativo atribuído**, dentro do portfólio `439185823713823`
+("Fiama.MK", de terceiro). Ele não consegue se auto-remover com acesso básico;
+só a dona do portfólio pode retirá-lo. "Viral Marketing Digital" é do próprio
+dono.
+
+⚠️ **O dono decidiu NÃO ter um segundo administrador** no portfólio do WhatsApp
+(`307228995768274`). Lá ele é a única pessoa: se a conta dele cair, os códigos
+de recuperação impressos são a única saída. Decisão informada, não repropor.
+
+⚠️ **O portfólio do WhatsApp NÃO é verificado** ("Qualificada para verificação").
+O verificado é o `178424846189517`. Como a conta do WhatsApp está no não
+verificado, isso tende a bloquear a produção/coexistência — é o mesmo problema
+de "ativos divididos" já anotado acima, agora com consequência concreta.
