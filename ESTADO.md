@@ -451,3 +451,77 @@ INSTAGRAM_PAGE_ACCESS_TOKEN, API_PUBLIC_URL.
 
 ⚠️ **Autenticação de dois fatores está em "Ninguém"** nos dois portfólios. Esse
 portfólio controla Página, Instagram e em breve o WhatsApp do hotel.
+
+---
+
+## Análise do App — estado em 16/10/2026
+
+**Verificação do negócio: APROVADA** em 17/10 (portfólio `178424846189517`,
+"Verificado"). Destravou a trilha de Provedor de Tecnologia.
+
+**Caminho escolhido:** Provedor de Tecnologia **independente** (não Parceiro de
+Soluções). Na pergunta da Meta "você está criando uma integração para vários
+clientes empresariais?" respondemos **Sim** — é isso que permite a coexistência
+do número. "Em nome de um cliente individual" jogaria o app para a trilha
+simples, sem coexistência.
+
+**Configurações básicas do app — preenchidas e conferidas após recarregar:**
+- Ícone 1024×1024 (logo HB fundo verde) ✔
+- URL da Política de Privacidade: `https://bella-ai-web.vercel.app/privacidade` ✔
+  (página pública nova em `apps/web/app/privacidade/page.tsx`, fora do grupo
+  `(app)` justamente para o revisor abrir sem login)
+- Categoria: Negócio e Páginas ✔
+- Domínios do aplicativo: `bella-ai-web.vercel.app` ✔
+
+⚠️ O upload do ícone **recarrega o formulário e apaga o que estiver digitado e
+não salvo**. Subir o ícone primeiro, depois preencher o resto.
+
+**Pedido de análise** (`submission_id=2216495959296031`), permissões
+`whatsapp_business_messaging` e `whatsapp_business_management`:
+
+| Seção | Estado |
+|---|---|
+| Verificação | ✅ |
+| Configurações do app | ✅ |
+| Tratamento de dados | ✅ |
+| Uso permitido | ⭕ só falta o contador de API |
+
+**Vídeos gravados** (PowerPoint → Inserir → Gravação de Tela; o Game Bar está
+desligado nesta máquina e só grava uma janela, não serve):
+- `video1-envio.mp4` — painel da Meta disparando e WhatsApp Web recebendo, lado
+  a lado numa gravação só.
+- `video2-modelo.mp4` — criação do modelo `confirmacao_de_contato` no WhatsApp
+  Manager.
+- O PowerPoint salva a apresentação, não o vídeo. O .mp4 está dentro do .pptx
+  (é um zip, em `ppt/media/`) — dá para extrair com System.IO.Compression.
+
+⚠️ **Não usar a sugestão de texto da IA da Meta**: ela afirmava que a plataforma
+"já integrou vários hotéis" e que eles "relataram aumento de satisfação". É
+falso. As descrições foram escritas à mão, dizendo que o Hotel do Bosque é hoje
+o único cliente.
+
+**Tratamento de dados — o que foi declarado:**
+- Operadores: Google LLC (Gemini API), Render Services, Supabase, Vercel — todos
+  "TI e nuvem", processando nos **Estados Unidos** (Render em Virginia pelo
+  `render.yaml`; Supabase em "leste-americano-2").
+- Responsável pelos dados: RS HOTELARIA LTDA, Brasil.
+- Pedidos de autoridades públicas nos últimos 12 meses: Não.
+- Prática assumida: apenas "análise obrigatória sobre a legitimidade das
+  solicitações" (decisão do dono — as outras três ele não quis assumir).
+
+**O bloqueio:** `0 de 1 chamada(s) de API obrigatória(s)` nas duas permissões.
+As chamadas de teste foram feitas em 16/10 às 13:54 e 14:01 (número de teste
+`+1 555 661-0396`, Phone Number ID `1433149153207724`, WABA de teste
+`1444894994490937`). A Meta avisa que os dados de teste levam **até 24 horas**
+para aparecer no formulário. Enquanto estiver em zero, "Enviar para análise"
+fica cinza.
+
+**Próximo passo (a partir de 17/10):** abrir o pedido, conferir se o contador
+virou e clicar em **Enviar para análise**. Se ainda estiver zerado, repetir o
+disparo na Etapa 1 e esperar mais.
+
+**Modelos criados na WABA de teste:** `recebemos_sua_mensagem` e
+`confirmacao_de_contato` (ambos Utilidade, pt-BR, em análise).
+
+⚠️ Um token temporário do número de teste apareceu num print durante a sessão e
+foi regenerado em seguida. Não reaproveitar prints antigos dessa tela.
