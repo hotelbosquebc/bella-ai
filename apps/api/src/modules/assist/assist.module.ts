@@ -684,7 +684,17 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   // cola no comeco da proxima.
   const semPref = semPrefixos(t);
   const mAdultos = semPref.match(/\b(\d{1,2})[ \t]*adultos?\b/i);
-  const mPessoas = semPref.match(/\b(\d{1,2})[ \t]*(?:pessoas?|hóspedes?|hospedes?)\b/i);
+  // Alem de "pessoas" e "hospedes", as palavras com que o hospede realmente diz
+  // quem sao. Caso real (16/10/2026): "Entrada 17/10 Saida 20/10 / 3 homens" -
+  // o periodo foi lido, "3 homens" nao, e a Bella nao montou o link.
+  // So entram palavras que designam ADULTO: "meninos", "garotas" e afins ficam
+  // de fora de proposito, porque mudam a tarifa e quem decide e a IA.
+  // Sem \b no fim: depois de letra acentuada ("moças") ele nao casa.
+  const mPessoas = semPref.match(
+    // Plural e singular escritos por extenso onde o "s?" nao resolve:
+    // "homens?" casaria "homen", nunca "homem".
+    /\b(\d{1,2})[ \t]*(?:pessoas?|hóspedes?|hospedes?|homens|homem|mulheres|mulher|rapazes|rapaz|moças?|mocas?|amigos?|amigas?|colegas?|senhores|senhor|senhoras?)(?![a-zà-ÿ])/i,
+  );
   const temCrianca = PALAVRA_DE_CRIANCA.test(semPref);
 
   let adultos: number | null = null;

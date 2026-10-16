@@ -23,6 +23,10 @@ const PESSOAS = [
   '2 pessoas', '2 hospedes', '2 hóspedes', 'somos 2', 'seremos 2 pessoas',
   'para 2 pessoas', 'um casal', '1 casal', 'eu e minha esposa',
   'duas pessoas', '02 adultos', '2 adultos apenas', 'só nós dois',
+  // Como o hospede realmente diz quem sao. Caso real de 16/10/2026: "3 homens"
+  // nao era entendido e a Bella deixava de montar o link.
+  '2 homens', '2 mulheres', '2 rapazes', '2 moças', '2 amigos', '2 amigas',
+  '2 colegas', '2 senhores', '2 senhoras',
 ];
 
 // ---------- CRIANÇAS E IDADES: 2 adultos + criança de 5 ----------
