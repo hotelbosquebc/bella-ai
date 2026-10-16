@@ -17,6 +17,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
+import { motivoParaHumano } from '../bella/escalonamento';
 import { blocoDeContato } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
 import { hospedePediuAtendente } from '../bella/escalonamento';
@@ -3579,7 +3580,24 @@ ${url}`;
     marcos.total = Date.now() - t0;
     this.tempos.push({ quando: new Date().toISOString(), ...marcos });
     if (this.tempos.length > 20) this.tempos.shift();
-    return { suggestion: formatarParaWhatsApp(textoFinal), model: draft.model, attachments: anexos };
+
+    // Esta conversa precisa de gente? A extensao usa isso para tocar o alerta.
+    //
+    // Pedido do dono em 16/10/2026: quem atende olha varias conversas ao mesmo
+    // tempo e nao percebe quando a Bella chega no limite dela. O motivo vai
+    // junto com a sugestao para o alerta dizer POR QUE tocou - alerta sem
+    // motivo vira barulho que se aprende a ignorar.
+    const motivoHumano = motivoParaHumano({
+      falaDoHospede: ultimaFalaDoHospede(conversation),
+      resposta: textoFinal,
+    } as any) || (devePassarParaHumano(conversation) ? 'a Bella já pediu os mesmos dados duas vezes' : null);
+
+    return {
+      suggestion: formatarParaWhatsApp(textoFinal),
+      model: draft.model,
+      attachments: anexos,
+      precisaDeHumano: motivoHumano,
+    };
   }
 }
 
