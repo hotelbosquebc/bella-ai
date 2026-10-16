@@ -16,6 +16,7 @@ import { ReservationEngineService } from '../reservations/reservation-engine.ser
 import { SilbeckAvailabilityService } from '../reservations/silbeck-availability.service';
 
 import { corrigirLinks, garantirLink } from '../../common/links';
+import { semPromessaDeRegistro } from '../../common/registro';
 import { blocoDeContato } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
 import { hospedePediuAtendente } from '../bella/escalonamento';
@@ -3524,6 +3525,19 @@ ${url}`;
       if (semPreco !== draft.text) {
         this.registrarDecisao('resposta trazia PRECO - frase removida', {});
         draft.text = semPreco;
+      }
+    }
+
+    // Promessa de registro tambem nao chega ao campo de digitacao.
+    //
+    // Caso real (16/10/2026): "Registrei aqui que voces vao chegar as 19h" e
+    // "ja anotei na sua reserva para deixarmos a recepcao ciente". Ela nao
+    // registra nada - e a hospede chega confiando num aviso que nao existe.
+    if (draft.text) {
+      const semPromessa = semPromessaDeRegistro(draft.text);
+      if (semPromessa !== draft.text) {
+        this.registrarDecisao('resposta PROMETIA registro - frase removida', {});
+        draft.text = semPromessa;
       }
     }
     }

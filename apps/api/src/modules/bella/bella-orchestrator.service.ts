@@ -8,6 +8,7 @@ import { normalizar } from '../attachments/attachments.module';
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { mensagemDeEntregaAoHumano } from '../../common/contato';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
+import { semPromessaDeRegistro } from '../../common/registro';
 import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -180,6 +181,17 @@ export class BellaOrchestratorService {
       if (semGarantia !== draft.text) {
         this.logger.warn('Resposta afirmava disponibilidade sem consulta - frase removida');
         draft.text = semGarantia;
+      }
+    }
+
+    // A Bella nao registra recado, nao anota na reserva e nao avisa a
+    // recepcao. Dizer que fez isso manda o hospede embora tranquilo com uma
+    // informacao falsa - caso real de 16/10/2026, chegada as 19h "registrada".
+    if (draft.text) {
+      const semPromessa = semPromessaDeRegistro(draft.text);
+      if (semPromessa !== draft.text) {
+        this.logger.warn('Resposta PROMETIA registro - frase removida');
+        draft.text = semPromessa;
       }
     }
     // 9. Validação anti-prejuízo
