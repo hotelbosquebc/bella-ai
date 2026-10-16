@@ -538,7 +538,13 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
   // porque e onde o hospede erra a grafia ("janwiro").
   //
   // 28 janeiro a 02 fevereiro  |  28 de janeiro até 2 de fevereiro
-  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
+  //
+  // Separadores: alem de "a/ate", tambem "as"/"as" (o hospede escreve "29
+  // dezembro as 1 Janeiro", sem crase) e "e" (em "entre 29 dezembro e 1
+  // janeiro"). Aqui "e" e seguro porque o padrao exige MES dos dois lados -
+  // "entre 2 e 3 pessoas" nao tem como casar. Caso real de 16/10/2026: pedido
+  // de Reveillon ficou sem link porque "as" nao estava na lista.
+  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:at[ée]|ao|[aà]s|a|à|e|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 14 a 19 janeiro  |  de 8 a 13 de setembro
   const rUmMes = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 15 a 17/10  |  15 a 17/10/2026 - o mes vem so na segunda data
@@ -935,12 +941,26 @@ export function idadesSemAPalavraAnos(linha: string): number[] | null {
   const m = (linha || '').match(
     /(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores?|ni[ñn][oa]s?|kids?|children)\b[^\d\n]{0,14}(\d{1,2}(?:\s*(?:[\/,;.e-]|y|and)\s*\d{1,2})*)/i,
   );
-  if (!m) return null;
+  // Sem quantidade, no SINGULAR, vale 1: "4 adulto e criança 7" (caso real de
+  // 16/10/2026, pedido de Reveillon que ficou sem link). Exigir o singular e o
+  // que mantem a guarda de pe - "criancas 7" continua ambiguo e fica com a IA,
+  // porque nao da para saber quantas sao.
+  const mUm = m
+    ? null
+    : (linha || '').match(
+        /\b(?:um|uma|1)?\s*(?:crian[çc]a|filh[oa]|menor|ni[ñn][oa]|kid|child)\b[^\d\n]{0,14}(\d{1,2})\b/i,
+      );
+  if (!m && !mUm) return null;
 
-  const quantas = Number(m[1]);
+  if (mUm) {
+    const idade = Number(mUm[1]);
+    return idade >= 0 && idade <= 17 ? [idade] : null;
+  }
+
+  const quantas = Number(m![1]);
   if (!quantas || quantas > 10) return null;
 
-  const numeros = m[2]
+  const numeros = m![2]
     .split(/\s*(?:[\/,;.-]|\be\b|\by\b|\band\b)\s*/i)
     .map((x) => x.trim())
     .filter((x) => /^\d{1,2}$/.test(x))

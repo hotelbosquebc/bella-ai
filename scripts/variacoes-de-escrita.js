@@ -15,6 +15,10 @@ const PERIODOS = [
   'entrada 21/11 saída 24/11', 'check in 21/11 check out 24/11',
   'chegando 21/11 e saindo 24/11', 'entrando dia 21 e saindo dia 24 de novembro',
   '21 nov a 24 nov', '21 a 24/11', 'vinte e um a vinte e quatro de novembro',
+  // Separadores vistos em 16/10/2026 num pedido de Reveillon que ficou sem
+  // link: "as" sem crase e "e" ligando dois meses por extenso.
+  '21 novembro as 24 novembro', '21 novembro às 24 novembro',
+  'entre 21 novembro e 24 novembro', '21 de novembro as 24 de novembro',
 ];
 
 // ---------- PESSOAS: todas as formas de dizer 2 adultos ----------
@@ -42,6 +46,8 @@ const CRIANCAS = [
   'casal com uma criança de 5 anos',
   '2 adultos e 1 criança, ela tem 5 anos',
   '2 adultos e 1 criança de 5 aninhos',
+  // Sem quantidade, no singular: "4 adulto e criança 7" (caso real 16/10/2026).
+  '2 adultos e criança 5', '2 adulto e criança 5', '2 adultos e uma criança 5',
 ];
 
 let total = 0, falhas = [];
