@@ -255,6 +255,36 @@ const conhecimentos = [
       'O hotel NÃO trabalha com day use como padrão. Cada pedido é analisado CASO A CASO pela equipe. Isso significa que você NÃO pode aceitar, recusar, cotar nem prometer day use: diga que não é um serviço regular do hotel, que o pedido pode ser avaliado pela equipe de reservas, e encaminhe. Respeite o horário do setor: fora do expediente, informe o horário e ofereça a recepção 24h.',
   },
   {
+    title: 'Churrasqueiras',
+    content:
+      'O hotel tem TRÊS churrasqueiras, de uso GRATUITO, mediante reserva na recepção, e com uso permitido até as 22h. Informe quando perguntarem sobre área de lazer ou churrasco. NÃO confirme reserva de churrasqueira nem prometa dia e horário — quem agenda é a recepção.',
+  },
+  {
+    title: 'Multas e cobranças previstas no contrato',
+    content:
+      'Valores previstos no contrato de reserva, que a Bella INFORMA quando perguntarem, mas NUNCA aplica, calcula ou negocia: perda da chave do apartamento, R$ 300,00; louça deixada suja no apartamento, R$ 200,00; limpeza extraordinária por causa de pet ou danos, mínimo de R$ 200,00; visitante sem autorização e registro na recepção, R$ 200,00 por ocorrência; atraso no check-out sem autorização, multa equivalente a DUAS diárias além da desocupação. Ao explicar, seja objetiva e sem tom de ameaça: é informação contratual que o hóspede tem direito de conhecer antes de reservar. Qualquer caso concreto é com a equipe.',
+  },
+  {
+    title: 'Prazo da pré-reserva',
+    content:
+      'A pré-reserva NÃO paga é cancelada automaticamente em 15 MINUTOS, sem aviso. É um prazo curto, então avise com clareza antes de o hóspede começar: diga que a reserva só fica garantida com o pagamento e que a pré-reserva expira em 15 minutos. Não prometa segurar data, nem por alguns minutos — a Bella não controla isso.',
+  },
+  {
+    title: 'Capacidade: bebês e crianças contam',
+    content:
+      'O limite é de SEIS pessoas por apartamento e esse limite inclui CRIANÇAS E BEBÊS — mesmo os que não pagam diária. Cuidado para não confundir com a política de preço: criança pequena pode ser cortesia no VALOR e ainda assim ocupar uma das seis vagas. Do quinto hóspede em diante, a acomodação é em colchão extra ou sofá-cama, conforme a disponibilidade do hotel. A tarifa é calculada por QUANTIDADE DE PESSOAS, não por apartamento.',
+  },
+  {
+    title: 'Ônibus e veículos extras no estacionamento',
+    content:
+      'O estacionamento é gratuito e rotativo, com UMA vaga por apartamento, para carro ou caminhonete. Veículo extra depende de disponibilidade e tem cobrança. O estacionamento NÃO comporta ÔNIBUS — diga isso com clareza a quem perguntar sobre excursão ou grupo chegando de ônibus, e encaminhe à equipe para combinarem onde o veículo fica.',
+  },
+  {
+    title: 'Café da manhã para grupos',
+    content:
+      'O café da manhã é servido das 7h às 10h e NÃO há antecipação de horário para grupos. Se um grupo precisar sair antes das 7h, não prometa café antecipado nem lanche para viagem: encaminhe à equipe, que avalia caso a caso.',
+  },
+  {
     title: 'Normas da casa',
     content:
       'Regras da casa, que a Bella pode informar quando perguntarem: é PROIBIDO FUMAR no apartamento, inclusive na sacada. Não emprestamos toalhas de praia e não é permitido levar as toalhas de banho para fora do hotel. A chave deve ser deixada na recepção ao sair, e o fechamento da conta é feito na entrega da chave, com conferência do apartamento. Pessoas não hospedadas não podem entrar sem aviso prévio à recepção. Pedimos silêncio, principalmente após as 22h. A voltagem do hotel é 220V, há bebidas à venda na recepção e o ramal da recepção funciona 24h: basta discar 9. O hotel não se responsabiliza por objetos ou dinheiro deixados dentro dos apartamentos. SOBRE MULTAS: ao explicar qualquer uma dessas regras, diga apenas que o descumprimento PODE ACARRETAR MULTA — NUNCA informe valores de multa, mesmo que o hóspede insista. Se ele quiser saber o valor, encaminhe para a equipe.',
