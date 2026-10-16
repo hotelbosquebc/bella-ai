@@ -2097,7 +2097,15 @@ export class AssistController {
           `\n\nO HÓSPEDE FEZ UMA PERGUNTA sobre como as coisas funcionam, e NÃO pediu orçamento. ` +
           `Responda a pergunta usando a base de conhecimento. NÃO peça período, quantidade de pessoas ` +
           `nem idades, e NÃO mande link de reserva — ele não pediu valores. ` +
-          `Se depois ele quiser orçamento, aí sim você pede o que falta.`
+          `Se depois ele quiser orçamento, aí sim você pede o que falta.\n` +
+          `TAMANHO: no MÁXIMO 3 linhas. A recepção reescreve 8 de cada 10 respostas suas, e a correção ` +
+          `quase sempre é ENCURTAR — ou seja, você está escrevendo mais do que o hóspede quer ler. ` +
+          `Responda o que foi perguntado e pare. Nada de introdução ("que ótima pergunta"), nada de ` +
+          `repetir a pergunta antes de responder, nada de resumo no fim.\n` +
+          `VENDA, sem excesso: depois da resposta, UMA frase curta que puxe para a reserva — e só uma. ` +
+          `Se ele já tem o link, lembre que por ele conclui a reserva; se ainda não falou de datas, ` +
+          `ofereça montar o orçamento. Nunca duas frases de venda, nunca insistir, nunca repetir o ` +
+          `convite que você já fez na mensagem anterior.`
         );
       }
 
@@ -3398,6 +3406,9 @@ ${url}`;
       temperature: settings?.temperature ?? 0.7,
     });
     marcos.geracao = Date.now() - t0 - marcos.contexto;
+    // Tamanho da resposta: e o numero que diz se a instrucao de ser sucinta
+    // pegou. Sem medir, "ficou mais curta" vira impressao.
+    marcos.caracteres = (draft.text || '').length;
 
     // Refacao que saiu igual a anterior nao serve de nada.
     //
