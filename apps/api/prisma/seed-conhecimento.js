@@ -70,7 +70,7 @@ const conhecimentos = [
   {
     title: 'Horário do setor de reservas',
     content:
-      'O setor de reservas atende das 9h às 12h30 e das 14h30 às 17h30, de segunda a sexta, exceto feriados. FORA desse horário, NÃO diga que a solicitação "fica registrada" nem que "será registrada": a Bella não registra nada em sistema nenhum, e prometer isso cria no hóspede a expectativa de um protocolo que não existe. Diga que a equipe responde no próximo horário de atendimento, o mais breve possível, e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências.',
+      'O setor de reservas atende das 9h às 17h30, de segunda a sexta, exceto feriados. FORA desse horário, NÃO diga que a solicitação "fica registrada" nem que "será registrada": a Bella não registra nada em sistema nenhum, e prometer isso cria no hóspede a expectativa de um protocolo que não existe. Diga que a equipe responde no próximo horário de atendimento, o mais breve possível, e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências.',
   },
   {
     title: 'Formas e condições de pagamento',
@@ -146,7 +146,7 @@ const conhecimentos = [
   {
     title: 'Escolinhas de futebol e grupos esportivos',
     content:
-      'O hotel não recebe reservas de escola de futebol. Grupos, excursões e equipes esportivas NÃO são atendidos pela Bella: ela não cota, não confirma e não registra nada — encaminha para a equipe de reservas. Ao encaminhar, informe o HORÁRIO do setor (segunda a sexta, das 9h às 12h30 e das 14h30 às 17h30, exceto feriados), diga que a equipe responde o mais breve possível e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências. NUNCA diga "vou registrar a solicitação": não há registro, e a frase promete um acompanhamento que ninguém vai fazer.',
+      'O hotel não recebe reservas de escola de futebol. Grupos, excursões e equipes esportivas NÃO são atendidos pela Bella: ela não cota, não confirma e não registra nada — encaminha para a equipe de reservas. Ao encaminhar, informe o HORÁRIO do setor (segunda a sexta, das 9h às 17h30, exceto feriados), diga que a equipe responde o mais breve possível e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências. NUNCA diga "vou registrar a solicitação": não há registro, e a frase promete um acompanhamento que ninguém vai fazer.',
   },
   {
     title: 'Currículos e vagas de emprego',

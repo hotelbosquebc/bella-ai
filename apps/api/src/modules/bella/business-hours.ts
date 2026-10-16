@@ -8,14 +8,14 @@
  */
 
 /**
- * Janelas de atendimento (Brasília): seg-sex, 9h-12h30 e 14h30-17h30.
+ * Janela de atendimento (Brasília): seg-sex, 9h as 17h30, SEM intervalo.
  *
  * Confirmado pelo dono em 15/10/2026. Antes a manha fechava as 12:00 aqui,
  * e essa funcao nao e so texto: e ela que decide se a Bella diz "um
  * atendente assume agora" ou "estamos fora do horario". Meia hora errada
  * virava promessa que ninguem cumpria, todo dia, entre meio-dia e 12h30.
  */
-export const HORARIO_RESERVAS_TEXTO = 'de segunda a sexta, das 9h às 12h30 e das 14h30 às 17h30';
+export const HORARIO_RESERVAS_TEXTO = 'de segunda a sexta, das 9h às 17h30';
 
 /** Recepção do hotel — atende 24h, inclusive quando reservas está fechado. */
 export const TELEFONE_RECEPCAO = '(47) 3367-0211';
@@ -37,9 +37,12 @@ export function isWithinBusinessHours(now = new Date()): boolean {
   const minute = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
   if (!['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].includes(weekday)) return false;
   const m = hour * 60 + minute;
-  const manha = m >= 9 * 60 && m < 12 * 60 + 30; // 09:00–12:30
-  const tarde = m >= 14 * 60 + 30 && m < 17 * 60 + 30; // 14:30–17:30
-  return manha || tarde;
+  // Janela UNICA. Ate 16/10/2026 havia duas (9h-12h30 e 14h30-17h30), vindas
+  // de uma informacao do dono que depois mudou. O contrato revisado diz 9h as
+  // 17h30 direto, e e ele que vale: e o documento que o hospede recebe e o
+  // que define o prazo da multa de cancelamento.
+  const dentro = m >= 9 * 60 && m < 17 * 60 + 30; // 09:00–17:30
+  return dentro;
 }
 
 /**
