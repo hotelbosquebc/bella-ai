@@ -12,7 +12,7 @@
  * aparecia quando o modelo resolvia busca-lo. Mesma licao do link e do preco.
  */
 export const TELEFONE_RECEPCAO = '(47) 3367-0211';
-export const HORARIO_RESERVAS = 'segunda a sexta, das 9h às 17h30 (exceto feriados)';
+export const HORARIO_RESERVAS = 'segunda a sexta, das 9h às 12h30 e das 14h30 às 17h30 (exceto feriados)';
 
 /** Instrucao para o modelo incluir contato na entrega ao humano. */
 export function blocoDeContato(dentroDoHorario: boolean): string {

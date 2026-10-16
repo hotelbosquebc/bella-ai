@@ -70,7 +70,7 @@ const conhecimentos = [
   {
     title: 'Horário do setor de reservas',
     content:
-      'O setor de reservas atende das 9h às 17h30, de segunda a sexta, exceto feriados. FORA desse horário, NÃO diga que a solicitação "fica registrada" nem que "será registrada": a Bella não registra nada em sistema nenhum, e prometer isso cria no hóspede a expectativa de um protocolo que não existe. Diga que a equipe responde no próximo horário de atendimento, o mais breve possível, e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências.',
+      'O setor de reservas atende de segunda a sexta, das 9h às 12h30 e das 14h30 às 17h30, exceto feriados. FORA desse horário, NÃO diga que a solicitação "fica registrada" nem que "será registrada": a Bella não registra nada em sistema nenhum, e prometer isso cria no hóspede a expectativa de um protocolo que não existe. Diga que a equipe responde no próximo horário de atendimento, o mais breve possível, e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências.',
   },
   {
     title: 'Formas e condições de pagamento',
@@ -146,7 +146,7 @@ const conhecimentos = [
   {
     title: 'Escolinhas de futebol e grupos esportivos',
     content:
-      'O hotel não recebe reservas de escola de futebol. Grupos, excursões e equipes esportivas NÃO são atendidos pela Bella: ela não cota, não confirma e não registra nada — encaminha para a equipe de reservas. Ao encaminhar, informe o HORÁRIO do setor (segunda a sexta, das 9h às 17h30, exceto feriados), diga que a equipe responde o mais breve possível e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências. NUNCA diga "vou registrar a solicitação": não há registro, e a frase promete um acompanhamento que ninguém vai fazer.',
+      'O hotel não recebe reservas de escola de futebol. Grupos, excursões e equipes esportivas NÃO são atendidos pela Bella: ela não cota, não confirma e não registra nada — encaminha para a equipe de reservas. Ao encaminhar, informe o HORÁRIO do setor (segunda a sexta, das 9h às 12h30 e das 14h30 às 17h30, exceto feriados), diga que a equipe responde o mais breve possível e lembre que a RECEPÇÃO atende 24 horas pelo telefone (47) 3367-0211 para emergências. NUNCA diga "vou registrar a solicitação": não há registro, e a frase promete um acompanhamento que ninguém vai fazer.',
   },
   {
     title: 'Currículos e vagas de emprego',
@@ -324,7 +324,7 @@ const conhecimentos = [
   {
     title: 'Cancelamento e alteração: multas da reserva DIRETA',
     content:
-      'Vale para reservas feitas DIRETO com o hotel (site ou WhatsApp). Reserva feita por operadora/OTA segue a regra da operadora — nesse caso, encaminhe. O pedido precisa ser POR ESCRITO e pelo WHATSAPP do setor de reservas — este é o ÚNICO canal aceito para cancelamento desde a revisão do contrato em 16/10/2026; NÃO oriente a cancelar por e-mail, porque um pedido por e-mail pode não ser processado e o hóspede perderia o prazo achando que cumpriu. O pedido só é considerado dentro do horário de atendimento do setor: o que chegar fora dele é processado no próximo dia útil. MULTAS, por antecedência em relação ao CHECK-IN: 30 dias ou mais antes, 10% do valor total; de 29 a 15 dias, 50%; de 14 a 8 dias, 80%; 7 dias ou menos, 100%. NÃO HÁ REEMBOLSO em dinheiro: o saldo que sobrar vira CRÉDITO para hospedagem futura, válido por um ano. Saída antecipada é diferente de cancelamento: quem vai embora antes NÃO tem direito a reembolso, crédito nem compensação. A Bella INFORMA essas regras quando perguntarem, mas NÃO calcula multa de um caso concreto, não confirma cancelamento, não processa estorno e não promete isenção — para isso encaminhe ao setor de reservas, informando o horário e o telefone 24h da recepção.',
+      'Vale para reservas feitas DIRETO com o hotel (site ou WhatsApp). Reserva feita por operadora/OTA segue a regra da operadora — nesse caso, encaminhe. O pedido precisa ser POR ESCRITO e pelo WHATSAPP do setor de reservas — este é o ÚNICO canal aceito para cancelamento desde a revisão do contrato em 16/10/2026; NÃO oriente a cancelar por e-mail, porque um pedido por e-mail pode não ser processado e o hóspede perderia o prazo achando que cumpriu. ATENÇÃO ao horário, porque são DOIS diferentes: o pedido de cancelamento é processado de segunda a sexta, das 9h às 17h30 SEM intervalo (o processamento é interno e não depende de alguém estar na mesa). Isso é diferente do EXPEDIENTE do setor, que tem intervalo de almoço e vale para quando alguém vai conversar com o hóspede. Pedido que chegar fora das 9h-17h30 é processado no próximo dia útil. MULTAS, por antecedência em relação ao CHECK-IN: 30 dias ou mais antes, 10% do valor total; de 29 a 15 dias, 50%; de 14 a 8 dias, 80%; 7 dias ou menos, 100%. NÃO HÁ REEMBOLSO em dinheiro: o saldo que sobrar vira CRÉDITO para hospedagem futura, válido por um ano. Saída antecipada é diferente de cancelamento: quem vai embora antes NÃO tem direito a reembolso, crédito nem compensação. A Bella INFORMA essas regras quando perguntarem, mas NÃO calcula multa de um caso concreto, não confirma cancelamento, não processa estorno e não promete isenção — para isso encaminhe ao setor de reservas, informando o horário e o telefone 24h da recepção.',
   },
   {
     title: 'Cancelamento: reserva direta x operadora/OTA',
