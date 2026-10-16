@@ -133,12 +133,39 @@ export class ChannelsService {
       for (const event of entry.messaging ?? []) {
         if (!event.message || event.message.is_echo) continue; // ignora ecos do próprio bot
         if (!this.paginaCorreta(channel, entry, event)) continue;
+
+        // Anexo no Instagram/Messenger: ate 16/10/2026 isso era DESCARTADO em
+        // silencio. O texto vinha vazio, o dispatch desistia por "sem
+        // conteudo", e o hospede que mandava um audio nao recebia resposta
+        // nenhuma - sem erro, sem aviso, sem ninguem saber.
+        //
+        // Audio agora e transcrito (os dois canais entregam a URL direto, sem
+        // token). Os outros anexos viram um marcador: a Bella precisa saber
+        // que chegou alguma coisa, mesmo sem conseguir ler, para nao responder
+        // como se o hospede tivesse ficado calado.
+        const anexo = (event.message.attachments ?? [])[0];
+        let conteudo: string = event.message?.text ?? '';
+        let tipo: 'text' | 'image' | 'audio' | 'document' = 'text';
+
+        if (!conteudo && anexo) {
+          const url = anexo?.payload?.url;
+          if (anexo.type === 'audio' && url) {
+            tipo = 'audio';
+            const transcrito = await this.transcreverPorUrl(url);
+            conteudo = transcrito || '[mensagem de voz — não foi possível transcrever]';
+          } else {
+            tipo = anexo.type === 'image' ? 'image' : 'document';
+            const nome = { image: 'uma imagem', video: 'um vídeo', file: 'um arquivo' }[String(anexo.type)] ?? 'um anexo';
+            conteudo = `[o hóspede enviou ${nome}]`;
+          }
+        }
+
         await this.dispatch({
           hotelId: this.hotelId,
           channel,
           senderExternalId: event.sender?.id,
-          content: event.message?.text ?? '',
-          contentType: event.message?.attachments?.length ? 'document' : 'text',
+          content: conteudo,
+          contentType: tipo,
           receivedAt: event.timestamp ? new Date(Number(event.timestamp)) : new Date(),
           raw: payload,
         });
@@ -174,6 +201,25 @@ export class ChannelsService {
       receivedAt: msg.date ? new Date(Number(msg.date) * 1000) : new Date(),
       raw: payload,
     });
+  }
+
+  /**
+   * Transcreve um audio a partir da URL que o proprio webhook entrega.
+   *
+   * O Instagram e o Messenger mandam o anexo com uma URL direta de CDN, ja
+   * assinada - diferente do WhatsApp, que da um ID e exige duas chamadas com
+   * token. Por isso esta funcao existe separada da do WhatsApp.
+   */
+  private async transcreverPorUrl(url: string, mimeType = 'audio/mp4'): Promise<string> {
+    try {
+      const base64 = await this.fetchAsBase64(url);
+      const texto = await this.ai.transcribeAudio(base64, mimeType);
+      this.logger.log(`Áudio de canal transcrito (${texto.length} caracteres)`);
+      return texto;
+    } catch (err) {
+      this.logger.error(`Falha ao transcrever áudio por URL: ${err instanceof Error ? err.message : err}`);
+      return '';
+    }
   }
 
   /** Baixa a nota de voz do WhatsApp (Graph media API) e transcreve. */
