@@ -40,6 +40,12 @@ semOcupacao('temos 2 malas', 'nós temos 2 malas grandes');
 semOcupacao('eu e minha filha', 'eu e minha filha');
 semOcupacao('eu e meu filho', 'eu e meu filho');
 semOcupacao('duvida sobre dos', 'qual o valor dos hóspedes extras?');
+// "dos" espanhol passou a valer 2 (20/10/2026), mas so em enumeracao de gente.
+// Estas sao as formas portuguesas que precisam continuar intactas.
+semOcupacao('dos partitivo', 'um dos adultos tem 70 anos');
+semOcupacao('dos de idade', 'qual a idade dos adultos?');
+semOcupacao('dos de nome', 'preciso do nome dos hóspedes');
+semOcupacao('dos de maioria', 'a maioria dos adultos prefere o térreo');
 
 console.log();
 console.log('--- e as formas novas continuam valendo ---');

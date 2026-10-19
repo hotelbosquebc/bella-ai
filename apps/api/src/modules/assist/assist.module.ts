@@ -730,7 +730,15 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   // Numero e palavra na MESMA linha ([ \t], nunca \s): senao o fim de uma linha
   // cola no comeco da proxima.
   const semPref = semPrefixos(t);
-  const mAdultos = semPref.match(/\b(\d{1,2})[ \t]*adultos?\b/i);
+  // A ULTIMA declaracao vence, nao a primeira.
+  //
+  // Caso real (20/10/2026): a hospede abriu com "somos um casal e dos adultos"
+  // e, na mensagem seguinte, foi direto ao ponto: "Somos 4 adultos". Pegando a
+  // primeira ocorrencia, o orcamento sairia para 2 pessoas. Ao longo de uma
+  // conversa o hospede corrige e precisa o que disse - o numero mais recente e
+  // o que vale.
+  const ultimoAdultos = [...semPref.matchAll(/\b(\d{1,2})[ \t]*adultos?\b/gi)].pop();
+  const mAdultos = ultimoAdultos ?? null;
   // Alem de "pessoas" e "hospedes", as palavras com que o hospede realmente diz
   // quem sao. Caso real (16/10/2026): "Entrada 17/10 Saida 20/10 / 3 homens" -
   // o periodo foi lido, "3 homens" nao, e a Bella nao montou o link.
@@ -774,8 +782,14 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   // significa tres apartamentos separados, um por familia. "casal" no singular
   // NAO entra aqui - aquilo e a ocupacao de um apartamento so (ver
   // adultosDeCasal).
+  // Descrever a planta NAO e pedir apartamentos.
+  //
+  // Caso real (20/10/2026): "todos os apartamentos SAO DE dois quartos?" era
+  // pergunta sobre a planta, virou apartamentos=2, e o link saiu sem ocupacao.
+  // O lookbehind corta as formas de descricao ("sao de", "e de", "possuem",
+  // "tem"); "preciso de 2 quartos" e "quero 2 quartos" continuam valendo.
   const mQuartos = semPref.match(
-    /\b(\d{1,2})[ \t]*(?:apartamentos?|quartos?|apt[os]?\.?|su[íi]tes?|fam[íi]lias|casais|habitaciones)\b/i,
+    /(?<!\b(?:s[ãa]o|[ée]|eh|possuem|possui|t[êe]m|tem|cont[êe]m|contam|conta)\s+(?:de\s+)?)\b(\d{1,2})[ \t]*(?:apartamentos?|quartos?|apt[os]?\.?|su[íi]tes?|fam[íi]lias|casais|habitaciones)\b/i,
   );
   const apartamentos = mQuartos ? Number(mQuartos[1]) : 1;
   if (apartamentos < 1 || apartamentos > 8) return null;
@@ -832,6 +846,23 @@ const UNIDADE: Record<string, number> = {
 const NUMERO_POR_EXTENSO: [RegExp, string][] = [
   [/\b(uma?|un|one)\b/gi, '1'],
   [/\b(duas|dois|two)\b/gi, '2'],
+  // "dos" em espanhol e dois, mas em portugues e "de os" - por isso ficou de
+  // fora por muito tempo. Caso real (20/10/2026): hospede argentina escreveu
+  // "somos um casal e dos adultos" (= 4 pessoas) e a Bella respondeu "grupo de
+  // 3 adultos", chutando.
+  //
+  // So converte colado numa palavra de PESSOA, e nunca depois de "um", "cada"
+  // e afins - assim "um dos adultos tem 70 anos" continua intacto, que e onde
+  // o portugues usaria a contracao.
+  [
+    // Listar o que NAO converte e frageil: "o valor dos hospedes extras" e
+    // portugues legitimo e passava. Entao a regra e ao contrario - so converte
+    // onde ha contexto de ENUMERAR gente: comeco da frase, ou depois de
+    // "somos", "e", "y", virgula ou "+". "o valor dos hospedes" nao tem nada
+    // disso antes e fica intacto.
+    /(?<=^|\n|\bsomos\s|\bseremos\s|\bsomos\s|\bson\s|\bseriamos\s|\be\s|\by\s|,\s|\+\s|\bmais\s|\bm[áa]s\s)dos\s+(?=(?:adultos?|pessoas?|personas?|h[óo]spedes?|hu[ée]spedes?|crian[çc]as?|ni[ñn][oa]s?|hij[oa]s?|homens|mulheres)\b)/gi,
+    '2 ',
+  ],
   [/\b(tr[êe]s|three)\b/gi, '3'],
   [/\b(quatro|cuatro|four)\b/gi, '4'],
   [/\b(cinco|five)\b/gi, '5'],
