@@ -589,3 +589,133 @@ terminal. A resposta confirmou os dois modelos **APPROVED**:
 (`submission_id=2216495959296031`) e, com o contador virado, clicar em
 **Enviar para analise**. Lembrete da propria Meta: depois de enviado nao da
 para editar nem cancelar enquanto estiver em analise.
+
+---
+
+# CONTINUIDADE — 20/10/2026
+
+Ponto de partida para a próxima conversa. Tudo abaixo já está no ar.
+
+## Como saber o que está rodando
+
+    curl -s https://bella-api-nh3h.onrender.com/api/health
+
+Devolve o commit publicado. Foi criado hoje porque uma correção de ontem
+parecia não ter efeito e não dava para distinguir "o Render não republicou" de
+"a correção está errada" — duas hipóteses com conserto bem diferente. O Render
+leva de 2 a 6 minutos para republicar depois do push. **Confira isto antes de
+investigar qualquer bug.**
+
+Diagnósticos (contagens, sem texto de hóspede):
+
+    /api/assist/diagnostico-link         decisões recentes
+    /api/assist/diagnostico-orcamento    acerto do link, o que a recepção fez
+    /api/assist/diagnostico-correcoes    como a recepção edita a sugestão
+    /api/assist/diagnostico-historico    por dia, motivos mais comuns
+    /api/assist/diagnostico-ia           chaves do Gemini, quedas
+    /api/channels/diagnostico            percurso dos webhooks da Meta
+
+## O que foi corrigido em 19 e 20/10 (todos vindos de prints reais)
+
+**Leitura do que o hóspede escreve** — era a maior causa de não sair link
+("dados incompletos apesar de falar de estadia": 92 em 7 dias):
+
+- `3 homens`, `4 amigos`, `2 moças` e afins não eram pessoas. Entraram
+  homem/mulher/rapaz/moça/amigo/amiga/colega/senhor/senhora. Meninos, meninas,
+  filhos e bebês ficam de fora de propósito — mudam a tarifa.
+- `4 adulto e criança 7`: criança no singular sem número agora vale 1.
+- `29 dezembro as 1 Janeiro`: faltavam os separadores "as"/"às" e "e".
+- `29 de dez a 03 de jan`: **"dez" é o número dez por extenso E a abreviação de
+  dezembro**. O conversor trocava por "10" antes da leitura da data. Agora não
+  converte quando vem logo depois de um dia; "somos dez" segue virando 10.
+- `24 dez 26 a 3 jan 27`: o ano de dois dígitos depois do mês não era capturado.
+- `20 a 22 nov 26` sumia quando já havia outro período lido: o bloco dos meses
+  abreviados só rodava `if (!brutos.length)`. **Era um bug esperando a conversa
+  certa** — hóspede pediu três orçamentos e ela respondeu sobre um.
+- `21 nov. a 24 nov.` (com ponto) nunca funcionou, apesar de um comentário no
+  código dizer que sim: o `\b` ficava depois do ponto.
+- `somos um casal e dos adultos` (espanhol): "dos" vale 2, mas **só em
+  enumeração de gente** (começo de frase, ou após somos/e/y/vírgula/+). A
+  primeira tentativa foi listar o que não converter e o corpus negativo pegou
+  na hora — "o valor dos hóspedes extras" é português legítimo.
+- `os apartamentos são de dois quartos?` era pergunta sobre a PLANTA e virava
+  apartamentos=2, o que fazia sair link sem ocupação. Formas de descrição
+  ("são de", "possuem", "tem") não contam como pedido.
+- **A última declaração vence, não a primeira**: "2 adultos" na abertura e
+  "Somos 4 adultos" depois davam 2. Ao longo da conversa o hóspede corrige.
+
+**Respostas:**
+
+- Link sem ocupação (`?checkin&checkout` sem `adultos-000001`) só sai quando o
+  grupo passa de 6 pessoas. Até 6, vai o link completo, que mostra o valor.
+- Vários períodos com a mesma ocupação agora geram **um link por período**, e a
+  resposta diz que considerou as mesmas pessoas em todos.
+- Não pergunta "juntos ou separados" sem o hóspede ter pedido mais de um quarto.
+- Não cita "até 6 pessoas" para grupo pequeno — é dado interno para a conta.
+- Estadia acima de 60 noites é descartada como leitura torta; quando isso
+  acontece e nada sobra, ela pede para CONFIRMAR entrada e saída, em vez de
+  perguntar do zero. (O diagnóstico mostrava links montados para 11 meses.)
+
+**Guardas (função é garantia, prompt é pedido):**
+
+- `semPromessaDeRegistro` — ela dizia "registrei aqui", "já anotei na sua
+  reserva", "deixei a recepção ciente". Não registra nada. Vale nos dois
+  caminhos. Já disparou 8 vezes em 7 dias.
+- `semPrecoInventado` mudou para `common/preco.ts` e **passou a valer também no
+  caminho automático**, onde faltava — justamente o caminho sem revisão humana.
+  Dispara ~13 vezes por semana no outro lado.
+- A saudação automática do WhatsApp **não conta mais como resposta nossa**. Ela
+  zerava a lista de perguntas pendentes, e como dispara em toda conversa nova,
+  a primeira pergunta do hóspede era a que mais se perdia.
+
+## Auditoria de 20/10 — os números antes das correções
+
+- Recepção **reescreve do zero 87%** das sugestões (527 de 605 em 30 dias).
+- Só ajuste fino: 7%.
+- Acerto do link: **29%** no mês; nos últimos 5 dias entre 9% e 15%.
+- Decisões em 7 dias: dados incompletos 92 · orçamento já enviado 38 · passou
+  para humano 64 · preço removido 13 · promessa de registro removida 8 ·
+  idiomas misturados 8 · leitura suspeita 5.
+
+**Recomendação registrada:** não ligar o WhatsApp automático sem antes medir o
+efeito destas correções. Se "dados incompletos" cair de 92 para algo perto de
+20 e o acerto subir dos 9% para ~40%, aí faz sentido — começando por Instagram
+e Facebook, que têm volume menor e já têm todas as travas.
+
+## A fazer
+
+1. **Medir** (prioridade): comparar `diagnostico-historico` e
+   `diagnostico-orcamento` com os números acima. É o que decide se ela pode
+   responder sozinha.
+2. **Instagram e Facebook pararam de responder sozinhos.** `percurso` vazio em
+   `/api/channels/diagnostico`. Falta o dono mandar um "oi" de uma conta que
+   não seja a do hotel para saber se a Meta parou de entregar os webhooks ou se
+   a Bella é que não responde.
+3. **Mensagem de espera** (ideia do dono, 20/10): no caminho automático,
+   avisar "um momento" para o silêncio de 5 a 12s não parecer abandono.
+   ⚠️ **Cuidado com o texto:** ela NÃO informa valores, e `checkAvailability()`
+   no caminho automático é um esqueleto que devolve `{available:true}` fixo —
+   dizer "vou verificar os valores e a disponibilidade" inventaria uma ação que
+   não acontece. Texto honesto: avisar que já vai enviar o link com os valores.
+   A consulta real ao motor só existe no caminho da extensão.
+4. **Trava de disponibilidade na extensão**: é a única guarda que falta lá.
+   Precisa que o resultado da consulta real chegue até o ponto da guarda, senão
+   apagaria frase correta.
+5. **Alerta de intervenção humana + painel de recados**, dentro do app
+   (decisão do dono: tudo no painel, não na extensão). O servidor já devolve
+   `precisaDeHumano` com o motivo em cada sugestão. ⚠️ O painel só enxerga
+   conversas que passam pela Meta; as do WhatsApp Web vivem só na extensão.
+6. **Análise do App da Meta**: tudo pronto, esperando o contador de chamadas de
+   API virar. Há lembrete agendado para 20/10 às 8h40.
+   `submission_id=2216495959296031`.
+7. **Portfólios divididos**: a conta do WhatsApp está no `307228995768274`, que
+   NÃO é verificado; a verificação está no `178424846189517`. Tende a travar a
+   coexistência.
+
+## Pendências do dono
+
+Segundo PC ainda na extensão 1.9.2 (zip pronto na Área de Trabalho; extrair em
+`C:\`, **nunca** neste PC, onde a pasta é uma junção para o repositório) ·
+apagar `C:\bella-extensao-1.9.2` (confirmado: nenhuma extensão aponta para ela)
+· mensagem de ausência do WhatsApp com horário errado · capítulo III do contrato
+· senha do Supabase · pedir à Fiama remoção do portfólio dela.
