@@ -650,6 +650,20 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
       saidaData = new Date(Date.UTC(saidaData.getUTCFullYear() + 1, saidaData.getUTCMonth(), saidaData.getUTCDate()));
     }
     if (saidaData <= entrada) continue;
+
+    // Estadia longa demais e erro de leitura, nao pedido de hospede.
+    //
+    // Caso real (19/10/2026): "pro dia 31 a dia 1 dezembro". Novembro nao tem
+    // dia 31, entao a leitura escorregou para 31/12; como o dia 1 de dezembro
+    // vem antes, a regra da virada de ano o jogou para 2027 e saiu um periodo
+    // de 335 diarias. Nenhum site devolve disponibilidade para isso, e o
+    // hospede ficaria sem link sem entender por que.
+    //
+    // 60 noites e folgado para hotelaria: acima disso, devolvemos nada e a IA
+    // pergunta as datas - melhor gastar a chamada do que adivinhar.
+    const noites = Math.round((saidaData.getTime() - entrada.getTime()) / 86400000);
+    if (noites > 60) continue;
+
     const iso = (d: Date) => d.toISOString().slice(0, 10);
     const chave = iso(entrada) + '|' + iso(saidaData);
     if (vistos.has(chave)) continue;
