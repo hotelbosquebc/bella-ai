@@ -2325,6 +2325,41 @@ export class AssistController {
     // atendimento pronto e esta errado, o que e pior do que nao mandar link.
     const periodos = periodosPedidos(falasDoHospede);
     if (periodos.length > 1) {
+      // Mesma ocupacao para todos os periodos? Entao da para orcar os tres.
+      //
+      // Caso real (20/10/2026): a hospede pediu tres periodos e repetiu "1
+      // casal e 1 pet pequeno" em cada um. Mandar so o reconhecimento e pedir
+      // de novo o que ela ja disse tres vezes e trabalho a toa - e ela tem que
+      // esperar outra mensagem para ver qualquer valor.
+      //
+      // A suposicao (as mesmas pessoas em todos) vai DITA na resposta, para ela
+      // corrigir se mudar de um periodo para o outro. Sem ocupacao clara, ou
+      // com crianca sem idade, cai no caminho antigo de so reconhecer.
+      const intervalos = intervalosNaFala(falasDoHospede);
+      const adultos = Number(stay.adults) || 0;
+      if (adultos > 0 && !criancaSemIdade(falasDoHospede) && intervalos.length === periodos.length) {
+        const linhas = intervalos.map((p, i) => {
+          const url = this.reservations.buildBookingLink({
+            checkin: p.checkin,
+            checkout: p.checkout,
+            adults: adultos,
+            children0_6: Number(stay.children0_6) || 0,
+            children7_9: Number(stay.children7_9) || 0,
+          } as any);
+          return `${periodos[i]}:\n${url}`;
+        });
+        this.registrarDecisao(`${periodos.length} periodos: um link para cada`, stay);
+        return (
+          `\n\nO HÓSPEDE PEDIU ${periodos.length} PERÍODOS DIFERENTES. Monte um orçamento para CADA um.\n` +
+          `Envie os links ABAIXO, na mesma ordem, cada um identificado pelas datas e SOZINHO em sua linha, ` +
+          `com uma linha em branco antes e depois.\n` +
+          `Diga, em UMA frase curta, que montou os três considerando a mesma ocupação que ele informou ` +
+          `(${adultos} ${adultos === 1 ? 'pessoa' : 'pessoas'}), e que é só avisar se mudar em algum período.\n` +
+          `NÃO informe preços — quem mostra o valor é cada link.\n\n` +
+          linhas.join('\n\n') +
+          ofertaAtendimento
+        );
+      }
       this.registrarDecisao(`${periodos.length} periodos pedidos`, stay);
       return (
         `\n\nO HÓSPEDE PEDIU ${periodos.length} PERÍODOS DIFERENTES (${periodos.join(' e ')}) — ` +
