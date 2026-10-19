@@ -19,6 +19,9 @@ const PERIODOS = [
   // link: "as" sem crase e "e" ligando dois meses por extenso.
   '21 novembro as 24 novembro', '21 novembro às 24 novembro',
   'entre 21 novembro e 24 novembro', '21 de novembro as 24 de novembro',
+  // "21 nov" ja estava aqui; o mes que quebrava era DEZEMBRO, porque "dez"
+  // tambem e numero por extenso e virava 10 antes da leitura da data.
+  '21 de nov a 24 de nov', '21 nov. a 24 nov.',
 ];
 
 // ---------- PESSOAS: todas as formas de dizer 2 adultos ----------

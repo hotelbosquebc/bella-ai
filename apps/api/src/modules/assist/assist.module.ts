@@ -610,7 +610,10 @@ export function intervalosNaFala(
   // casa, porque depois de "nov" vem letra. Sem ele, voltariamos ao bug que
   // fez "dia 21 a 23 agora em novembro" virar agosto.
   if (!brutos.length) {
-    const rDoisAbrev = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b/gi;
+    // O guarda e (?![a-z]) e nao \b: com "nov." o \b vinha DEPOIS do ponto, e
+    // entre "." e espaco nao ha fronteira de palavra - entao "21 nov. a 24
+    // nov." nunca casava, apesar do comentario acima dizer que sim.
+    const rDoisAbrev = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?(?![a-zà-ÿ])\s*(?:at[ée]|ao|[aà]s|a|à|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?(?![a-zà-ÿ])/gi;
     while ((m = rDoisAbrev.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
     if (!brutos.length) {
       const rUmAbrev = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b/gi;
@@ -824,7 +827,11 @@ const NUMERO_POR_EXTENSO: [RegExp, string][] = [
   [/\b(sete|siete|seven)\b/gi, '7'],
   [/\b(oito|ocho|eight)\b/gi, '8'],
   [/\b(nove|nueve|nine)\b/gi, '9'],
-  [/\b(dez|diez|ten)\b/gi, '10'],
+  // "dez" e o numero dez E a abreviacao de dezembro. Caso real (19/10/2026):
+  // "29 de dez a 03 de jan" virava "29 de 10 a 03 de jan" e a data saia torta,
+  // enquanto "29 de dezembro" funcionava. Quando vem logo depois de um dia
+  // ("29 dez", "29 de dez"), e mes - nao converte. "somos dez" segue virando 10.
+  [/(?<!\d\s{0,3})(?<!\d\s{0,3}de\s{0,3})\b(dez|diez|ten)\b/gi, '10'],
   [/\b(onze|once|eleven)\b/gi, '11'],
   [/\b(doze|doce|twelve)\b/gi, '12'],
   [/\b(treze|trece|thirteen)\b/gi, '13'],
