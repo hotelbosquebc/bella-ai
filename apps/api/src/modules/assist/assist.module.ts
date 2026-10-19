@@ -277,8 +277,17 @@ export function falasPendentesDoHospede(conversation: string): string[] {
   const linhas = (conversation || '').split(/\r?\n/);
   const pendentes: string[] = [];
   for (const linha of linhas) {
-    if (/^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(linha)) {
-      // Respondemos: o que veio antes ja foi tratado.
+    const nossa = linha.match(/^\s*N[óo]s\s*(?:\(hoje\))?\s*:\s*(.*)$/i);
+    if (nossa) {
+      // A saudacao automatica do WhatsApp NAO e resposta.
+      //
+      // Caso real (20/10/2026): o hospede pergunta, o WhatsApp dispara sozinho
+      // o "Olá, seja bem-vindo(a)! ... clique no link abaixo", e a pergunta
+      // dele saia da lista de pendencias como se tivesse sido respondida. Ela
+      // aparece em quase toda conversa nova, entao a primeira pergunta do
+      // hospede era justamente a que mais se perdia.
+      if (ehMensagemAutomatica(nossa[1] || '')) continue;
+      // Respondemos de verdade: o que veio antes ja foi tratado.
       pendentes.length = 0;
       continue;
     }
