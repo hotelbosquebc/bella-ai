@@ -2596,7 +2596,14 @@ ${url}`;
     }
 
     // Sabemos que são vários, mas não conseguimos separar as composições.
-    if (Number(stay.apartamentos) > 1) {
+    //
+    // Só vale quando o grupo realmente não cabe num apartamento. Caso real
+    // (20/10/2026): 4 adultos, e saiu o link só com as datas, sem ocupação -
+    // que não mostra valor nenhum. Até 6 pessoas seguimos pelo caminho normal,
+    // com o link completo; dividir em dois é escolha do hóspede, não nossa.
+    const totalPessoasPedido =
+      Number(stay.adults || 0) + Number(stay.children0_6 || 0) + Number(stay.children7_9 || 0);
+    if (Number(stay.apartamentos) > 1 && totalPessoasPedido > 6) {
       const linkBase = this.reservations.buildSearchLink(stay.checkin, stay.checkout);
       this.registrarDecisao('varios apartamentos sem composicao clara', stay);
       return (

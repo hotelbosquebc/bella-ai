@@ -60,7 +60,16 @@ export class ReservationEngineService {
     // Com mais de um apartamento a ocupação não cabe num link só (o máximo é 6
     // por apartamento): somar todo mundo num link traria resultado errado. O
     // hóspede monta a composição no próprio site.
-    const varios = Number((stay as { apartamentos?: number }).apartamentos) > 1;
+    // ...MAS so quando o grupo realmente nao cabe num apartamento.
+    //
+    // Caso real (20/10/2026): 4 adultos, 23/01 a 31/01/2027. Como a conversa
+    // falava em mais de um quarto, saiu o link so com as datas - e um link sem
+    // ocupacao nao mostra valor nenhum, o pior dos mundos. Ate 6 pessoas, o
+    // link com a ocupacao completa mostra o preco de verdade; se o hospede
+    // quiser dividir em dois apartamentos, ele pede.
+    const pessoas =
+      Number(stay.adults ?? 0) + Number(stay.children0_6 ?? 0) + Number(stay.children7_9 ?? 0);
+    const varios = Number((stay as { apartamentos?: number }).apartamentos) > 1 && pessoas > 6;
     const link = varios
       ? this.buildSearchLink(stay.checkin!, stay.checkout!)
       : this.buildBookingLink(stay);
