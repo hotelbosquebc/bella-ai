@@ -2323,7 +2323,23 @@ export class AssistController {
         `adicional — é um ganho, e vale apresentar assim. Nada de "não é possível" ou "infelizmente".`;
     }
 
-    const ofertaAtendimento = isWithinBusinessHours()
+    // UMA vez por conversa, e só isso.
+    //
+    // A oferta é injetada em seis ramos diferentes, e o texto já pedia "sem
+    // repetir em toda mensagem" — mas pedido no prompt não é garantia, e na
+    // prática ela reaparecia a cada resposta. Pedido do dono em 20/10/2026: a
+    // Bella deve tentar a venda pelo LINK. Oferecer um atendente a toda hora
+    // mina isso, porque dá ao hóspede uma saída mais cômoda do que clicar e
+    // reservar sozinho — e ainda joga trabalho para a recepção que o site
+    // resolveria.
+    //
+    // Se ele pedir atendente, o caminho continua: motivoParaHumano e
+    // hospedePediuAtendente tratam disso em outro lugar, independente daqui.
+    const jaOfereceuAtendente =
+      /\bpix\b|especialista em reservas|setor de reservas|encaminh/i.test(
+        apenasNossasFalas(conversation),
+      );
+    const ofertaAtendimento = isWithinBusinessHours() && !jaOfereceuAtendente
       ? `\n\nOFERTA DE ATENDIMENTO HUMANO (o setor de reservas está atendendo AGORA): ` +
         `logo DEPOIS do link, acrescente UMA frase curta oferecendo que, se ele preferir fazer a reserva ` +
         `por aqui mesmo pelo WhatsApp com pagamento via pix, basta pedir que você encaminha para o nosso ` +
