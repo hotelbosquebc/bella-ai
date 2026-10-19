@@ -341,6 +341,11 @@ const conhecimentos = [
     content:
       'MAPA COMPLETO DOS ANDARES (informe exatamente assim quando perguntarem sobre andar, altura ou vista): 1º e 2º andar = Apartamento Standard. 3º e 4º andar = Apartamento Luxo. 5º e 6º andar = Apartamento Superior. 7º e 8º andar = Suíte Bosque. ATENÇÃO - erro comum: o LUXO NÃO fica mais alto que o Superior; ele fica ABAIXO (3º-4º contra 5º-6º). Nunca deduza o andar pelo nome da categoria nem associe "mais caro" ou "melhor" a "mais alto" - a ordem dos andares não segue a ordem das categorias. "Último andar", "andar mais alto" ou "lá em cima" = Suíte Bosque. Nunca prometa um andar específico dentro da categoria nem um número de apartamento: a distribuição é da recepção, conforme a ocupação do dia.',
   },
+  {
+    title: 'Setor de compras / fornecedores',
+    content:
+      'QUEM PROCURA O SETOR DE COMPRAS NÃO É HÓSPEDE: é fornecedor, representante comercial ou alguém querendo vender para o hotel. Reconheça pelo assunto — oferecer produto, enviar proposta, catálogo, orçamento de mercadoria, falar com o comprador, "setor de compras", "departamento de compras". NÃO trate como pedido de reserva e NÃO mande o link do motor de reservas: ele não serve para nada aqui. O CONTATO: WhatsApp do setor de compras (47) 9754-4372 ("Adm Hotel Do Bosque"), ou o telefone fixo do hotel (47) 3367-0211. Informe um dos dois com cordialidade e encerre o assunto — você não recebe proposta, não encaminha catálogo, não agenda visita de representante e não opina sobre o que o hotel compra. Cuidado para não confundir: hóspede perguntando onde COMPRAR algo na cidade, ou sobre compras no comércio de Balneário Camboriú, não tem relação com este setor.',
+  },
 ];
 
 /* ------------------------------------------------------------------ *
