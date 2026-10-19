@@ -553,7 +553,11 @@ export function intervalosNaFala(
   // janeiro"). Aqui "e" e seguro porque o padrao exige MES dos dois lados -
   // "entre 2 e 3 pessoas" nao tem como casar. Caso real de 16/10/2026: pedido
   // de Reveillon ficou sem link porque "as" nao estava na lista.
-  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\s*(?:at[ée]|ao|[aà]s|a|à|e|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
+  // O ANO depois do mes, de 2 ou 4 digitos, e opcional em cada ponta:
+  // "24 dez 26 a 3 jan 27" (caso real de 20/10/2026). Sem capturar o ano, o
+  // "26" era lido como se fosse dia e o periodo saia torto - a Bella nao
+  // montava link e ainda respondia com datas de outra conversa.
+  const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\.?(?:\s*(?:de\s*)?(\d{4}|\d{2})\b)?\s*(?:at[ée]|ao|[aà]s|a|à|e|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\.?(?:\s*(?:de\s*)?(\d{4}|\d{2})\b)?/gi;
   // 14 a 19 janeiro  |  de 8 a 13 de setembro
   const rUmMes = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
   // 15 a 17/10  |  15 a 17/10/2026 - o mes vem so na segunda data
@@ -561,7 +565,8 @@ export function intervalosNaFala(
 
   let m: RegExpExecArray | null;
   while ((m = rNumerico.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
-  while ((m = rDoisMeses.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
+  // Grupos: dia1, mes1, ano1, dia2, mes2, ano2 - os anos sao opcionais.
+  while ((m = rDoisMeses.exec(t)) !== null) push(m[1], mes(m[2]), m[4], mes(m[5]), m[3], m[6]);
   while ((m = rUmMes.exec(t)) !== null) push(m[1], mes(m[3]), m[2], mes(m[3]));
   // "15 a 17/10": o mes vem so na segunda data. So entra em acao se nenhuma das
   // leituras acima achou periodo - senao, em "15/10 a 17/10", ela leria o MES da
@@ -609,14 +614,21 @@ export function intervalosNaFala(
   // O \b depois da abreviacao e o que torna isso seguro: "3 novamente" nao
   // casa, porque depois de "nov" vem letra. Sem ele, voltariamos ao bug que
   // fez "dia 21 a 23 agora em novembro" virar agosto.
-  if (!brutos.length) {
+  // Este bloco roda SEMPRE, e nao so quando nada foi encontrado.
+  //
+  // Caso real (20/10/2026): a hospede pediu tres orcamentos, um deles escrito
+  // "20 a 22 nov 26". Como o periodo de dezembro ja tinha sido lido, o bloco
+  // das abreviacoes nunca rodava e novembro sumia em silencio - a Bella
+  // respondia sobre um periodo so. Periodos repetidos nao sao problema: o
+  // conjunto `vistos` mais abaixo elimina duplicata.
+  {
     // O guarda e (?![a-z]) e nao \b: com "nov." o \b vinha DEPOIS do ponto, e
     // entre "." e espaco nao ha fronteira de palavra - entao "21 nov. a 24
     // nov." nunca casava, apesar do comentario acima dizer que sim.
     const rDoisAbrev = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?(?![a-zà-ÿ])\s*(?:at[ée]|ao|[aà]s|a|à|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?(?![a-zà-ÿ])/gi;
     while ((m = rDoisAbrev.exec(t)) !== null) push(m[1], mes(m[2]), m[3], mes(m[4]));
-    if (!brutos.length) {
-      const rUmAbrev = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?\b/gi;
+    {
+      const rUmAbrev = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\.?(?![a-zà-ÿ])/gi;
       while ((m = rUmAbrev.exec(t)) !== null) push(m[1], mes(m[3]), m[2], mes(m[3]));
     }
   }
