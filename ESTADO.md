@@ -564,3 +564,28 @@ de recuperação impressos são a única saída. Decisão informada, não reprop
 O verificado é o `178424846189517`. Como a conta do WhatsApp está no não
 verificado, isso tende a bloquear a produção/coexistência — é o mesmo problema
 de "ativos divididos" já anotado acima, agora com consequência concreta.
+
+---
+
+## Analise do App — 19/10/2026
+
+`whatsapp_business_messaging` ficou **completo**: o contador de chamadas de API
+virou sozinho ~24h depois do disparo de 16/10. Confirma que o mecanismo funciona
+e que a espera e so lentidao da Meta.
+
+`whatsapp_business_management` seguia em `0 de 1` porque **criar modelo pelo
+WhatsApp Manager e interface, nao chamada de API** - o contador nunca ia mexer
+por ali. Em 19/10 ~15h foi feita uma chamada real pelo Explorador da Graph API:
+
+    GET 1444894994490937/message_templates
+
+O Explorador e o caminho mais simples porque gera o token na propria pagina
+(app "Bella - Hotel do Bosque", token de usuario, permissao
+whatsapp_business_management ja presente) e nao exige Postman nem token no
+terminal. A resposta confirmou os dois modelos **APPROVED**:
+`confirmacao_de_contato` e `recebemos_sua_mensagem`, ambos UTILITY / pt_BR.
+
+**Proximo passo:** a partir de 20/10, abrir o pedido
+(`submission_id=2216495959296031`) e, com o contador virado, clicar em
+**Enviar para analise**. Lembrete da propria Meta: depois de enviado nao da
+para editar nem cancelar enquanto estiver em analise.
