@@ -17,6 +17,9 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
+import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
+// Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
+export { fraseTemPreco, semPrecoInventado };
 import { motivoParaHumano } from '../bella/escalonamento';
 import { blocoDeContato } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
@@ -1587,13 +1590,6 @@ export function respostaMisturada(texto: string, idioma: 'pt' | 'es' | 'en'): bo
  * motor de reservas. Numero em dinheiro na resposta so pode ter vindo de
  * invencao do modelo.
  */
-export function fraseTemPreco(frase: string): boolean {
-  const t = frase || '';
-  if (/R\$\s*\d/.test(t)) return true;
-  if (/\b\d{2,4}[.,]\d{2}\s*(reais|por noite|a di[áa]ria)\b/i.test(t)) return true;
-  if (/\b(valor|pre[çc]o|di[áa]ria|tarifa)\b[^.!?]{0,40}\b\d{2,4}\b/i.test(t)) return true;
-  return false;
-}
 
 /**
  * Tira da resposta qualquer frase que informe preco.
@@ -1610,29 +1606,6 @@ export function fraseTemPreco(frase: string): boolean {
  * Se depois do corte nao sobrar mensagem de pe, devolvemos uma frase segura
  * que aponta para o link - nunca o texto com preco.
  */
-export function semPrecoInventado(texto: string, link?: string | null): string {
-  const original = texto || '';
-  if (!original.trim() || !fraseTemPreco(original)) return original;
-
-  const limpo = original
-    .split(/\r?\n/)
-    .map((linha) =>
-      linha
-        .split(/(?<=[.!?])\s+/)
-        .filter((f) => !fraseTemPreco(f))
-        .join(' ')
-        .trim(),
-    )
-    .join('\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-
-  if (limpo.length >= 40) return limpo;
-
-  return link
-    ? `Segue o link com os valores e a disponibilidade para o seu período. Por ele você já consegue concluir a sua reserva:\n\n${link}`
-    : 'Para eu verificar os valores e a disponibilidade, me confirme por gentileza o período da estadia e quantas pessoas seriam.';
-}
 
 /**
  * O que ha de errado com a resposta que o atendente recusou.

@@ -9,6 +9,7 @@ import { corrigirLinks, garantirLink } from '../../common/links';
 import { mensagemDeEntregaAoHumano } from '../../common/contato';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { semPromessaDeRegistro } from '../../common/registro';
+import { semPrecoInventado } from '../../common/preco';
 import { motivoParaHumano } from './escalonamento';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -192,6 +193,21 @@ export class BellaOrchestratorService {
       if (semPromessa !== draft.text) {
         this.logger.warn('Resposta PROMETIA registro - frase removida');
         draft.text = semPromessa;
+      }
+    }
+
+    // PRECO INVENTADO nunca chega ao hospede.
+    //
+    // Esta trava existia so na sugestao da extensao, onde um atendente le
+    // antes de enviar. Aqui, que e o caminho automatico, ela faltava - e no
+    // diagnostico de 20/10/2026 a guarda do outro lado disparou 13 vezes em 7
+    // dias, ou seja, a Bella tenta cotar valor com frequencia. Um preco
+    // inventado no Instagram sai direto para o hospede, sem ninguem no meio.
+    if (draft.text) {
+      const semPreco = semPrecoInventado(draft.text, linksOficiais[0] || null);
+      if (semPreco !== draft.text) {
+        this.logger.warn('Resposta trazia PRECO - frase removida');
+        draft.text = semPreco;
       }
     }
     // 9. Validação anti-prejuízo
