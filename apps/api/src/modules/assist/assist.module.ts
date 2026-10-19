@@ -504,7 +504,14 @@ const MESES: Record<string, number> = {
  * 19 janeiro OU 28 de janeiro a 02 de fevereiro") precisa ser reconhecido como
  * dois, nao colapsado num so.
  */
-export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: string; checkout: string }[] {
+export function intervalosNaFala(
+  texto: string,
+  hoje = new Date(),
+  // Opcional e so de saida: quem quiser saber POR QUE nao saiu periodo passa
+  // este objeto e le depois. Assim a assinatura antiga continua valendo em
+  // todos os pontos que ja chamavam a funcao.
+  diagnostico?: { descartadosPorDuracao: number },
+): { checkin: string; checkout: string }[] {
   // Tira os prefixos de quem falou ANTES de qualquer leitura de data.
   //
   // Alguns chamadores ja passavam o texto limpo e outros nao, e isso decidia o
@@ -662,7 +669,10 @@ export function intervalosNaFala(texto: string, hoje = new Date()): { checkin: s
     // 60 noites e folgado para hotelaria: acima disso, devolvemos nada e a IA
     // pergunta as datas - melhor gastar a chamada do que adivinhar.
     const noites = Math.round((saidaData.getTime() - entrada.getTime()) / 86400000);
-    if (noites > 60) continue;
+    if (noites > 60) {
+      if (diagnostico) diagnostico.descartadosPorDuracao++;
+      continue;
+    }
 
     const iso = (d: Date) => d.toISOString().slice(0, 10);
     const chave = iso(entrada) + '|' + iso(saidaData);
@@ -2092,6 +2102,17 @@ export class AssistController {
       : pareceOrcamento(falasParaTriagem)
         ? await this.extrair(conversation)
         : {};
+
+    // A data que ele escreveu nao fecha? Entao peca para CONFIRMAR, e nao
+    // pergunte como se ele nao tivesse dito nada.
+    //
+    // Caso real (19/10/2026): "dia 31 a dia 1 dezembro" - novembro nao tem 31,
+    // a leitura virou um periodo de 335 diarias e foi descartada. Sem este
+    // aviso a Bella pediria "o periodo da estadia" do zero, como se ele
+    // estivesse em silencio - e ele acabou de dar duas datas.
+    const diagPeriodo = { descartadosPorDuracao: 0 };
+    intervalosNaFala(apenasFalasDoHospede(conversation), new Date(), diagPeriodo);
+    if (diagPeriodo.descartadosPorDuracao > 0 && !stay.checkin) stay.dataImpossivel = true;
     // Tem dados de estadia? Entao e orcamento, qualquer que seja o rotulo.
     //
     // Caso real: "preciso saber o valor total das diarias para check in sexta
@@ -2324,11 +2345,18 @@ export class AssistController {
           `virou "dezembro" numa resposta. Peça as datas exatas e explique, em meia frase, ` +
           `que os valores mudam conforme o período.`
         : '';
+      const avisoDataImpossivel = stay.dataImpossivel
+        ? ` ATENÇÃO: ele JÁ DEU datas, mas elas não fecham (ex.: "31 a 1 de dezembro" — ` +
+          `novembro não tem dia 31). NÃO pergunte as datas como se ele não tivesse dito nada e ` +
+          `NÃO escolha uma interpretação por conta própria. Reconheça o que ele escreveu e peça ` +
+          `para CONFIRMAR a data de entrada e a de saída, com dia e mês.`
+        : '';
       return (
         `\n\nRESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ` +
         `${faltam.map((c) => rotulos[c]).join(', ')}. Não pergunte o que ele já informou. ` +
         `NÃO prometa verificar valores ou disponibilidade — quem consulta é o próprio hóspede no link.` +
-        avisoVago
+        avisoVago +
+        avisoDataImpossivel
       );
     }
 
