@@ -129,6 +129,13 @@ export class ModelRouterService {
       chaveEmUso: this.provider === 'gemini' ? this.chaveAtual + 1 : null,
       // Posicao das chaves que o Google recusou (nunca o valor delas).
       chavesRecusadas: this.provider === 'gemini' ? [...this.chavesInvalidas].map((i) => i + 1) : null,
+      // Quais modelos estao sem cota em qual chave, e ate quando.
+      semCota:
+        this.provider === 'gemini'
+          ? [...this.esgotados.entries()]
+              .filter(([, ate]) => ate > Date.now())
+              .map(([k, ate]) => ({ chave: Number(k.split('|')[0]) + 1, modelo: k.split('|')[1], ate: new Date(ate).toISOString() }))
+          : null,
       quedasRecentes: this.quedas.length,
       ultimasQuedas: this.quedas.slice(-10),
     };
@@ -141,37 +148,45 @@ export class ModelRouterService {
     if (this.provider === 'gemini') {
       const modelos = this.modelosPara(req.task);
       const tentativas: { modelo: string; motivo: string }[] = [];
-      const voltas = Math.max(1, this.chavesGemini().length);
+      const totalChaves = Math.max(1, this.chavesGemini().length);
 
-      for (let volta = 0; volta < voltas; volta++) {
-        for (const modelo of modelos) {
+      // Ordem: cada modelo em TODAS as chaves antes de descer para o proximo.
+      //
+      // Ate 20/10/2026 era o contrario - todos os modelos numa chave, e so
+      // entao a outra. E a troca de chave olhava apenas o ULTIMO erro: o
+      // 2.5-flash dava 429 (cota), o 2.5-flash-lite 429, o 3.5-flash-lite 503
+      // (congestionado)... e como o ultimo era 503, a segunda chave nunca
+      // era tentada. Resultado medido: sugestoes de 26 a 82 segundos na
+      // extensao, com o 2.5-flash rapido (~600ms) intacto na chave 2.
+      for (const modelo of modelos) {
+        for (let idx = 0; idx < totalChaves; idx++) {
+          if (this.chavesInvalidas.has(idx)) continue;
+          if (this.esgotado(idx, modelo)) continue; // cota ja sabida: nem chama
+          this.chaveAtual = idx;
           try {
             return await this.completeGemini(req, modelo);
           } catch (err) {
             const motivo = err instanceof Error ? err.message : String(err);
-            tentativas.push({ modelo, motivo: motivo.slice(0, 700) });
-            this.logger.warn(`Modelo ${modelo} indisponivel: ${motivo}`);
-            // Chave recusada: o problema nao e o modelo, e a credencial. Marca e
-            // sai, para tentar a proxima chave.
+            tentativas.push({ modelo: `${modelo} (chave ${idx + 1})`, motivo: motivo.slice(0, 700) });
+            this.logger.warn(`Modelo ${modelo} indisponivel na chave ${idx + 1}: ${motivo}`);
+            // Chave recusada: o problema e a credencial. Marca e tenta a proxima.
             if (motivo.includes('API_KEY_INVALID')) {
               this.marcarChaveInvalida();
-              break;
+              continue;
             }
-            // 429 e cota DIARIA e POR MODELO (medido no painel: 20/dia no
-            // 2.5-flash, 500/dia no 3.5-flash-lite). Entao o proximo modelo tem
-            // balde proprio e vale tentar - era o contrario do que eu fazia
-            // aqui, de quando eu achava que o teto era por minuto e
-            // compartilhado: naquela leitura, insistir so gastava a janela.
-            // Com a ordem por velocidade, e isto que faz o atendimento
-            // continuar depois das primeiras 20 respostas do dia.
+            // 429 e cota DIARIA, POR MODELO e POR CHAVE (20/dia no 2.5-flash,
+            // 500/dia no 3.5-flash-lite). A outra chave tem balde proprio.
+            // Guardamos ate quando esta esgotado, para as proximas mensagens do
+            // dia nao gastarem uma chamada so para ouvir o mesmo 429.
+            if (motivo.includes('429')) {
+              this.marcarEsgotado(idx, modelo, motivo);
+              continue;
+            }
+            // Outro erro (503 congestionado, 500...) e do MODELO, nao da chave:
+            // trocar de chave repetiria o mesmo. Desce para o proximo modelo.
+            break;
           }
         }
-        // Trocar de chave so ajuda quando o problema e da chave: cota estourada
-        // ou credencial recusada. Qualquer outro erro se repetiria igual.
-        const ultima = tentativas[tentativas.length - 1];
-        const motivoUltima = ultima ? ultima.motivo : '';
-        const trocaAjuda = motivoUltima.includes('429') || motivoUltima.includes('API_KEY_INVALID');
-        if (!trocaAjuda || !this.proximaChave()) break;
       }
       this.logger.error(`Todos os modelos falharam na task ${req.task}`);
       // Guarda o motivo de CADA modelo, nao so do ultimo: com um 429 de cota,
@@ -264,15 +279,33 @@ export class ModelRouterService {
     );
   }
 
-  /** Passa para a proxima chave utilizavel; false se nao houver outra. */
-  private proximaChave(): boolean {
-    const chaves = this.chavesGemini();
-    if (chaves.length < 2) return false;
-    const proximo = this.indiceValido((this.chaveAtual + 1) % chaves.length);
-    if (proximo === null || proximo === this.chaveAtual) return false;
-    this.chaveAtual = proximo;
-    this.logger.warn(`Alternando para a chave ${this.chaveAtual + 1} de ${chaves.length}.`);
+  /**
+   * Ate quando cada par chave+modelo esta sem cota ("0|gemini-2.5-flash" ->
+   * epoch ms). O proprio 429 do Google diz quanto falta ("Please retry in
+   * 15h5m5.29s"); sem essa informacao, supomos uma hora. Em memoria: some no
+   * restart, e ai a primeira chamada descobre de novo, ao custo de um 429.
+   */
+  private readonly esgotados = new Map<string, number>();
+
+  private esgotado(idx: number, modelo: string): boolean {
+    const ate = this.esgotados.get(`${idx}|${modelo}`);
+    if (!ate) return false;
+    if (Date.now() >= ate) {
+      this.esgotados.delete(`${idx}|${modelo}`);
+      return false;
+    }
     return true;
+  }
+
+  private marcarEsgotado(idx: number, modelo: string, motivo: string) {
+    const m = motivo.match(/retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?/i);
+    let ms = 60 * 60 * 1000;
+    if (m && (m[1] || m[2] || m[3])) {
+      ms = ((Number(m[1] || 0) * 60 + Number(m[2] || 0)) * 60 + Number(m[3] || 0)) * 1000;
+    }
+    // Teto de 24h: a cota diaria nunca demora mais que isso para virar.
+    ms = Math.min(Math.max(ms, 1000), 24 * 60 * 60 * 1000);
+    this.esgotados.set(`${idx}|${modelo}`, Date.now() + ms);
   }
 
   // ---------- Gemini (gratuito) ----------
