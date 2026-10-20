@@ -207,9 +207,18 @@ link de reservas.
    disponibilidade": ela não informa valores, e `checkAvailability()` naquele
    fluxo é um esqueleto que devolve `{available:true}` fixo. Versão honesta:
    avisar que já vai enviar o link com os valores.
-4. **Trava de disponibilidade na extensão** — única guarda que falta lá. Precisa
-   que o resultado da consulta real chegue até o ponto da guarda, senão apagaria
-   frase correta.
+4. ~~Trava de disponibilidade na extensão~~ — **feita em 20/10** (`91c7f30`).
+   Só deixa passar "temos disponibilidade" quando o contexto traz a marca
+   `VAGA CONFIRMADA`, que só entra quando a consulta real devolve categorias.
+   No mesmo commit: rótulo órfão depois do corte de preço ("Para 3 pessoas:"
+   vazio) e leitura de "3 em um apto, 4 em outro".
+   **Também em 20/10** (`aa65848`): a IA não trocava de chave quando o último
+   erro era 503, e as sugestões levavam de 26 a 82 s. Agora cada modelo
+   passa por todas as chaves antes de descer para o lento. Veja
+   `semCota` em `/api/assist/diagnostico-ia`.
+   **Pendente:** ela inventou que a nota fiscal "se solicita na recepção no
+   check-out". Não há nada sobre nota fiscal na base. Falta o dono dizer a
+   regra verdadeira, para entrar como conhecimento.
 5. **Alerta de intervenção humana + painel de recados**, dentro do app (decisão
    do dono: no painel, não na extensão). O servidor já devolve `precisaDeHumano`
    com o motivo em cada sugestão. ⚠️ O painel só enxerga conversas que passam
