@@ -17,6 +17,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
+import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 // Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
 export { fraseTemPreco, semPrecoInventado };
@@ -976,6 +977,38 @@ export function apartamentosDeCasais(
   if (/\bapartamento|\bapto|\bquarto|\bsu[íi]te/i.test(t)) return null;
 
   return Array.from({ length: n }, () => ({ adultos: 2, criancas0_6: 0, criancas7_9: 0 }));
+}
+
+/**
+ * "3 em um apto / 4 em outro apto" = 2 apartamentos, de 3 e de 4.
+ *
+ * Caso real (20/10/2026): a hospede escreveu a divisao com todas as letras, o
+ * extrator nao devolveu a lista de apartamentos e o pedido caiu em "7 pessoas:
+ * pedir a divisao" - perguntando o que ela tinha acabado de dizer. Sem link,
+ * a IA improvisou: afirmou vaga que ninguem consultou e escreveu precos (que a
+ * guarda cortou, deixando "Para 3 pessoas:" vazio na mensagem).
+ *
+ * Mesma prudencia de apartamentosDeCasais: crianca na conversa torna a conta
+ * ambigua (quem fica onde, com que idade), e ai quem decide segue o extrator.
+ */
+export function apartamentosDeclarados(
+  falasDoHospede: string,
+): { adultos: number; criancas0_6: number; criancas7_9: number }[] | null {
+  const t = semPrefixos(falasDoHospede || '');
+  if (PALAVRA_DE_CRIANCA.test(t)) return null;
+
+  const re = /(?<![\d\/.,])(\d{1,2})[ \t]*(?:pessoas?|adultos?|h[óo]spedes?)?[ \t]+(?:em|no|na|num|numa|pra|para)[ \t]+(?:(?:um|uma|1|outro|outra|o[ \t]+outro|a[ \t]+outra|mais[ \t]+um)[ \t]+)?(?:aptos?|apartamentos?|quartos?|su[íi]tes?)(?![a-zà-ÿ])/gi;
+  const completos = [...t.matchAll(re)];
+  if (!completos.length) return null;
+  // "4 em um quarto e 3 em outro": o segundo vem sem o substantivo. So vale
+  // depois de um completo, senao "2 em outro horario" viraria apartamento.
+  const elipse = /(?<![\d\/.,])(\d{1,2})[ \t]*(?:pessoas?|adultos?|h[óo]spedes?)?[ \t]+(?:em|no|na|num|numa)[ \t]+(?:o[ \t]+|a[ \t]+)?(?:outro|outra)(?![a-zà-ÿ])(?![ \t]+(?:aptos?|apartamentos?|quartos?|su[íi]tes?|dia|hor[áa]rio|m[êe]s|per[íi]odo)(?![a-zà-ÿ]))/gi;
+  const ns = [...completos, ...t.matchAll(elipse)]
+    .sort((a, b) => (a.index ?? 0) - (b.index ?? 0))
+    .map((m) => Number(m[1]));
+  if (ns.length < 2 || ns.length > 5) return null;
+  if (ns.some((n) => n < 1 || n > 6)) return null;
+  return ns.map((n) => ({ adultos: n, criancas0_6: 0, criancas7_9: 0 }));
 }
 
 /**
@@ -2063,6 +2096,9 @@ export class AssistController {
    * que o hospede tinha informado data e ocupacao.
    */
   private static readonly EXTRACAO_INDISPONIVEL = '__extracao_indisponivel__';
+  /** Vai no contexto so quando o sistema CONFIRMOU vaga para o periodo. */
+  private static readonly MARCA_VAGA_CONSULTADA =
+    'VAGA CONFIRMADA: o sistema de reservas foi consultado agora e há apartamentos para este período.';
 
   private async extrair(conversation: string): Promise<any> {
     const chave = createHash('sha256').update(conversation).digest('hex').slice(0, 16);
@@ -2526,6 +2562,17 @@ export class AssistController {
         this.registrarDecisao(`${porCasais.length} casais: um apartamento duplo para cada`, stay);
       }
     }
+    // "3 em um apto, 4 em outro": a divisao ja foi dita - ver apartamentosDeclarados.
+    if (detalhe.length <= 1) {
+      const declarados = apartamentosDeclarados(falasDoHospede);
+      const totalDito =
+        (Number(stay.adults) || 0) + (Number(stay.children0_6) || 0) + (Number(stay.children7_9) || 0);
+      const soma = declarados ? declarados.reduce((s, a) => s + a.adultos, 0) : 0;
+      if (declarados && (totalDito === 0 || soma === totalDito)) {
+        detalhe = declarados;
+        this.registrarDecisao(`divisao dita pelo hospede: ${declarados.length} apartamentos`, stay);
+      }
+    }
     // O hospede PEDIU uma pessoa - isso vem antes de qualquer outra coisa.
     //
     // Pedido do dono (15/10/2026). O caminho automatico ja escalava nesse caso;
@@ -2712,6 +2759,13 @@ ${url}`;
         );
       }
 
+      // Marca que a vaga foi CONFIRMADA no sistema. E o que permite, la no
+      // suggest(), deixar passar "temos disponibilidade" - sem a marca, a
+      // guarda corta a frase (ver semGarantiaDeVaga).
+      if (disp && disp.categorias.length) {
+        contextoDisponibilidade = `\n\n${AssistController.MARCA_VAGA_CONSULTADA}`;
+      }
+
       if (disp) {
         const poucos = disp.categorias.filter((c) => c.restantes !== null);
         const linhas: string[] = [];
@@ -2724,7 +2778,7 @@ ${url}`;
           linhas.push('Já SEM disponibilidade neste período: ' + disp.esgotadas.join(', ') + '.');
         }
         if (linhas.length) {
-          contextoDisponibilidade =
+          contextoDisponibilidade +=
             `\n\nDISPONIBILIDADE REAL (consultada agora no sistema, para ${stay.checkin} a ${stay.checkout}):\n` +
             linhas.join('\n') +
             `\nVocê PODE usar esta informação para criar urgência HONESTA — é dado real, não suposição. ` +
@@ -3699,6 +3753,21 @@ ${url}`;
       if (semPromessa !== draft.text) {
         this.registrarDecisao('resposta PROMETIA registro - frase removida', {});
         draft.text = semPromessa;
+      }
+    }
+
+    // Vaga que ninguem consultou tambem nao chega ao campo de digitacao.
+    //
+    // Era a unica guarda que faltava na extensao. Caso real (20/10/2026): sete
+    // pessoas em dois apartamentos, nenhuma consulta feita, e a sugestao abriu
+    // com "Temos disponibilidade para o periodo de 16/11 a 25/11 para os dois
+    // apartamentos". So passa quando o sistema confirmou a vaga para o periodo.
+    if (draft.text) {
+      const consultou = reserva.includes(AssistController.MARCA_VAGA_CONSULTADA);
+      const semVaga = semGarantiaDeVaga(draft.text, consultou);
+      if (semVaga !== draft.text) {
+        this.registrarDecisao('resposta GARANTIA vaga sem consulta - frase removida', {});
+        draft.text = semVaga;
       }
     }
     }

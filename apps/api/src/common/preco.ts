@@ -33,15 +33,30 @@ export function semPrecoInventado(texto: string, link?: string | null): string {
   const original = texto || '';
   if (!original.trim() || !fraseTemPreco(original)) return original;
 
-  const limpo = original
-    .split(/\r?\n/)
-    .map((linha) =>
-      linha
-        .split(/(?<=[.!?])\s+/)
-        .filter((f) => !fraseTemPreco(f))
-        .join(' ')
-        .trim(),
-    )
+  const linhas = original.split(/\r?\n/);
+  const cortada: boolean[] = [];
+  const restos = linhas.map((linha, i) => {
+    const sobra = linha
+      .split(/(?<=[.!?])\s+/)
+      .filter((f) => !fraseTemPreco(f))
+      .join(' ')
+      .trim();
+    cortada[i] = Boolean(linha.trim()) && !sobra;
+    return sobra;
+  });
+
+  // Rotulo que ficou orfao: "Para 3 pessoas:" com o valor na linha de baixo.
+  // Caso real (20/10/2026): a guarda cortou os valores e a mensagem chegou ao
+  // atendente com "Para 3 pessoas:" e "Para 4 pessoas:" seguidos de nada.
+  // So sai o rotulo cuja PROXIMA linha com texto foi justamente a cortada.
+  for (let i = 0; i < restos.length; i++) {
+    if (!/:\s*$/.test(restos[i])) continue;
+    let j = i + 1;
+    while (j < linhas.length && !linhas[j].trim()) j++;
+    if (j < linhas.length && cortada[j]) restos[i] = '';
+  }
+
+  const limpo = restos
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
