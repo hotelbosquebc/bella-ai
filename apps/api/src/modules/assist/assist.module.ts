@@ -70,6 +70,18 @@ export function apenasFalasDoHospede(conversation: string): string {
   return saida.join('\n');
 }
 
+/** So as falas do hospede marcadas como de HOJE ("Hóspede (hoje): ..."), com as linhas de continuacao. */
+export function apenasFalasDoHospedeDeHoje(conversation: string): string {
+  const saida: string[] = [];
+  let pega = false;
+  for (const linha of (conversation || '').split(/\r?\n/)) {
+    if (/^\s*H[óo]spede\s*\(hoje\)\s*:/i.test(linha)) pega = true;
+    else if (/^\s*(H[óo]spede|N[óo]s)\s*(\(hoje\))?\s*:/i.test(linha)) pega = false;
+    if (pega) saida.push(linha);
+  }
+  return saida.join('\n');
+}
+
 /**
  * Os assuntos que a Bella responde, e com que frequencia.
  *
@@ -2341,6 +2353,14 @@ export class AssistController {
       stay.checkout = null;
     }
 
+    // Saida no mesmo dia da entrada (ou antes) e zero diarias. Caso real
+    // (20/10/2026): saiu link de 21/10 a 21/10. Nao e periodo: e leitura
+    // torta - pedir para confirmar, como nas datas que nao fecham.
+    if (stay.checkin && stay.checkout && String(stay.checkout) <= String(stay.checkin)) {
+      stay.checkout = null;
+      stay.dataImpossivel = true;
+    }
+
 
     // String.raw: a expressao precisa chegar com as barras invertidas intactas.
     // Escrita como texto comum, '\b' virava caractere de controle e a trava nao
@@ -2354,14 +2374,36 @@ export class AssistController {
     const temTipoDeQuarto = /\b(casal|duplo|dupla|triplo|tripla|qu[áa]druplo|individual|single|solteiro|matrimonial|doble|triple|double)\b/i;
     const temComposicao =
       /\b(somos|seremos|s[ãa]o|seria|ser[íi]a|vamos)\s+\d+|\bsozinh[oa]\b|\b(eu|yo)\s+(e|y|com|con)\s|\beu e (a |o |minha |meu )/i;
-    const mencionaPessoas =
-      temNumeroDePessoas.test(falasDoHospede) ||
-      temPessoasPorExtenso.test(falasDoHospede) ||
-      temTipoDeQuarto.test(falasDoHospede) ||
-      temComposicao.test(falasDoHospede);
+    const falaDePessoas = (t: string) =>
+      temNumeroDePessoas.test(t) || temPessoasPorExtenso.test(t) || temTipoDeQuarto.test(t) || temComposicao.test(t);
+    const mencionaPessoas = falaDePessoas(falasDoHospede);
 
     if (!mencionaPessoas && stay.adults) {
       stay.adults = null;
+    }
+
+    // Data de HOJE com gente de OUTRO DIA: confirmar, nao supor.
+    //
+    // Caso real (20/10/2026): contato nao salvo, cinco mensagens na tela ("tem
+    // disponibilidade de hoje pra amanha? qual o valor da diaria?"), nenhuma
+    // palavra sobre quantas pessoas. A extensao mandou 29 falas - o historico
+    // guardado daquele contato - e o "1 adulto" veio de la. Saiu link para 1
+    // pessoa e "restam poucas unidades", consultado para essa ocupacao que a
+    // hospede nunca deu.
+    //
+    // As linhas de hoje chegam marcadas com "(hoje)". Se o pedido de agora tem
+    // data e nao fala de gente, a ocupacao antiga e de OUTRO pedido: pode ter
+    // mudado. Pedir para confirmar custa uma mensagem; o link errado custa a
+    // venda.
+    const falasDeHoje = apenasFalasDoHospedeDeHoje(conversation);
+    if (
+      stay.adults &&
+      falasDeHoje.trim() &&
+      !falaDePessoas(falasDeHoje) &&
+      (temNumeroDeData.test(falasDeHoje) || temDataRelativa.test(falasDeHoje) || temDiaDaSemana.test(falasDeHoje))
+    ) {
+      stay.adults = null;
+      stay.ocupacaoDeOutroDia = true;
     }
 
     // Oferta de atendimento humano — SÓ dentro do horário do setor de reservas.
@@ -2492,6 +2534,10 @@ export class AssistController {
           `virou "dezembro" numa resposta. Peça as datas exatas e explique, em meia frase, ` +
           `que os valores mudam conforme o período.`
         : '';
+      const avisoOcupacaoAntiga = stay.ocupacaoDeOutroDia
+        ? ` Em conversas de OUTROS DIAS ele chegou a falar de quantidade de pessoas, mas no pedido de hoje não ` +
+          `disse. NÃO suponha que é a mesma: pergunte quantas pessoas serão desta vez (e a idade das crianças, se houver).`
+        : '';
       const avisoDataImpossivel = stay.dataImpossivel
         ? ` ATENÇÃO: ele JÁ DEU datas, mas elas não fecham (ex.: "31 a 1 de dezembro" — ` +
           `novembro não tem dia 31). NÃO pergunte as datas como se ele não tivesse dito nada e ` +
@@ -2503,6 +2549,7 @@ export class AssistController {
         `${faltam.map((c) => rotulos[c]).join(', ')}. Não pergunte o que ele já informou. ` +
         `NÃO prometa verificar valores ou disponibilidade — quem consulta é o próprio hóspede no link.` +
         avisoVago +
+        avisoOcupacaoAntiga +
         avisoDataImpossivel
       );
     }
