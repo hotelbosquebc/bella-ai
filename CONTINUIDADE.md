@@ -216,6 +216,17 @@ link de reservas.
    erro era 503, e as sugestões levavam de 26 a 82 s. Agora cada modelo
    passa por todas as chaves antes de descer para o lento. Veja
    `semCota` em `/api/assist/diagnostico-ia`.
+   **Também em 20/10** (`402abca`): data de hoje com ocupação só de outros
+   dias → pede para confirmar quantas pessoas. Saída igual à entrada → pede
+   para confirmar as datas. ⚠️ **Investigar:** contato não salvo (Rayanne,
+   5 falas na tela) chegou ao servidor com 29 falas do hóspede e 11 nossas,
+   vindas do histórico guardado pela extensão (`chaveConversa` =
+   título do cabeçalho). Falta saber se é histórico legítimo do mesmo número
+   ou outro contato caindo no mesmo registro, como no bug da 1.1.6.
+   **Chaves do Gemini:** a chave 2 é INVÁLIDA (400). A chave 3 (projeto
+   Bella 3) funciona só nos 3.x, porque projeto novo não tem a linha 2.5.
+   Para ganhar velocidade, trocar a chave 2 por uma nova do **Gemini
+   Project**.
    **Pendente:** ela inventou que a nota fiscal "se solicita na recepção no
    check-out". Não há nada sobre nota fiscal na base. Falta o dono dizer a
    regra verdadeira, para entrar como conhecimento.
