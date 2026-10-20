@@ -196,6 +196,14 @@ export class ModelRouterService {
               this.marcarEsgotado(idx, modelo, motivo);
               continue;
             }
+            // 404 "no longer available to new users": projeto criado depois que
+            // o Google fechou a linha 2.5 (caso da chave 3, de 20/10/2026). Nao
+            // vai mudar ate amanha nem depois - pula o par por 24h, sem gastar
+            // chamada, e tenta a proxima chave no mesmo modelo.
+            if (motivo.includes('404')) {
+              this.marcarEsgotado(idx, modelo, 'retry in 24h');
+              continue;
+            }
             // Outro erro (503 congestionado, 500...) e do MODELO, nao da chave:
             // trocar de chave repetiria o mesmo. Desce para o proximo modelo.
             break;
