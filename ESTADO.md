@@ -719,3 +719,25 @@ Segundo PC ainda na extensão 1.9.2 (zip pronto na Área de Trabalho; extrair em
 apagar `C:\bella-extensao-1.9.2` (confirmado: nenhuma extensão aponta para ela)
 · mensagem de ausência do WhatsApp com horário errado · capítulo III do contrato
 · senha do Supabase · pedir à Fiama remoção do portfólio dela.
+
+---
+
+## Análise do App — ENVIADA em 20/10/2026
+
+`submission_id=2216495959296031` · permissões `whatsapp_business_management` e
+`whatsapp_business_messaging` · status **"Análise em andamento"**.
+
+Prazo informado pela Meta: **até 20 dias**, podendo ser mais se pedirem
+informação adicional.
+
+O contador de chamadas de API virou de `0 de 1` para `Ativo (1)` cerca de 18h
+depois da chamada feita pelo Explorador da Graph API — dentro das 24h que a
+Meta avisa.
+
+⚠️ **Durante a análise, não mexer no app.** A Meta avalia o app inteiro, não só
+o que foi pedido: ícone, URL da política de privacidade, categoria, domínios e
+as permissões já aprovadas antes. Mudar qualquer um desses no meio do processo
+é pedir rejeição. Alterar o CÓDIGO da Bella é seguro — o que não se toca é a
+configuração do app no painel da Meta.
+
+Se a Meta pedir mais informação, aparece em Análise do app > Pedidos.
