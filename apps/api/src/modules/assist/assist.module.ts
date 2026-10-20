@@ -2091,6 +2091,7 @@ export class AssistController {
     sinaisAudio: string[];
     marcadorDeAudioNaConversa: boolean;
     fontesDirecao?: Record<string, number>;
+    historico?: { fonte: string; naTela: number; guardadas: number };
     formato?: Record<string, number | boolean>;
   }[] = [];
 
@@ -3514,7 +3515,7 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; anterior?: string }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; historico?: { fonte?: string; naTela?: number; guardadas?: number }; anterior?: string }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     // Cronometro das etapas. "Esta demorando muito" precisa virar numero: sem
     // isso a gente otimiza no escuro. Nenhum texto entra aqui, so tempos.
@@ -3542,6 +3543,17 @@ ${url}`;
       sinaisAudio: Array.isArray(body.sinaisAudio) ? body.sinaisAudio.map((s) => String(s).slice(0, 80)).slice(0, 5) : [],
       marcadorDeAudioNaConversa: /\[(mensagem de voz|áudio transcrito)/i.test(conversation),
       fontesDirecao: body.fontesDirecao && typeof body.fontesDirecao === 'object' ? body.fontesDirecao : undefined,
+      // Como a extensao identificou o historico (1.10.3+): "por-chat" e o
+      // esperado; "sem-identificador" quer dizer que o WhatsApp mudou a
+      // marcacao e a Bella esta trabalhando so com a tela. So contagens.
+      historico:
+        body.historico && typeof body.historico === 'object'
+          ? {
+              fonte: String(body.historico.fonte || '').slice(0, 30),
+              naTela: Number(body.historico.naTela) || 0,
+              guardadas: Number(body.historico.guardadas) || 0,
+            }
+          : undefined,
       formato,
     });
     if (this.clientes.length > 20) this.clientes.shift();

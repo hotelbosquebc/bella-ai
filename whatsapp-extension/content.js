@@ -116,9 +116,37 @@
    * mesmo balde. O resultado foi a Bella citar, para um contato, a estadia de
    * outro hospede. Sem identificacao segura da conversa nao se grava nada.
    */
-  function chaveConversa() {
-    const t = tituloDaConversa();
-    return t ? 'hist:' + t : null;
+  //
+  // 1.10.3 (20/10/2026): a chave deixou de ser o TITULO e passou a ser o
+  // identificador interno do chat, que o WhatsApp grava em cada balao
+  // (data-id="false_5547...@c.us_ID"). O titulo e o painel de mensagens nao
+  // trocam no mesmo instante: na passagem de uma conversa para outra, as
+  // mensagens de uma podiam ser gravadas com o nome da outra. Caso real: um
+  // contato nao salvo, com 5 mensagens na tela, chegou ao servidor com 29
+  // falas de hospede - e a Bella usou a ocupacao de outro pedido.
+  //
+  // Agora cada mensagem guardada carrega o chat de onde veio, e so entra no
+  // historico de uma conversa o que tem o identificador dela. Sem
+  // identificador legivel, nada e gravado nem lido: a Bella fica so com a
+  // tela, que e menos contexto, mas nunca contexto de outra pessoa.
+  // Os baldes antigos ('hist:' + titulo) deixam de ser lidos.
+  function chaveConversa(chat) {
+    return chat ? 'hist2:' + chat : null;
+  }
+
+  /** O chat a que o balao pertence, pelo data-id ("false_5547...@c.us_ID" -> "5547...@c.us"). */
+  function chatDoBalao(row) {
+    if (!row) return null;
+    const alvo = row.matches && row.matches('[data-id]') ? row : row.querySelector && row.querySelector('[data-id]');
+    const id = (alvo && alvo.getAttribute('data-id')) || '';
+    const m = id.match(/^(?:true|false)_([^_\s]+@[^_\s]+)_/);
+    return m ? m[1] : null;
+  }
+
+  /** Linha no formato que o servidor le, com "(hoje)" calculado AGORA, nao quando foi guardada. */
+  function linhaDe(e) {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    return (e.autor === 'h' ? 'Hóspede' : 'Nós') + (e.data && e.data === hoje ? ' (hoje)' : '') + ': ' + e.texto;
   }
 
   /** '13/08/2026' + '10:02' -> '202608131002', para ordenar cronologicamente. */
@@ -144,13 +172,14 @@
   }
 
   /** Junta o que esta na tela com o que ja foi visto antes, sem duplicar. */
-  async function mesclarHistorico(atuais) {
-    if (!document.querySelector('#main')) return atuais || [];
-    const chave = chaveConversa();
-    if (!chave) return atuais || [];
-    const anterior = await lerHistorico(chave);
+  async function mesclarHistorico(atuais, chat) {
+    const daTela = (atuais || []).filter(function (m) { return m && m.texto && m.chat === chat; });
+    if (!document.querySelector('#main')) return daTela;
+    const chave = chaveConversa(chat);
+    if (!chave) return daTela;
+    const anterior = (await lerHistorico(chave)).filter(function (m) { return m && m.texto && m.chat === chat; });
     const mapa = new Map();
-    anterior.concat(atuais || []).forEach(function (m) { if (m && m.linha) mapa.set(m.linha, m); });
+    anterior.concat(daTela).forEach(function (m) { mapa.set(m.autor + '|' + m.ord + '|' + m.texto, m); });
     const juntas = [...mapa.values()].sort(function (a, b) { return a.ord < b.ord ? -1 : a.ord > b.ord ? 1 : 0; });
     await gravarHistorico(chave, juntas);
     return juntas;
@@ -438,8 +467,11 @@
 
   /** De onde veio a direcao dos baloes na ultima leitura, para o diagnostico. */
   let fontesDeDirecao = {};
+  /** Como o historico foi identificado na ultima leitura - vai para o diagnostico, sem nenhum dado do contato. */
+  let historicoFonte = 'sem-leitura';
 
   function scrapeConversation() {
+    historicoFonte = 'sem-leitura';
     // #main é o painel da conversa aberta; evita varrer a lista de contatos
     // e o próprio painel da Bella.
     const main = document.querySelector('#main') || document.body;
@@ -513,6 +545,7 @@
       fontesDeDirecao = {};
       let ultimaOrdConhecida = null;
       let semDataSeguidas = 0;
+      const chatsNaTela = {};
 
       for (const row of linhasDaConversa) {
         const el = row.querySelector('.copyable-text[data-pre-plain-text]');
@@ -571,14 +604,21 @@
         // afirmando que o hospede mandou audio. Audio transcrito, esse sim,
         // tem conteudo e fica.
         const audioSemConteudo = !m && /\[mensagem de voz/.test(t);
+        const chat = chatDoBalao(row);
+        if (chat) chatsNaTela[chat] = (chatsNaTela[chat] || 0) + 1;
         if (!audioSemConteudo) {
-          estruturado.push({ linha: msgs[msgs.length - 1], ord: ord });
+          estruturado.push({ autor: isIn ? 'h' : 'n', texto: t, data: m ? m[2] : null, ord: ord, chat: chat });
         }
         if (isIn) lastIn = t;
       }
 
       if (msgs.length) {
-        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado };
+        // UM chat so na tela: e ele. Mais de um quer dizer que o WhatsApp esta
+        // no meio da troca de conversa - nao e hora de gravar nem de juntar.
+        const chats = Object.keys(chatsNaTela);
+        const chatAtual = chats.length === 1 ? chats[0] : null;
+        historicoFonte = chats.length === 1 ? 'por-chat' : chats.length > 1 ? 'chats-misturados' : 'sem-identificador';
+        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado, chatAtual: chatAtual };
       }
     }
 
@@ -1167,18 +1207,29 @@
     const lido = scrapeConversation();
     let { conversation, lastMessage, lidas } = lido;
 
+    // Balões de mais de um chat na tela: o WhatsApp ainda está trocando de
+    // conversa. Sugerir agora seria responder misturando duas pessoas.
+    if (historicoFonte === 'chats-misturados') {
+      if (!automatica) status('A conversa ainda está carregando. Aguarde um instante e clique de novo.', true);
+      return;
+    }
+
     // Junta com o que a extensão já viu antes nesta conversa. O WhatsApp Web
     // descarta o histórico, então sem isso a Bella responde sem saber o que o
-    // hóspede escreveu ontem — ou até horas atrás.
+    // hóspede escreveu ontem — ou até horas atrás. Só do MESMO chat: ver
+    // chaveConversa.
+    let guardadas = 0;
     try {
-      const juntas = await mesclarHistorico(lido.estruturado);
+      const juntas = await mesclarHistorico(lido.estruturado, lido.chatAtual);
+      guardadas = juntas.length;
       if (juntas.length > (lido.estruturado || []).length) {
-        conversation = juntas.slice(-40).map(function (m) { return m.linha; }).join(String.fromCharCode(10));
+        conversation = juntas.slice(-40).map(linhaDe).join(String.fromCharCode(10));
         lidas = juntas.length;
       }
     } catch (_) {
       /* storage indisponível — segue com o que está na tela */
     }
+    const historico = { fonte: historicoFonte, naTela: (lido.estruturado || []).length, guardadas: guardadas };
     if (!conversation) {
       if (!automatica) {
         // Distingue "nenhuma conversa aberta" de "não consegui LER a conversa",
@@ -1218,7 +1269,7 @@
           : 'Pensando… (pode levar alguns segundos)') + (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, anterior: anterior || undefined });
+      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, historico: historico, anterior: anterior || undefined });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
@@ -1325,7 +1376,7 @@
     // chrome.storage. Numa aba que fica aberta o dia todo na recepcao, era
     // escrita continua sem nada de novo para escrever.
     if (conversation && conversation !== ultimaConversa) {
-      mesclarHistorico(lido.estruturado).catch(function () {});
+      mesclarHistorico(lido.estruturado, lido.chatAtual).catch(function () {});
     }
     if (!conversation || conversation === ultimaConversa) return;
     const trocouDeConversa = tituloDaConversa() !== tituloAnterior;
