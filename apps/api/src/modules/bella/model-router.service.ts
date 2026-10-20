@@ -136,6 +136,10 @@ export class ModelRouterService {
               .filter(([, ate]) => ate > Date.now())
               .map(([k, ate]) => ({ chave: Number(k.split('|')[0]) + 1, modelo: k.split('|')[1], ate: new Date(ate).toISOString() }))
           : null,
+      errosPorChave:
+        this.provider === 'gemini'
+          ? [...this.ultimoErroPorChave.entries()].map(([chave, e]) => ({ chave, ...e }))
+          : null,
       quedasRecentes: this.quedas.length,
       ultimasQuedas: this.quedas.slice(-10),
     };
@@ -169,6 +173,16 @@ export class ModelRouterService {
             const motivo = err instanceof Error ? err.message : String(err);
             tentativas.push({ modelo: `${modelo} (chave ${idx + 1})`, motivo: motivo.slice(0, 700) });
             this.logger.warn(`Modelo ${modelo} indisponivel na chave ${idx + 1}: ${motivo}`);
+            // O ultimo erro de cada chave fica visivel no diagnostico. Em
+            // 20/10/2026 a chave nova falhava com um erro que nao era cota nem
+            // chave invalida, e o motivo so existia no log do Render.
+            if (!motivo.includes('429')) {
+              this.ultimoErroPorChave.set(idx + 1, {
+                quando: new Date().toISOString(),
+                modelo,
+                motivo: motivo.slice(0, 300),
+              });
+            }
             // Chave recusada: o problema e a credencial. Marca e tenta a proxima.
             if (motivo.includes('API_KEY_INVALID')) {
               this.marcarChaveInvalida();
@@ -287,6 +301,9 @@ export class ModelRouterService {
    */
   private readonly esgotados = new Map<string, number>();
 
+  /** Ultimo erro que nao foi cota, por chave (1, 2, 3...). Nunca o valor da chave. */
+  private readonly ultimoErroPorChave = new Map<number, { quando: string; modelo: string; motivo: string }>();
+
   private esgotado(idx: number, modelo: string): boolean {
     const ate = this.esgotados.get(`${idx}|${modelo}`);
     if (!ate) return false;
@@ -332,8 +349,8 @@ export class ModelRouterService {
       },
     });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    const data = await this.fetchGemini(url, model, buildBody);
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const data = await this.fetchGemini(url, model, buildBody, key);
     const text: string = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
     return this.pack(text, model, wantsJson);
   }
@@ -369,9 +386,9 @@ export class ModelRouterService {
         ...(withThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
       },
     });
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     try {
-      const data = await this.fetchGemini(url, model, buildBody);
+      const data = await this.fetchGemini(url, model, buildBody, key);
       const text: string = data.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') ?? '';
       return text.trim();
     } catch (err) {
@@ -393,16 +410,16 @@ export class ModelRouterService {
    * Sem isso, um alias que não aceita o parâmetro derruba TODA resposta da Bella
    * para o mock ("estou com a inteligência em configuração").
    */
-  private async fetchGemini(url: string, model: string, buildBody: (withThinking: boolean) => unknown): Promise<any> {
+  private async fetchGemini(url: string, model: string, buildBody: (withThinking: boolean) => unknown, key: string): Promise<any> {
     const tentarComThinking = !this.semThinkingConfig.has(model);
     try {
-      return await this.fetchWithRetry(url, buildBody(tentarComThinking));
+      return await this.fetchWithRetry(url, buildBody(tentarComThinking), key);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (tentarComThinking && msg.includes('400') && msg.includes('INVALID_ARGUMENT')) {
         this.semThinkingConfig.add(model);
         this.logger.warn(`Modelo ${model} não aceita thinkingConfig; repetindo sem esse parâmetro.`);
-        return this.fetchWithRetry(url, buildBody(false));
+        return this.fetchWithRetry(url, buildBody(false), key);
       }
       throw err;
     }
@@ -438,12 +455,16 @@ export class ModelRouterService {
    * modelo (a janela vira em segundos). Se e longa, desistimos rapido - e quem
    * chamou sabe, pelo 429 na mensagem, que nao adianta tentar outro modelo.
    */
-  private async fetchWithRetry(url: string, body: unknown, attempts = 3): Promise<any> {
+  private async fetchWithRetry(url: string, body: unknown, key: string, attempts = 3): Promise<any> {
     let lastErr = '';
     for (let i = 0; i < attempts; i++) {
+      // A chave vai no cabecalho, nao na URL. As chaves novas do AI Studio
+      // (20/10/2026) vem num formato diferente ("AQ." em vez de "AIza"), e o
+      // cabecalho e a forma que o Google documenta para os dois. De quebra, a
+      // chave deixa de aparecer em qualquer log que registre a URL.
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify(body),
       });
       if (res.ok) return res.json();
