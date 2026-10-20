@@ -49,8 +49,20 @@ status "Análise em andamento", prazo de **até 20 dias**.
 auditoria de 20/10 mostrou a recepção reescrevendo do zero 87% das sugestões.
 Esse número é anterior às correções desta semana.
 
-**Instagram e Facebook pararam de responder sozinhos** e isso segue sem
-explicação — `percurso` vazio em `/api/channels/diagnostico`.
+**Instagram e Facebook: a Bella não recebe as mensagens dos hóspedes.** O
+hóspede só vê a resposta automática da Meta (a do Business Suite, que roda
+fora do nosso app), e o `percurso` em `/api/channels/diagnostico` fica vazio.
+Causa provável, achada em 20/10: **o app está em modo desenvolvimento**
+(acesso padrão). Nesse modo a Meta só entrega webhook de quem tem papel no
+app, como o perfil "Victor Bosque". Por isso os testes de 15/10 funcionaram e
+os hóspedes de verdade nunca chegaram. Não é bug de código: a mensagem não
+sai da Meta.
+
+⚠️ **A análise enviada em 20/10 NÃO resolve isso.** Ela pede só as permissões
+do WhatsApp. Para o Instagram e o Facebook falta uma **segunda análise**, com
+`pages_messaging` e `instagram_manage_messages` (acesso avançado). Ela só pode
+ser enviada depois que a atual terminar, porque o painel não se mexe durante a
+análise.
 
 ---
 
@@ -72,6 +84,8 @@ sobra.
 **Critério combinado com o dono:** se "dados incompletos" cair para perto de 20
 e o acerto subir para algo como 40%, faz sentido ligar o automático — começando
 por Instagram e Facebook, que têm volume menor e já têm todas as travas.
+(Esses dois canais também dependem de uma segunda análise da Meta. Ver "A
+fazer", item 2.)
 
 ⚠️ **Esperar 2 ou 3 dias de uso antes de medir.** A janela do diagnóstico é de
 7 dias e ainda está contaminada pelo período anterior às correções.
@@ -179,10 +193,15 @@ link de reservas.
 ## A fazer
 
 1. **Medir** (ver acima) — decide o resto.
-2. **Instagram e Facebook sem resposta automática.** Falta o dono mandar um
-   "oi" de uma conta que não seja a do hotel para o Instagram @hotelbosquebc ou
-   para a Página, e então olhar `/api/channels/diagnostico`. Sem isso não dá
-   para saber se a Meta parou de entregar ou se a Bella não responde.
+2. **Instagram e Facebook sem resposta** (ver "Onde o projeto está").
+   Para confirmar: mandar "oi" para a Página **pelo Messenger do perfil
+   pessoal "Victor Bosque"**, que tem papel no app, e olhar
+   `/api/channels/diagnostico`. Se aparecer a linha e a Bella responder,
+   confirmado: o código funciona e o bloqueio é o modo do app. Depois que a
+   análise do WhatsApp terminar, enviar a segunda análise
+   (`pages_messaging` + `instagram_manage_messages`). **Isso muda o critério de
+   ligar o automático.** Começar por Instagram e Facebook depende da medição
+   **e** dessa segunda aprovação.
 3. **Mensagem de espera** no caminho automático, para o silêncio de 5 a 12s não
    parecer abandono. ⚠️ O texto **não pode** dizer "vou verificar os valores e a
    disponibilidade": ela não informa valores, e `checkAvailability()` naquele
