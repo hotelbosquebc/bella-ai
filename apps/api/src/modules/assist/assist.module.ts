@@ -23,7 +23,7 @@ export { fraseTemPreco, semPrecoInventado };
 import { motivoParaHumano } from '../bella/escalonamento';
 import { blocoDeContato } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
-import { hospedePediuAtendente } from '../bella/escalonamento';
+import { hospedePediuAtendente, hospedeTravouNoSite } from '../bella/escalonamento';
 // Reexportado para nao quebrar quem ja importava daqui (e os testes).
 export { corrigirLinks, garantirLink };
 
@@ -2123,6 +2123,34 @@ export class AssistController {
     const falasParaTriagem = temAutoria(conversation)
       ? apenasFalasDoHospede(conversation)
       : conversation;
+
+    // TRAVOU NO SITE: entrega a uma pessoa, antes de qualquer outra coisa.
+    //
+    // Decisao do dono em 20/10/2026. "Nao aparece disponibilidade" ou "o link
+    // nao abre" e o contato mais quente que existe: ele JA decidiu reservar e
+    // esbarrou num obstaculo. Insistir no link ali e a pior resposta, e o
+    // hospede desiste em silencio.
+    //
+    // E a Bella nao tem como conferir sozinha: do servidor o Cloudflare
+    // bloqueia a consulta ao Silbeck (403, confirmado em producao hoje), e no
+    // Reveillon o site realmente nao mostra nada com menos de 5 diarias. Entao
+    // ela nao discute e nao adivinha - passa para quem abre o sistema e olha.
+    //
+    // Vem antes de tudo de proposito: nao adianta montar link para quem acabou
+    // de dizer que o link nao funcionou.
+    if (hospedeTravouNoSite(ultimaFalaDoHospede(conversation))) {
+      this.registrarDecisao('hospede travou no site: entregar a uma pessoa', {});
+      return (
+        `\n\nO HÓSPEDE DISSE QUE NÃO CONSEGUIU: ou não apareceu disponibilidade, ou o link não abriu.\n` +
+        `NÃO mande o link de novo e NÃO insista que ele tente outra vez — ele já tentou. ` +
+        `NÃO afirme que há ou que não há vaga: você não consultou o sistema e não tem como saber.\n` +
+        `Reconheça o que aconteceu em uma frase, pergunte se ele tem interesse em OUTRAS DATAS ` +
+        `(muitas vezes é um único dia lotado no meio do período, e mudar a entrada ou a saída resolve) ` +
+        `e diga que vai passar para a nossa equipe de reservas verificar no sistema.` +
+        contextoDeEntregaAoHumano(isWithinBusinessHours())
+      );
+    }
+
     // Antes de gastar chamada: a frase se le sozinha?
     //
     // "10/10 a 12/10 / 2 adultos" nao precisa de modelo. Isso corta a maior

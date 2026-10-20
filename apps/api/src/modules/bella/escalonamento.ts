@@ -109,6 +109,35 @@ export function hospedePediuAtendente(texto: string): boolean {
   return PEDIU_HUMANO.some((r) => r.test(texto || ''));
 }
 
+/**
+ * O hospede travou no site: nao aparece disponibilidade, ou o link nao abre.
+ *
+ * Decisao do dono em 20/10/2026. Este e o contato mais quente que existe - ele
+ * JA decidiu reservar e esbarrou num obstaculo. Hoje a Bella insiste no link,
+ * que e a pior resposta possivel, e o hospede desiste em silencio.
+ *
+ * A Bella nao tem como conferir: do servidor o Cloudflare bloqueia a consulta
+ * ao Silbeck (403 "Just a moment", confirmado em producao em 20/10/2026), e no
+ * Reveillon o site realmente nao mostra nada com menos de 5 diarias. Entao ela
+ * nao discute e nao adivinha: passa para quem pode abrir o sistema e olhar.
+ */
+const TRAVOU_NO_SITE: RegExp[] = [
+  // "nao tem disponibilidade", "sem disponibilidade", "nao aparece nada"
+  /\bn[ãa]o\s+(?:tem|h[áa]|aparece|mostra|consta|achei|encontrei|acho|encontro)\b[^.!?]{0,30}\b(?:disponibilidade|vaga|aparta|quarto|nada|op[çc][ãa]o|data)/i,
+  /\bsem\s+disponibilidade\b/i,
+  /\b(?:est[áa]|ficou|aparece como)\s+(?:indispon[íi]vel|esgotado|lotado)\b/i,
+  // "o link nao abre", "nao consigo acessar", "deu erro no site"
+  /\b(?:link|site|p[áa]gina)\b[^.!?]{0,25}\bn[ãa]o\s+(?:abre|abriu|funciona|funcionou|carrega|carregou|vai)\b/i,
+  /\bn[ãa]o\s+(?:consigo|consegui|estou conseguindo|to conseguindo)\b[^.!?]{0,30}\b(?:acessar|abrir|entrar|reservar|ver|visualizar|fazer)\b/i,
+  /\b(?:deu|dá|da)\s+erro\b/i,
+  // Espanhol - hospede argentino e rotina aqui
+  /\bno\s+(?:hay|aparece|muestra|tengo|puedo)\b[^.!?]{0,30}\b(?:disponibilidad|habitaci[óo]n|nada|acceder|abrir|entrar)/i,
+];
+
+export function hospedeTravouNoSite(texto: string): boolean {
+  return TRAVOU_NO_SITE.some((r) => r.test(texto || ''));
+}
+
 export interface DadosDaDecisao {
   /** O que o hospede acabou de escrever. */
   falaDoHospede: string;
@@ -135,6 +164,10 @@ export function motivoParaHumano(dados: DadosDaDecisao): string | null {
 
   if (RECLAMACAO.some((r) => r.test(fala))) {
     return 'o hóspede fez uma reclamação';
+  }
+
+  if (hospedeTravouNoSite(fala)) {
+    return 'o hóspede não conseguiu ver disponibilidade ou usar o link';
   }
 
   const outraLingua = idiomaNaoAtendido(fala);
