@@ -227,9 +227,17 @@ link de reservas.
    Bella 3) funciona só nos 3.x, porque projeto novo não tem a linha 2.5.
    Para ganhar velocidade, trocar a chave 2 por uma nova do **Gemini
    Project**.
-   **Pendente:** ela inventou que a nota fiscal "se solicita na recepção no
-   check-out". Não há nada sobre nota fiscal na base. Falta o dono dizer a
-   regra verdadeira, para entrar como conhecimento.
+   **Nota fiscal — regra do dono (21/10, `5e5348e`):** emitida para PF ou
+   PJ, inclusive em reserva do site. Pede-se na recepção no check-out, com
+   CPF/CNPJ, razão social, endereço e e-mail, e sai impressa ou por e-mail.
+   O **tomador** depende da reserva (portal pode receber a nota), por isso
+   uma pessoa sempre confere. Em código (`escalonamento.ts`): a resposta só
+   pode trazer `fraseOficialNotaFiscal`, a extensão dispara
+   `precisaDeHumano` e o automático escala.
+   **21/10 também:** período novo depois da nossa resposta substitui o já
+   respondido (`7ecc064`). "Pet porte pequeno" não conta como criança. Tom
+   mais caloroso (`6f09c70`). ⚠️ O Render levou mais de 1h para publicar o
+   `7ecc064`, por fila do lado dele.
 5. **Alerta de intervenção humana + painel de recados**, dentro do app (decisão
    do dono: no painel, não na extensão). O servidor já devolve `precisaDeHumano`
    com o motivo em cada sugestão. ⚠️ O painel só enxerga conversas que passam
