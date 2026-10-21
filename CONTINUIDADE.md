@@ -49,20 +49,27 @@ status "Análise em andamento", prazo de **até 20 dias**.
 auditoria de 20/10 mostrou a recepção reescrevendo do zero 87% das sugestões.
 Esse número é anterior às correções desta semana.
 
-**Instagram e Facebook: a Bella não recebe as mensagens dos hóspedes.** O
-hóspede só vê a resposta automática da Meta (a do Business Suite, que roda
-fora do nosso app), e o `percurso` em `/api/channels/diagnostico` fica vazio.
-Causa provável, achada em 20/10: **o app está em modo desenvolvimento**
-(acesso padrão). Nesse modo a Meta só entrega webhook de quem tem papel no
-app, como o perfil "Victor Bosque". Por isso os testes de 15/10 funcionaram e
-os hóspedes de verdade nunca chegaram. Não é bug de código: a mensagem não
-sai da Meta.
+**Instagram e Facebook: RELIGADOS em 21/10/2026.** A causa real era a
+**inscrição da Página no app**: estava só no campo `name`, sem `messages`.
+Por isso a Meta não entregava nada, nem mensagem de administrador.
+`/api/channels/diagnostico-meta` mostra a inscrição (só leitura), e o
+botão **"Religar Instagram e Facebook"** na Central da Bella reinscreve a
+Página com `messages` e `messaging_postbacks`. Teste pelo Messenger às
+14:52: chegou, e a Bella respondeu sozinha em 15 s.
+`/api/channels/diagnostico` agora tem `gravado`, que vem do banco e
+sobrevive ao deploy, e registra até as recusas na porta (assinatura).
+Instagram ainda sem teste confirmado.
 
-⚠️ **A análise enviada em 20/10 NÃO resolve isso.** Ela pede só as permissões
-do WhatsApp. Para o Instagram e o Facebook falta uma **segunda análise**, com
-`pages_messaging` e `instagram_manage_messages` (acesso avançado). Ela só pode
-ser enviada depois que a atual terminar, porque o painel não se mexe durante a
-análise.
+⚠️ Ainda vale: o app está em **modo desenvolvimento**. Hóspede sem papel
+no app pode não receber resposta até a **segunda análise**
+(`pages_messaging` + `instagram_manage_messages`), que só pode ser
+enviada depois que a do WhatsApp terminar.
+
+**Regras do dono de 21/10:** no Instagram e no Facebook a Bella responde
+**sempre**, inclusive no expediente. O que ela não souber vai para a
+equipe, e o painel **toca e pisca** (`AlertaAtendimento`, em todas as
+telas). O automático usa o **mesmo `bookingContext`** da extensão
+(`definirLeitorDoPedido`), e toda correção vale para os dois.
 
 ---
 
