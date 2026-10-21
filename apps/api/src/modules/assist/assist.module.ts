@@ -21,7 +21,7 @@ import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 // Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
 export { fraseTemPreco, semPrecoInventado };
-import { motivoParaHumano } from '../bella/escalonamento';
+import { motivoParaHumano, falaDeNotaFiscal, fraseOficialNotaFiscal, semNotaFiscalInventada } from '../bella/escalonamento';
 import { blocoDeContato } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
 import { hospedePediuAtendente, hospedeTravouNoSite } from '../bella/escalonamento';
@@ -3876,6 +3876,21 @@ ${url}`;
         draft.text = semVaga;
       }
     }
+
+    // Nota fiscal: so a frase oficial, nada alem dela (regra do dono,
+    // 21/10/2026 - ver semNotaFiscalInventada). E se o hospede perguntou e a
+    // resposta nao tocou no assunto, a frase entra: pergunta sem resposta e
+    // pior que resposta curta.
+    if (draft.text) {
+      const semNF = semNotaFiscalInventada(draft.text, idiomaEsperado);
+      if (semNF !== draft.text) {
+        this.registrarDecisao('resposta detalhava NOTA FISCAL - trocada pela frase oficial', {});
+        draft.text = semNF;
+      }
+      if (falaDeNotaFiscal(falasDoHospedeDepoisDaNossa(conversation)) && !falaDeNotaFiscal(draft.text)) {
+        draft.text = draft.text.trim() + '\n\n' + fraseOficialNotaFiscal(idiomaEsperado);
+      }
+    }
     }
 
 
@@ -3925,7 +3940,13 @@ ${url}`;
     const motivoHumano = motivoParaHumano({
       falaDoHospede: ultimaFalaDoHospede(conversation),
       resposta: textoFinal,
-    } as any) || (devePassarParaHumano(conversation) ? 'a Bella já pediu os mesmos dados duas vezes' : null);
+    } as any) ||
+      // A pergunta de nota fiscal pode estar numa fala anterior da mesma
+      // rajada, nao so na ultima linha.
+      (falaDeNotaFiscal(falasDoHospedeDepoisDaNossa(conversation))
+        ? 'o hóspede perguntou sobre nota fiscal: verificar o tomador (hóspede, empresa ou portal) antes de confirmar'
+        : null) ||
+      (devePassarParaHumano(conversation) ? 'a Bella já pediu os mesmos dados duas vezes' : null);
 
     return {
       suggestion: formatarParaWhatsApp(textoFinal),

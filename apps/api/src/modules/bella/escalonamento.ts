@@ -138,6 +138,80 @@ export function hospedeTravouNoSite(texto: string): boolean {
   return TRAVOU_NO_SITE.some((r) => r.test(texto || ''));
 }
 
+/**
+ * Nota fiscal: so uma pessoa responde.
+ *
+ * Regra do dono (21/10/2026): o hotel SEMPRE emite nota fiscal de
+ * hospedagem, mas QUEM e o tomador - o hospede, a empresa dele ou o portal
+ * onde a reserva foi feita - depende da reserva, e precisa ser analisado por
+ * alguem antes de confirmar qualquer coisa. Caso que motivou: a Bella
+ * inventou que a nota "se solicita na recepcao no momento do check-out".
+ */
+const NOTA_FISCAL = /\bnota\s+fiscal\b|\bnota\s+d[ae]\s+(?:hospedagem|estadia|reserva|di[áa]ria)|\bnotas\s+fiscais\b|\bnfs?-?e\b|\bnf\b|\bcupom\s+fiscal\b|\bfactura\b|\binvoice\b/i;
+
+export function falaDeNotaFiscal(texto: string): boolean {
+  return NOTA_FISCAL.test(texto || '');
+}
+
+/**
+ * A unica coisa que a Bella pode afirmar sobre nota fiscal.
+ *
+ * Procedimento passado pelo dono em 21/10/2026: pessoa fisica ou empresa,
+ * pedida na recepcao no check-out, com CPF ou CNPJ, razao social, endereco e
+ * e-mail; entregue impressa ou por e-mail; reserva feita pelo site tambem tem
+ * nota. O que NAO entra: em nome de quem sai - reserva de portal pode ter a
+ * nota emitida para o portal, e isso uma pessoa confere.
+ */
+export function fraseOficialNotaFiscal(idioma: 'pt' | 'es' | 'en' = 'pt'): string {
+  if (idioma === 'es') {
+    return (
+      'Sí, el hotel emite factura de hospedaje, para persona física o empresa. ' +
+      'Se solicita en la recepción al hacer el check-out, informando el documento (CPF o CNPJ), razón social, dirección y e-mail, ' +
+      'y puede entregarse impresa o por e-mail. Nuestro equipo va a confirmar los datos de su reserva para la emisión.'
+    );
+  }
+  if (idioma === 'en') {
+    return (
+      'Yes, the hotel issues an invoice for the stay, for individuals or companies. ' +
+      'It is requested at the front desk at check-out, with your tax ID, company name, address and e-mail, ' +
+      'and can be printed or sent by e-mail. Our team will confirm your booking details for the issuance.'
+    );
+  }
+  return (
+    'Sim, o hotel emite nota fiscal de hospedagem, para pessoa física ou empresa. ' +
+    'Ela é solicitada na recepção no momento do check-out, informando CPF ou CNPJ, razão social, endereço e e-mail, ' +
+    'e pode ser entregue impressa ou enviada por e-mail. Nossa equipe vai confirmar os dados da sua reserva para a emissão.'
+  );
+}
+
+/**
+ * Troca tudo o que a resposta diz sobre nota fiscal pela frase oficial.
+ *
+ * Qualquer detalhe alem dela - para quem sai, quando, onde pedir, que dado
+ * informar - e decisao de uma pessoa. Recorte por frase, como nas outras
+ * guardas: o resto da resposta continua valendo.
+ */
+export function semNotaFiscalInventada(texto: string, idioma: 'pt' | 'es' | 'en' = 'pt'): string {
+  const original = texto || '';
+  if (!falaDeNotaFiscal(original)) return original;
+  const oficial = fraseOficialNotaFiscal(idioma);
+  let colocou = false;
+  const linhas = original.split(/\r?\n/).map((linha) =>
+    linha
+      .split(/(?<=[.!?])\s+/)
+      .map((f) => {
+        if (!falaDeNotaFiscal(f)) return f;
+        if (colocou) return '';
+        colocou = true;
+        return oficial;
+      })
+      .filter(Boolean)
+      .join(' ')
+      .trim(),
+  );
+  return linhas.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export interface DadosDaDecisao {
   /** O que o hospede acabou de escrever. */
   falaDoHospede: string;
@@ -164,6 +238,10 @@ export function motivoParaHumano(dados: DadosDaDecisao): string | null {
 
   if (RECLAMACAO.some((r) => r.test(fala))) {
     return 'o hóspede fez uma reclamação';
+  }
+
+  if (falaDeNotaFiscal(fala)) {
+    return 'o hóspede perguntou sobre nota fiscal: verificar o tomador (hóspede, empresa ou portal) antes de confirmar';
   }
 
   if (hospedeTravouNoSite(fala)) {
