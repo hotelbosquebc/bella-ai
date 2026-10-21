@@ -842,7 +842,9 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
  * IA havia extraido, e sem ocupacao nao ha link.
  */
 const PALAVRA_DE_CRIANCA =
-  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|entead[oa]|pequen[oa]|hij[oa]|ni[ñn][oa]|nen[ea]|chic[oa]|nieto|child|kid|son|daughter|baby)/i;
+  // "pequeno" de PORTE nao e crianca: "uma pet porte pequeno" (21/10/2026)
+  // virou crianca sem idade e prendeu o link.
+  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|entead[oa]|(?<!(?:porte|pet|c[ãa]o|cachorr[oa]|gat[oa])\s{1,3})pequen[oa](?!\s+porte)|hij[oa]|ni[ñn][oa]|nen[ea]|chic[oa]|nieto|child|kid|son|daughter|baby)/i;
 
 /** Como se diz "pessoa" nos tres idiomas. */
 const PALAVRA_DE_PESSOA = /(pessoa|persona|adulto|adult|h[óo]spede|hu[ée]sped|guest|gente|people|person)/i;
@@ -1344,6 +1346,22 @@ export function apenasNossasFalas(conversation: string): string {
     if (nossa) saida.push(linha);
   }
   return saida.join('\n');
+}
+
+/** As falas do hospede DEPOIS da nossa ultima mensagem - o pedido de agora. */
+export function falasDoHospedeDepoisDaNossa(conversation: string): string {
+  const linhas = (conversation || '').split(/\r?\n/);
+  let ultimaNossa = -1;
+  linhas.forEach((l, i) => { if (/^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(l)) ultimaNossa = i; });
+  return apenasFalasDoHospede(linhas.slice(ultimaNossa + 1).join('\n'));
+}
+
+/** As falas do hospede ANTES da nossa ultima mensagem - o que ja foi respondido. */
+export function falasDoHospedeAntesDaNossa(conversation: string): string {
+  const linhas = (conversation || '').split(/\r?\n/);
+  let ultimaNossa = -1;
+  linhas.forEach((l, i) => { if (/^\s*N[óo]s\s*(\(hoje\))?\s*:/i.test(l)) ultimaNossa = i; });
+  return ultimaNossa < 0 ? '' : apenasFalasDoHospede(linhas.slice(0, ultimaNossa).join('\n'));
 }
 
 /**
@@ -2459,7 +2477,36 @@ export class AssistController {
     // A extracao devolve UM orcamento so, e o que sai e a combinacao errada -
     // as datas de um pedido com a quantidade do outro. Um link assim parece
     // atendimento pronto e esta errado, o que e pior do que nao mandar link.
-    const periodos = periodosPedidos(falasDoHospede);
+    let periodos = periodosPedidos(falasDoHospede);
+    let intervalosDoPedido = intervalosNaFala(falasDoHospede);
+
+    // Periodo NOVO depois da nossa resposta substitui o antigo.
+    //
+    // Caso real (21/10/2026): a hospede pediu 03 a 09/12, a recepcao respondeu
+    // que o dia 05 estava lotado, e ela mandou "do dia 07 ao dia 13 quanto
+    // ficaria". O codigo viu dois periodos e tratou como dois pedidos
+    // simultaneos: sem link, e a resposta voltou a falar do 03 a 09 - "como
+    // voce ja sabe". O antigo ja foi respondido; o pedido de agora e o que ela
+    // escreveu DEPOIS da nossa ultima mensagem.
+    //
+    // O periodo novo e o que aparece na conversa inteira e NAO aparecia antes
+    // da nossa resposta. Comparar assim, e nao ler so as falas recentes, porque
+    // "do dia 07 ao dia 13" sozinho nao tem mes - o "dezembro" ficou na fala
+    // anterior.
+    if (periodos.length > 1 && apenasNossasFalas(conversation).trim() && falasDoHospedeDepoisDaNossa(conversation).trim()) {
+      const chave = (p: { checkin: string; checkout: string }) => p.checkin + '>' + p.checkout;
+      const antes = new Set(intervalosNaFala(falasDoHospedeAntesDaNossa(conversation)).map(chave));
+      const novos = intervalosNaFala(falasDoHospede).filter((p) => !antes.has(chave(p)));
+      if (antes.size >= 1 && novos.length >= 1) {
+        const br = (iso: string) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+        stay.checkin = novos[0].checkin;
+        stay.checkout = novos[0].checkout;
+        intervalosDoPedido = novos;
+        periodos = novos.map((p) => br(p.checkin) + ' a ' + br(p.checkout));
+        this.registrarDecisao(`periodo novo substitui o ja respondido (${novos.length})`, stay);
+      }
+    }
+
     if (periodos.length > 1) {
       // Mesma ocupacao para todos os periodos? Entao da para orcar os tres.
       //
@@ -2471,7 +2518,7 @@ export class AssistController {
       // A suposicao (as mesmas pessoas em todos) vai DITA na resposta, para ela
       // corrigir se mudar de um periodo para o outro. Sem ocupacao clara, ou
       // com crianca sem idade, cai no caminho antigo de so reconhecer.
-      const intervalos = intervalosNaFala(falasDoHospede);
+      const intervalos = intervalosDoPedido;
       const adultos = Number(stay.adults) || 0;
       if (adultos > 0 && !criancaSemIdade(falasDoHospede) && intervalos.length === periodos.length) {
         const linhas = intervalos.map((p, i) => {
