@@ -194,6 +194,21 @@ link de reservas.
   sempre). No automático ela não afirma nada sobre vaga; quem travar no site vai
   para uma pessoa. O caminho C (pedir ao Silbeck liberação de IP ou API) está
   sobre a mesa e **o e-mail ainda não foi escrito**.
+- **Quem a Bella não atende** (21/10, `038b432`), decidido no código, antes
+  de qualquer IA:
+  - **Guia de grupos e excursões**, marcado no painel (caixa de entrada, 4
+    cores) ou na extensão. Tabela `contatos_marcados`, rota
+    `/api/contatos-marcados`. No automático, a conversa vai direto para a
+    equipe; na extensão, ela não sugere, mostra uma faixa colorida e pinta o
+    contato na lista do WhatsApp Web. Contato salvo é comparado pelo **nome**
+    (a extensão não enxerga o número); contato não salvo, pelo número.
+  - **Currículo e oferta de venda** (`assuntoForaDoAtendimento`): uma resposta
+    curta pronta e a conversa fica com a equipe.
+  - **Grupo do WhatsApp**: a extensão não sugere sozinha, só no clique. O
+    `data-id` com `@g.us` sumiu da marcação; a detecção usa ícone, "dados do
+    grupo", lista de participantes com "Você" e três autores diferentes.
+    **Não confirmado num grupo real.** Se ela ainda sugerir em grupo,
+    investigar o cabeçalho do grupo no WhatsApp Web.
 
 ---
 
