@@ -69,6 +69,46 @@ export class ChannelsService {
     if (this.percurso.length > 50) this.percurso.shift();
   }
 
+  /**
+   * A Pagina continua inscrita no app? So LEITURA na Graph API.
+   *
+   * Em 21/10/2026 nenhuma mensagem do Messenger/Instagram chegava - nem a de
+   * um administrador do app, que o modo desenvolvimento entregaria. O painel
+   * da Meta nao pode ser mexido durante a Analise do App, mas consultar nao
+   * muda nada: aqui perguntamos a Meta, com o token da Pagina que ja esta no
+   * servidor, se a inscricao (subscribed_apps) e o token estao de pe.
+   * Nenhum token sai na resposta.
+   */
+  async diagnosticoMeta() {
+    const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+    const pagina = process.env.FACEBOOK_PAGE_ID;
+    if (!token || !pagina) return { erro: 'FACEBOOK_PAGE_ACCESS_TOKEN ou FACEBOOK_PAGE_ID ausente' };
+    const ler = async (caminho: string) => {
+      try {
+        const r = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${caminho}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const j: any = await r.json();
+        return j?.error ? { erro: `${j.error.code ?? ''} ${j.error.type ?? ''}: ${String(j.error.message ?? '').slice(0, 200)}` } : j;
+      } catch (err) {
+        return { erro: String(err instanceof Error ? err.message : err).slice(0, 200) };
+      }
+    };
+    const [eu, inscricoes, instagram] = await Promise.all([
+      ler('me?fields=id,name'),
+      ler(`${pagina}/subscribed_apps`),
+      ler(`${pagina}?fields=instagram_business_account{id,username}`),
+    ]);
+    return {
+      tokenDaPagina: eu?.erro ? { valido: false, erro: eu.erro } : { valido: true, id: eu?.id, nome: eu?.name },
+      paginaConfigurada: pagina,
+      inscricoes: inscricoes?.erro
+        ? { erro: inscricoes.erro }
+        : (inscricoes?.data || []).map((a: any) => ({ app: a.id, nome: a.name, campos: a.subscribed_fields })),
+      instagram: instagram?.erro ? { erro: instagram.erro } : instagram?.instagram_business_account ?? null,
+    };
+  }
+
   /** As ultimas passagens gravadas no banco (canal, motivo, tempo) - nenhum texto. */
   async percursoGravado() {
     try {

@@ -78,6 +78,12 @@ export class ChannelsController {
     return { percurso: this.channels.percurso.slice(-30), gravado };
   }
 
+  /** A Pagina continua inscrita no app, e o token vale? So leitura - ver diagnosticoMeta. */
+  @Get('diagnostico-meta')
+  diagnosticoMeta() {
+    return this.channels.diagnosticoMeta();
+  }
+
   /**
    * Conclusao do Cadastro Incorporado (coexistencia).
    *
