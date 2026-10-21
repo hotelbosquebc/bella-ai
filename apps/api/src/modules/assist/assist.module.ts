@@ -995,6 +995,48 @@ export function apartamentosDeCasais(
 }
 
 /**
+ * A divisao por apartamento, lida no CODIGO, um trecho por apartamento.
+ *
+ * Caso real (21/10/2026): "um apartamento com 2 adultos e uma crianca com 12
+ * anos e o outro com 2 adultos e duas criancas 9 e 6 anos". O extrator (IA)
+ * devolveu os dois apartamentos SEM as criancas, e saiu link de 2 adultos para
+ * cada um - mais um terceiro, "todos juntos", para 4 adultos. A frase se le
+ * sozinha: corta em "o outro" / quebra de linha, e cada pedaco passa pelo
+ * mesmo leitor de ocupacao que ja acerta "2 adultos e 1 crianca de 12 anos".
+ *
+ * Devolve null na duvida (crianca sem idade num pedaco, apartamento acima de
+ * 6, menos de dois pedacos com gente): ai segue o caminho de antes.
+ */
+export function divisaoPorApartamento(
+  falasDoHospede: string,
+): { adultos: number; idades: number[]; criancas0_6: number; criancas7_9: number }[] | null {
+  const t = semPrefixos(falasDoHospede || '');
+  if (!/\b(aptos?|apartamentos?|quartos?|su[íi]tes?|outr[oa])\b/i.test(t)) return null;
+  const pedacos = t.split(/\r?\n|;|\b(?:e\s+)?(?:o|a|no|na|em|num|numa)\s+outr[oa]\b/i);
+  const lista: { adultos: number; idades: number[]; criancas0_6: number; criancas7_9: number }[] = [];
+  for (const p of pedacos) {
+    const pedaco = p.trim();
+    if (!pedaco) continue;
+    const comIdade = ocupacaoNaFala(pedaco);
+    if (comIdade) {
+      lista.push({ adultos: comIdade.adultos, idades: comIdade.idades, criancas0_6: 0, criancas7_9: 0 });
+      continue;
+    }
+    // Crianca sem idade neste pedaco: nao da para classificar - desiste.
+    if (PALAVRA_DE_CRIANCA.test(pedaco)) return null;
+    const adultos = pedaco.match(/(?<![\d\/])(\d{1,2})\s*(?:adultos?|pessoas?|h[óo]spedes?)(?![a-zà-ÿ])/i);
+    if (adultos) {
+      lista.push({ adultos: Number(adultos[1]), idades: [], criancas0_6: 0, criancas7_9: 0 });
+    } else if (/\bcasal\b/i.test(pedaco)) {
+      lista.push({ adultos: 2, idades: [], criancas0_6: 0, criancas7_9: 0 });
+    }
+  }
+  if (lista.length < 2 || lista.length > 5) return null;
+  if (lista.some((a) => a.adultos < 1 || a.adultos + a.idades.length > 6)) return null;
+  return lista;
+}
+
+/**
  * Quantas criancas o hospede disse, mesmo sem a idade ("4 adultos e tres
  * criancas" -> 3). Vale a ULTIMA mencao: ao longo da conversa ele corrige.
  */
@@ -2693,6 +2735,27 @@ export class AssistController implements OnModuleInit {
 
     let detalhe: any[] = Array.isArray(stay.apartamentos_detalhe) ? stay.apartamentos_detalhe : [];
 
+    // A divisao que o hospede ESCREVEU vence a do extrator - ver
+    // divisaoPorApartamento. Le primeiro o que ele disse depois da nossa
+    // ultima mensagem (a resposta a "como prefere dividir?").
+    const recentesParaDivisao = falasDoHospedeDepoisDaNossa(conversation);
+    const divisaoEscrita =
+      divisaoPorApartamento(recentesParaDivisao.trim() ? recentesParaDivisao : falasDoHospede);
+    if (divisaoEscrita) {
+      detalhe = divisaoEscrita;
+      this.registrarDecisao(`divisao escrita pelo hospede: ${divisaoEscrita.length} apartamentos`, stay);
+    } else if (detalhe.length > 1) {
+      // Extrator sem crianca quando a fala tem idade: perdeu gente no caminho.
+      const falaTemIdade = /\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(falasDoHospede);
+      const detalheTemCrianca = detalhe.some(
+        (a: any) => (Array.isArray(a?.idades) && a.idades.length) || Number(a?.criancas0_6) || Number(a?.criancas7_9),
+      );
+      if (falaTemIdade && !detalheTemCrianca) {
+        this.registrarDecisao('divisao do extrator sem as criancas - descartada', stay);
+        detalhe = [];
+      }
+    }
+
     // "4 casais" ja E a divisao: 4 apartamentos de 2 pessoas.
     //
     // Sem isto o pedido caia na regra generica de "mais de 6 pessoas, pergunte
@@ -2842,7 +2905,9 @@ ${url}`;
       // apresentada. Quando couber junto, oferecemos as DUAS possibilidades e
       // quem escolhe e o hospede.
       let opcaoJuntos = '';
-      if (totalPessoas > 1 && totalPessoas <= 6) {
+      // Se ele mesmo escreveu "um com... e o outro com...", a escolha ja foi
+      // feita: oferecer "todos juntos" e desfazer o que ele decidiu.
+      if (totalPessoas > 1 && totalPessoas <= 6 && !divisaoEscrita) {
         const juntos = this.reservations.buildBookingLink({
           checkin: stay.checkin,
           checkout: stay.checkout,
