@@ -23,9 +23,9 @@ import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 // Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
 export { fraseTemPreco, semPrecoInventado };
 import { motivoParaHumano, falaDeNotaFiscal, fraseOficialNotaFiscal, semNotaFiscalInventada } from '../bella/escalonamento';
-import { blocoDeContato } from '../../common/contato';
+import { blocoDeContato, mensagemForaDoAtendimento } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
-import { hospedePediuAtendente, hospedeTravouNoSite } from '../bella/escalonamento';
+import { hospedePediuAtendente, hospedeTravouNoSite, assuntoForaDoAtendimento } from '../bella/escalonamento';
 // Reexportado para nao quebrar quem ja importava daqui (e os testes).
 export { corrigirLinks, garantirLink };
 
@@ -3867,6 +3867,19 @@ ${url}`;
       };
     }
     const focus = body.lastMessage || conversation;
+
+    // Curriculo e venda: resposta pronta e atendimento humano, sem IA.
+    // Mesma regra do automatico - ver assuntoForaDoAtendimento.
+    const naoEHospede = assuntoForaDoAtendimento(falasDoHospedeAgora);
+    if (naoEHospede) {
+      this.registrarDecisao(naoEHospede === 'curriculo' ? 'curriculo: direto para humano' : 'venda: direto para humano', {});
+      return {
+        suggestion: mensagemForaDoAtendimento(naoEHospede),
+        model: 'sem-ia',
+        attachments: [],
+        precisaDeHumano: naoEHospede === 'curriculo' ? 'currículo: não é hóspede' : 'oferta de venda: não é hóspede',
+      };
+    }
 
     // Pede a disponibilidade ANTES de escrever qualquer coisa.
     //

@@ -201,6 +201,9 @@ export class ChannelsService {
       for (const change of entry.changes ?? []) {
         const contacts = change.value?.contacts ?? [];
         for (const msg of change.value?.messages ?? []) {
+          // Mensagem de GRUPO nao e atendimento: a Bella nao responde la
+          // (regra do dono, 21/10/2026). A API marca o grupo em group_id.
+          if (msg.group_id || change.value?.group_id) continue;
           // Nota de voz do WhatsApp → transcreve; texto → usa direto
           const isAudio = msg.type === 'audio' || msg.type === 'voice';
           const content = isAudio

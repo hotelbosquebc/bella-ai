@@ -318,3 +318,46 @@ export function praticamenteIgual(a: string, b: string): boolean {
   });
   return comuns / Math.max(A.size, B.size) >= 0.9;
 }
+
+/**
+ * Curriculo e venda nao sao hospede: vao direto para uma pessoa, sem IA.
+ *
+ * Regra do dono (21/10/2026): quem manda curriculo ou oferece produto e
+ * servico nao quer reservar nem tirar duvida sobre o hotel. A Bella gastava
+ * extracao, resposta e varias idas e vindas com quem nunca ia reservar. Agora
+ * sai UMA mensagem curta, pronta, e a conversa fica com a equipe.
+ *
+ * "Tem vaga?" sozinho e pergunta de QUARTO: so conta como emprego com a
+ * palavra de trabalho junto. E quem fala de estadia (datas, pessoas) segue
+ * como hospede, mesmo que diga "parceria" ou "fornecedor" no meio.
+ */
+const CURRICULO: RegExp[] = [
+  /\bcurr[íi]culos?\b|\bcurriculum\b|\bcurr[íi]culo\s+vitae\b/i,
+  /\bvagas?\s+(?:de|para|pra)\s+(?:emprego|trabalho|trabalhar|est[áa]gio|camareir[ao]|recepcionista|recep[çc][ãa]o|gar[çc]o[mn]|cozinh|copeir|auxiliar|servi[çc]os\s+gerais|manuten[çc][ãa]o|limpeza|jovem\s+aprendiz)/i,
+  /\b(?:est[ãa]o|vcs\s+est[ãa]o|voc[êe]s\s+est[ãa]o)\s+contratando\b/i,
+  /\b(?:procuro|procurando|preciso\s+de|busco|buscando)\s+(?:um\s+)?(?:emprego|trabalho|servi[çc]o)\b/i,
+  /\b(?:quero|gostaria\s+de|queria)\s+trabalhar\s+(?:a[íi]|no\s+hotel|com\s+voc[êe]s|na\s+empresa|nesse\s+hotel|neste\s+hotel)/i,
+  /\boportunidades?\s+de\s+(?:emprego|trabalho)\b/i,
+];
+
+const VENDAS: RegExp[] = [
+  /\b(?:gostaria|queria|quero)\s+de\s+apresentar\b|\bgostaria\s+de\s+apresentar\b/i,
+  /\b(?:sou|somos)\s+(?:representantes?|consultor(?:a|es)?|vendedor(?:a|es)?)\b/i,
+  /\brepresento\s+(?:a|uma)\s+(?:empresa|marca)\b/i,
+  /\bproposta\s+comercial\b|\bparceria\s+comercial\b/i,
+  /\b(?:nossos?|nossas?)\s+(?:produtos?|servi[çc]os|solu[çc][õo]es|cat[áa]logo)\b/i,
+  /\b(?:sou|somos)\s+(?:fornecedor(?:es)?|distribuidor(?:a|es)?)\b/i,
+  /\b(?:tr[áa]fego\s+pago|marketing\s+digital|gest[ãa]o\s+de\s+redes|google\s+meu\s+neg[óo]cio)\b/i,
+  /\b(?:aumentar|alavancar|dobrar)\s+(?:as\s+|suas\s+|a\s+sua\s+|o\s+seu\s+)?(?:vendas|reservas|faturamento|ocupa[çc][ãa]o)\b/i,
+];
+
+const FALA_DE_ESTADIA =
+  /\b\d{1,2}\s*(?:\/|de\s+)\s*(?:\d{1,2}|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)|\b\d{1,2}\s*(?:adultos?|pessoas?|h[óo]spedes?|crian[çc]as?)\b|\b(?:check-?in|check-?out|di[áa]rias?|hospedagem|hospedar|reservar|reserva\s+para)\b/i;
+
+export function assuntoForaDoAtendimento(texto: string): 'curriculo' | 'vendas' | null {
+  const t = texto || '';
+  if (FALA_DE_ESTADIA.test(t)) return null;
+  if (CURRICULO.some((r) => r.test(t))) return 'curriculo';
+  if (VENDAS.some((r) => r.test(t))) return 'vendas';
+  return null;
+}

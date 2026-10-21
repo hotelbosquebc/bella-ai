@@ -21,6 +21,7 @@ import { TrainingModule } from './modules/training/training.module';
 import { QuickRepliesModule } from './modules/quick-replies/quick-replies.module';
 import { AssistModule } from './modules/assist/assist.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
+import { ContatosModule } from './modules/contatos/contatos.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { AttachmentsModule } from './modules/attachments/attachments.module';
     QuickRepliesModule,
     AssistModule,
     AttachmentsModule,
+    ContatosModule,
   ],
   controllers: [HealthController],
 })

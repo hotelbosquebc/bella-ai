@@ -671,6 +671,7 @@
     </div>
     <div id="bella-body">
       <div id="bella-modo">…</div>
+      <div id="bella-marca" style="display:none"></div>
       <button id="bella-suggest" class="bella-btn">🤖 Sugerir resposta da Bella</button>
       <div id="bella-suggestion" style="display:none">
         <textarea id="bella-sugtext" rows="5"></textarea>
@@ -680,6 +681,7 @@
       <div id="bella-qr-title">⚡ Respostas rápidas</div>
       <div id="bella-qr">Carregando…</div>
       <div id="bella-status"></div>
+      <button id="bella-marcar" class="bella-link" style="display:none"></button>
     </div>`;
   document.body.appendChild(panel);
 
@@ -1199,6 +1201,11 @@
 
   async function sugerir(automatica) {
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
+    // Guia de grupos e excursoes: quem atende e a equipe (regra do dono, 21/10/2026).
+    if (marcadoPara(tituloDaConversa())) {
+      if (!automatica) status('Guia de grupos e excursões: atendimento da equipe. A Bella não sugere aqui.', true);
+      return;
+    }
     // Puxa o histórico antes de ler: sem isso a Bella vê só a última mensagem.
     // Rolar o historico e caro (varias rolagens de ~700ms) e so precisa ser
     // feito UMA vez por conversa: depois disso a memoria local ja guarda tudo.
@@ -1341,6 +1348,152 @@
     }
   };
 
+  // ---------- grupos e guias de excursão (21/10/2026) ----------
+  //
+  // Regras do dono: em GRUPO a Bella nao sugere sozinha; GUIA de grupos e
+  // excursoes e atendido pela equipe, e aparece com uma cor propria na lista
+  // de conversas. A lista de guias vive no servidor - a mesma do painel.
+  let contatosMarcados = [];
+
+  /** Mesma regra do servidor (common/contatos-marcados.ts): DDD + 8 ultimos digitos. */
+  function telefoneCanonico(v) {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.length >= 12 && d.length <= 13 && d.indexOf('55') === 0) d = d.slice(2);
+    if (d.length === 11 && d[2] === '9') d = d.slice(0, 2) + d.slice(3);
+    return d;
+  }
+  function nomeCanonico(v) {
+    return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  /** O titulo da conversa (nome salvo ou numero) e de um contato marcado? */
+  function marcadoPara(titulo) {
+    if (!titulo || !contatosMarcados.length) return null;
+    const ehNumero = /^[\d\s()+.-]+$/.test(titulo);
+    const tel = ehNumero ? telefoneCanonico(titulo) : '';
+    const nome = nomeCanonico(titulo);
+    for (const m of contatosMarcados) {
+      const mTel = telefoneCanonico(m.identificador);
+      if (tel.length >= 8 && mTel.length >= 8 && tel === mTel) return m;
+      if (!ehNumero && m.nome && nomeCanonico(m.nome) === nome) return m;
+    }
+    return null;
+  }
+
+  async function carregarMarcados() {
+    const r = await send('CONTATOS_MARCADOS');
+    if (r && r.ok && Array.isArray(r.data)) {
+      contatosMarcados = r.data;
+      atualizarMarca();
+      pintarLista();
+    }
+  }
+
+  /**
+   * A conversa aberta e um grupo?
+   *
+   * O identificador do chat (data-id "...@g.us") sumiu da marcacao do
+   * WhatsApp Web em 10/2026 (o diagnostico mostra "sem-identificador"), entao
+   * nenhum sinal sozinho basta. Qualquer um destes indica grupo: icone de
+   * grupo no cabecalho, "dados do grupo", subtitulo com a lista de
+   * participantes terminando em "Você", ou tres autores diferentes nas
+   * mensagens (numa conversa individual sao so dois: o contato e nos).
+   */
+  function conversaEhGrupo() {
+    const main = document.querySelector('#main');
+    if (!main) return false;
+    const hdr = main.querySelector('header');
+    if (hdr) {
+      if (hdr.querySelector('[data-icon*="group"], [data-icon*="community"]')) return true;
+      const texto = hdr.innerText || '';
+      if (/dados do grupo|informa[çc][õo]es do grupo|group info|info\.? del grupo/i.test(texto)) return true;
+      const linhas = texto.split(String.fromCharCode(10)).map(function (x) { return x.trim(); });
+      if (linhas.some(function (l) { return l.indexOf(',') >= 0 && /(^|,\s*)(voc[êe]|you|t[úu])$/i.test(l); })) return true;
+    }
+    if (main.querySelector('[data-id*="@g.us"]')) return true;
+    const autores = new Set();
+    for (const el of main.querySelectorAll('.copyable-text[data-pre-plain-text]')) {
+      const m = (el.getAttribute('data-pre-plain-text') || '').match(/\]\s*(.*?):\s*$/);
+      if (m && m[1]) autores.add(m[1]);
+      if (autores.size >= 3) return true;
+    }
+    return false;
+  }
+
+  /** Cor com transparencia, para o fundo da linha nao brigar com o texto. */
+  function corSuave(hex, alfa) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return '';
+    return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + alfa + ')';
+  }
+
+  /** Faixa colorida no painel e no cabecalho da conversa aberta. */
+  function atualizarMarca() {
+    const caixa = panel.querySelector('#bella-marca');
+    const botao = panel.querySelector('#bella-marcar');
+    const titulo = tituloDaConversa();
+    const grupo = Boolean(titulo) && conversaEhGrupo();
+    const m = titulo && !grupo ? marcadoPara(titulo) : null;
+    const chave = (titulo || '') + '|' + grupo + '|' + (m ? m.id + m.cor : '');
+    if (caixa.dataset.chave === chave) return;
+    caixa.dataset.chave = chave;
+    if (m) {
+      caixa.style.display = 'block';
+      caixa.style.background = m.cor;
+      caixa.textContent = '🧭 Guia de grupos e excursões: atendimento da equipe. A Bella não responde aqui.';
+    } else if (grupo) {
+      caixa.style.display = 'block';
+      caixa.style.background = '#5f6b66';
+      caixa.textContent = '👥 Grupo: a Bella só sugere se você clicar.';
+    } else {
+      caixa.style.display = 'none';
+    }
+    botao.style.display = titulo && !grupo ? 'block' : 'none';
+    botao.textContent = m ? 'Desmarcar guia de grupos' : '🧭 Marcar como guia de grupos';
+    botao.dataset.id = m ? m.id : '';
+    const hdr = document.querySelector('#main header');
+    if (hdr) hdr.style.boxShadow = m ? 'inset 5px 0 0 ' + m.cor : '';
+  }
+
+  /**
+   * Pinta na lista de conversas os guias marcados. O WhatsApp reaproveita as
+   * linhas ao rolar, entao isto roda a cada ciclo do observador e compara a
+   * cor gravada na propria linha antes de mexer no estilo.
+   */
+  function pintarLista() {
+    const lado = document.querySelector('#pane-side');
+    if (!lado) return;
+    for (const linha of lado.querySelectorAll('[role="listitem"], [role="row"]')) {
+      const nome = linha.querySelector('span[title]');
+      const m = nome ? marcadoPara(nome.getAttribute('title')) : null;
+      const cor = m ? m.cor : '';
+      if ((linha.dataset.bellaCor || '') === cor) continue;
+      linha.dataset.bellaCor = cor;
+      linha.style.boxShadow = m ? 'inset 5px 0 0 ' + m.cor : '';
+      linha.style.background = m ? corSuave(m.cor, 0.14) : '';
+    }
+  }
+
+  panel.querySelector('#bella-marcar').onclick = async function () {
+    const botao = panel.querySelector('#bella-marcar');
+    const titulo = tituloDaConversa();
+    if (!titulo) return;
+    if (botao.dataset.id) {
+      if (!confirm('Desmarcar "' + titulo + '" como guia de grupos? A Bella volta a sugerir respostas para este contato.')) return;
+      const r = await send('DESMARCAR_CONTATO', { id: botao.dataset.id });
+      if (!r || !r.ok) return status('Não consegui desmarcar agora. Tente de novo.', true);
+    } else {
+      // Contato nao salvo: o titulo e o numero. Salvo: o nome, como aparece aqui.
+      const ehNumero = /^[\d\s()+.-]+$/.test(titulo) && telefoneCanonico(titulo).length >= 8;
+      const r = await send('MARCAR_CONTATO', {
+        identificador: ehNumero ? titulo : null,
+        nome: ehNumero ? null : titulo,
+      });
+      if (!r || !r.ok) return status('Não consegui marcar agora. Tente de novo.', true);
+      status('Marcado como guia de grupos: a Bella não sugere mais respostas aqui.');
+    }
+    await carregarMarcados();
+  };
+
   // ---------- modo de operação (ligada / desligada / automática) ----------
   let modo = null;
 
@@ -1412,6 +1565,9 @@
     // Duas travas: a fala do hospede precisa ser NOVA, e ha um intervalo minimo
     // entre sugestoes automaticas.
     if (!modo || !modo.autoSuggest) return;
+    // Grupo do WhatsApp nao e atendimento (regra do dono, 21/10/2026): a Bella
+    // so escreve ali se alguem clicar. Guia marcado: nem assim.
+    if (conversaEhGrupo() || marcadoPara(tituloDaConversa())) return;
     const falaNova = lido.lastMessage && lido.lastMessage !== ultimaFalaSugerida;
     const passouTempo = Date.now() - ultimaSugestaoAutomatica > 15000;
     if (!falaNova || !passouTempo) return;
@@ -1428,6 +1584,8 @@
       if (!extensaoViva()) return pararPorExtensaoAtualizada();
       verificarEnvio();
       aoTrocarDeConversa();
+      atualizarMarca();
+      pintarLista();
     }, 1200);
   });
   window.__bellaObservador.observe(document.body, { childList: true, subtree: true });
@@ -1435,7 +1593,11 @@
   carregarModo().then(() => aoTrocarDeConversa());
   // O modo muda no painel a qualquer momento — reconsulta de minuto em minuto,
   // e assim a virada do horário também entra sozinha.
-  window.__bellaTimerModo = setInterval(carregarModo, 60000);
+  window.__bellaTimerModo = setInterval(function () {
+    carregarModo();
+    carregarMarcados();
+  }, 60000);
+  carregarMarcados();
 
   // Remove o balde comum criado pelo bug da 1.1.5, que misturava conversas.
   try { chrome.storage.local.remove('hist:desconhecida'); } catch (_) {}

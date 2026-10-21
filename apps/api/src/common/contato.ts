@@ -40,3 +40,14 @@ export function mensagemDeEntregaAoHumano(dentroDoHorario: boolean): string {
     'Se preferir, deixe a sua mensagem por aqui que respondemos no próximo horário de atendimento. 🌿'
   );
 }
+
+/**
+ * Resposta PRONTA para quem nao e hospede (curriculo, venda), sem IA.
+ * Curta de proposito: nao e venda nossa e nao tem link, telefone ou horario -
+ * so o aviso de que uma pessoa vai ver. Regra do dono (21/10/2026).
+ */
+export function mensagemForaDoAtendimento(tipo: 'curriculo' | 'vendas'): string {
+  return tipo === 'curriculo'
+    ? 'Olá! Obrigada pelo interesse em trabalhar conosco. Vou encaminhar a sua mensagem ao setor responsável. 🌿'
+    : 'Olá! Obrigada pelo contato. Vou encaminhar a sua mensagem ao setor responsável. 🌿';
+}

@@ -161,6 +161,18 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
         }
         sendResponse({ ok: true, data: { base64: btoa(bin), mimeType: res.headers.get('Content-Type') || '' } });
+      } else if (msg.type === 'CONTATOS_MARCADOS') {
+        // Guias de grupos e excursoes - a mesma lista do painel.
+        sendResponse({ ok: true, data: await authed('/api/contatos-marcados') });
+      } else if (msg.type === 'MARCAR_CONTATO') {
+        const out = await authed('/api/contatos-marcados', {
+          method: 'POST',
+          body: JSON.stringify({ identificador: msg.identificador, nome: msg.nome, tipo: 'guia' }),
+        });
+        sendResponse({ ok: true, data: out });
+      } else if (msg.type === 'DESMARCAR_CONTATO') {
+        await authed('/api/contatos-marcados/' + encodeURIComponent(msg.id), { method: 'DELETE' });
+        sendResponse({ ok: true });
       } else if (msg.type === 'QUICK_REPLIES') {
         const list = await authed(`/api/quick-replies?hotelId=${HOTEL_ID}`);
         sendResponse({ ok: true, data: list });

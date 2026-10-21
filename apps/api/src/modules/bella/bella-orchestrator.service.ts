@@ -6,11 +6,12 @@ import { MemoryService } from './memory.service';
 import { ModelRouterService } from './model-router.service';
 import { normalizar } from '../attachments/attachments.module';
 import { corrigirLinks, garantirLink } from '../../common/links';
-import { mensagemDeEntregaAoHumano } from '../../common/contato';
+import { mensagemDeEntregaAoHumano, mensagemForaDoAtendimento } from '../../common/contato';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semPrecoInventado } from '../../common/preco';
-import { motivoParaHumano } from './escalonamento';
+import { motivoParaHumano, assuntoForaDoAtendimento } from './escalonamento';
+import { buscarContatoMarcado } from '../contatos/contatos.module';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
 import { ReservationEngineService } from '../reservations/reservation-engine.service';
@@ -113,6 +114,39 @@ export class BellaOrchestratorService {
     const sempreResponde = inbound.channel === 'INSTAGRAM' || inbound.channel === 'FACEBOOK';
     if (modo === 'auto' && isWithinBusinessHours() && !sempreResponde) {
       this.logger.log('Modo automático dentro do expediente — atendimento fica com a equipe.');
+      return;
+    }
+
+    // Quem a Bella NAO atende vai direto para uma pessoa, ANTES de qualquer IA.
+    //
+    // Regras do dono (21/10/2026): guia de grupos e excursoes (marcado no
+    // painel ou na extensao) fala sempre com a equipe; curriculo e oferta de
+    // venda nao sao reserva nem duvida sobre o hotel. Uma mensagem pronta, a
+    // conversa fica com a equipe e o painel avisa - sem extracao, sem
+    // resposta gerada, sem ida e volta.
+    const marcado = await buscarContatoMarcado(this.prisma, guest.hotelId, {
+      identificador: inbound.senderExternalId,
+      nome: inbound.senderName ?? guest.name,
+    });
+    const naoEHospede = marcado ? null : assuntoForaDoAtendimento(inbound.content);
+    if (marcado || naoEHospede) {
+      const motivo = marcado
+        ? marcado.tipo === 'guia'
+          ? 'contato marcado: guia de grupos e excursões'
+          : `contato marcado: ${marcado.tipo}`
+        : naoEHospede === 'curriculo'
+          ? 'currículo: não é hóspede'
+          : 'oferta de venda: não é hóspede';
+      await this.prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { status: ConversationStatus.PENDING_HUMAN, escalationReason: motivo },
+      });
+      await this.sendReply(
+        conversation.id,
+        inbound,
+        naoEHospede ? mensagemForaDoAtendimento(naoEHospede) : this.humanHandoffMessage(),
+      );
+      this.logger.warn(`Direto para humano, sem IA: ${motivo}`);
       return;
     }
 

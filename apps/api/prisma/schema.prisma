@@ -393,3 +393,26 @@ model Diagnostico {
   @@index([tipo, createdAt])
   @@map("diagnosticos")
 }
+
+/// Contatos que a Bella NAO atende: guias de grupos e excursoes.
+///
+/// Pedido do dono (21/10/2026): quem organiza grupo fala com a equipe, sempre.
+/// A Bella passa a conversa direto para uma pessoa, e o contato aparece com
+/// uma cor propria no painel e no WhatsApp Web.
+///
+/// identificador: telefone (so digitos) ou o id do canal (Instagram/Facebook).
+/// nome: como aparece no WhatsApp Web, para contato salvo, cujo numero a
+/// extensao nao enxerga.
+model ContatoMarcado {
+  id            String   @id @default(uuid())
+  hotelId       String
+  identificador String?
+  nome          String?
+  tipo          String   @default("guia")
+  cor           String   @default("#7c3aed")
+  observacao    String?
+  createdAt     DateTime @default(now())
+
+  @@index([hotelId])
+  @@map("contatos_marcados")
+}

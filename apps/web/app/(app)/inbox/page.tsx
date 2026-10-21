@@ -19,6 +19,33 @@ type ConversationDetail = Conversation & {
   guest: Guest & { reservations?: any[]; leads?: any[] };
 };
 
+/** Guia de grupos e excursoes (pedido do dono, 21/10/2026): a Bella nao atende. */
+type ContatoMarcado = { id: string; identificador?: string | null; nome?: string | null; tipo: string; cor: string };
+
+const CORES_DE_GUIA = ['#7c3aed', '#db2777', '#ea580c', '#0284c7'];
+
+/** Mesma comparacao do servidor (common/contatos-marcados.ts): DDD + 8 ultimos digitos. */
+function telefoneCanonico(v?: string | null) {
+  let d = String(v || '').replace(/\D/g, '');
+  if (d.length >= 12 && d.length <= 13 && d.startsWith('55')) d = d.slice(2);
+  if (d.length === 11 && d[2] === '9') d = d.slice(0, 2) + d.slice(3);
+  return d;
+}
+
+function marcaDe(marcados: ContatoMarcado[], guest?: Guest): ContatoMarcado | null {
+  if (!guest) return null;
+  const tel = telefoneCanonico(guest.phone);
+  const nome = (guest.name || '').trim().toLowerCase();
+  return (
+    marcados.find((m) => {
+      const mTel = telefoneCanonico(m.identificador);
+      if (tel.length >= 8 && mTel.length >= 8 && tel === mTel) return true;
+      if (guest.phone && m.identificador && guest.phone === m.identificador) return true;
+      return Boolean(nome && m.nome && m.nome.trim().toLowerCase() === nome);
+    }) ?? null
+  );
+}
+
 const bubbleClass = (sender: string) =>
   sender === 'GUEST' ? 'guest' : sender === 'HUMAN_AGENT' ? 'agent' : 'bella';
 
@@ -33,6 +60,16 @@ export default function InboxPage() {
   // Em ref, e nao em estado: o temporizador e criado uma vez e precisa enxergar
   // a conversa ATUAL, nao a que estava aberta quando ele nasceu.
   const selectedId = useRef<string | null>(null);
+  const [marcados, setMarcados] = useState<ContatoMarcado[]>([]);
+
+  const loadMarcados = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/contatos-marcados', { cache: 'no-store' });
+      if (res.ok) setMarcados(await res.json());
+    } catch {
+      /* sem a lista, as conversas so aparecem sem cor */
+    }
+  }, []);
 
   const loadList = useCallback(async () => {
     try {
@@ -48,7 +85,8 @@ export default function InboxPage() {
 
   useEffect(() => {
     loadList();
-  }, [loadList]);
+    loadMarcados();
+  }, [loadList, loadMarcados]);
 
   // A lista so carregava ao abrir a pagina e no botao Atualizar: mensagem
   // nova NAO aparecia sozinha. Numa recepcao isso significa hospede
@@ -126,6 +164,27 @@ export default function InboxPage() {
     await loadList();
   }
 
+  /** Marca (ou desmarca) o contato aberto como guia de grupos e excursoes. */
+  async function marcarGuia(cor: string | null) {
+    if (!selected) return;
+    const atual = marcaDe(marcados, selected.guest);
+    if (cor === null) {
+      if (atual) await apiFetch(`/api/contatos-marcados/${atual.id}`, { method: 'DELETE' });
+    } else {
+      await apiFetch('/api/contatos-marcados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          identificador: selected.guest.phone || null,
+          nome: selected.guest.name || null,
+          tipo: 'guia',
+          cor,
+        }),
+      });
+    }
+    await loadMarcados();
+  }
+
   async function release() {
     if (!selected) return;
     await apiFetch(`/api/conversations/${selected.id}/release`, { method: 'POST' });
@@ -162,16 +221,24 @@ export default function InboxPage() {
             </p>
           )}
           <div style={{ marginTop: 12 }}>
-            {conversations.map((c) => (
+            {conversations.map((c) => {
+              const guia = marcaDe(marcados, c.guest);
+              return (
               <div
                 key={c.id}
                 className={`conv-item${selected?.id === c.id ? ' active' : ''}`}
                 onClick={() => openConversation(c.id)}
+                style={guia ? { borderLeft: `5px solid ${guia.cor}`, background: `${guia.cor}1f` } : undefined}
               >
                 <div className="conv-name">
                   <span>{c.guest?.name || c.guest?.phone || 'Hóspede'}</span>
                   <span className="badge">{CHANNEL_LABELS[c.channel] ?? c.channel}</span>
                 </div>
+                {guia && (
+                  <div className="badge" style={{ marginTop: 4, background: guia.cor, color: '#fff' }}>
+                    🧭 Guia de grupos e excursões
+                  </div>
+                )}
                 {c.escalationReason && (
                   <div className="badge amber" style={{ marginTop: 4 }}>
                     🔔 a Bella pediu ajuda — {c.escalationReason}
@@ -179,7 +246,8 @@ export default function InboxPage() {
                 )}
                 <div className="conv-preview">{c.messages?.[0]?.content ?? '—'}</div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -257,6 +325,42 @@ export default function InboxPage() {
               <div>
                 <span className="muted">Leads:</span> {selected.guest.leads?.length ?? 0}
               </div>
+              {(() => {
+                const guia = marcaDe(marcados, selected.guest);
+                return (
+                  <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
+                    <strong style={{ fontSize: 14 }}>🧭 Guia de grupos e excursões</strong>
+                    <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, margin: '4px 0 8px' }}>
+                      {guia
+                        ? 'Marcado. A Bella não responde a este contato: a conversa vai direto para a equipe.'
+                        : 'Marque quem organiza grupos e excursões. A Bella passa direto para a equipe, e o contato ganha uma cor própria aqui e no WhatsApp Web.'}
+                    </p>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {CORES_DE_GUIA.map((cor) => (
+                        <button
+                          key={cor}
+                          onClick={() => marcarGuia(cor)}
+                          title={guia ? 'Trocar a cor' : 'Marcar com esta cor'}
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '50%',
+                            background: cor,
+                            border: guia?.cor === cor ? '3px solid #111827' : '2px solid #fff',
+                            boxShadow: '0 0 0 1px #d1d5db',
+                            cursor: 'pointer',
+                          }}
+                        />
+                      ))}
+                      {guia && (
+                        <button className="btn ghost" onClick={() => marcarGuia(null)}>
+                          Desmarcar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
