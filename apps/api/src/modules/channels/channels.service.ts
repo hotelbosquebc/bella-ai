@@ -78,8 +78,9 @@ export class ChannelsService {
         take: 30,
       });
       return linhas.map((l) => ({ quando: l.createdAt, canal: l.canal, motivo: l.motivo, tipo: l.detalhe, ms: l.ms }));
-    } catch {
-      return [];
+    } catch (err) {
+      // Lista vazia por ERRO nao pode parecer "nada chegou".
+      return [{ erroAoLer: String(err instanceof Error ? err.message : err).slice(0, 200) }];
     }
   }
 
