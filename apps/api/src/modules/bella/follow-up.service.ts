@@ -58,6 +58,8 @@ export class FollowUpService {
         await this.prisma.message.create({
           data: { conversationId: conversation.id, sender: MessageSender.BELLA, content: next.message },
         });
+        // Mesma razao de subirNaCaixaDeEntrada: sem isto a conversa nao sobe na lista.
+        await this.prisma.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });
         this.logger.log(
           `Follow-up passo ${next.step} ${delivered ? 'enviado' : 'registrado'} para ${lead.guest.name ?? lead.guest.phone} via ${conversation.channel}`,
         );

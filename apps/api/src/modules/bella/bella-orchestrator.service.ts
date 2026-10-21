@@ -90,6 +90,7 @@ export class BellaOrchestratorService {
         type: inbound.contentType,
       },
     });
+    await this.subirNaCaixaDeEntrada(conversation.id);
 
     // Hóspede respondeu → interromper follow-ups pendentes
     const lead = await this.findOrCreateLead(guest.id);
@@ -355,6 +356,7 @@ export class BellaOrchestratorService {
       await this.prisma.message.create({
         data: { conversationId, sender: MessageSender.BELLA, content: `[anexo] ${a.title}`, type: 'document' },
       });
+      await this.subirNaCaixaDeEntrada(conversationId);
       this.logger.log(`Anexo "${a.title}" ${entregue ? 'entregue' : 'NAO entregue'} via ${inbound.channel}`);
     }
   }
@@ -363,6 +365,7 @@ export class BellaOrchestratorService {
     await this.prisma.message.create({
       data: { conversationId, sender: MessageSender.BELLA, content, type: 'text' },
     });
+    await this.subirNaCaixaDeEntrada(conversationId);
     const delivered = await this.outbound.send(inbound.channel, inbound.senderExternalId, content);
     this.logger.log(
       `Resposta ${delivered ? 'entregue' : 'registrada (entrega pendente)'} via ${inbound.channel} para ${inbound.senderExternalId}`,
@@ -401,6 +404,16 @@ export class BellaOrchestratorService {
     // O texto vive em common/contato.ts: estava escrito a mao aqui e divergiu
     // do atalho /dados que a recepcao manda. O dono confirmou: 9h-12h30, 14h30-17h30.
     return mensagemDeEntregaAoHumano(isWithinBusinessHours());
+  }
+
+  /**
+   * A caixa de entrada ordena pela atualizacao da CONVERSA, e gravar uma
+   * mensagem nao mexe nela. Caso real (21/10/2026): mensagem nova numa
+   * conversa antiga ficava no meio da lista - ou alem das 100 que o painel
+   * carrega - e para a recepcao era como se nao tivesse chegado.
+   */
+  async subirNaCaixaDeEntrada(conversationId: string) {
+    await this.prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
   }
 
   private async findOrCreateGuest(inbound: NormalizedInboundMessage) {
