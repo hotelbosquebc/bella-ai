@@ -105,7 +105,12 @@ export class BellaOrchestratorService {
       this.logger.log('Bella desligada no painel — mensagem registrada, sem resposta automática.');
       return;
     }
-    if (modo === 'auto' && isWithinBusinessHours()) {
+    // Instagram e Facebook: a Bella responde SEMPRE, inclusive no expediente.
+    // Decisao do dono em 21/10/2026 - so o que ela nao souber vai para uma
+    // pessoa, com alerta sonoro no painel (motivoParaHumano + AlertaAtendimento).
+    // O WhatsApp segue a regra do modo: no "auto", o expediente e da equipe.
+    const sempreResponde = inbound.channel === 'INSTAGRAM' || inbound.channel === 'FACEBOOK';
+    if (modo === 'auto' && isWithinBusinessHours() && !sempreResponde) {
       this.logger.log('Modo automático dentro do expediente — atendimento fica com a equipe.');
       return;
     }

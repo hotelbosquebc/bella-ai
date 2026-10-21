@@ -2,6 +2,7 @@ import Link from 'next/link';
 import ThemeToggle from '../components/ThemeToggle';
 import LogoutButton from '../components/LogoutButton';
 import AuthGuard from '../components/AuthGuard';
+import AlertaAtendimento from '../components/AlertaAtendimento';
 
 const NAV = [
   { href: '/dashboard', label: '📊 Dashboard' },
@@ -37,6 +38,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </aside>
         <main className="content">{children}</main>
+        <AlertaAtendimento />
       </div>
     </AuthGuard>
   );

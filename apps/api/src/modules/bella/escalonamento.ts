@@ -56,6 +56,20 @@ const PROMESSA_HUMANA: RegExp[] = [
 ];
 
 /**
+ * A propria Bella anunciou que vai passar para uma pessoa.
+ *
+ * So frases de ENTREGA feita ou anunciada. A oferta ("se preferir, basta
+ * pedir que eu encaminho") nao entra: e convite, nao pedido de ajuda.
+ */
+const BELLA_PASSOU_ADIANTE: RegExp[] = [
+  /\b(vou|irei)\s+(te\s+)?(encaminhar|transferir|repassar)\b/i,
+  /\b(j[áa]\s+)?(encaminhei|transferi|repassei)\b/i,
+  /\b(um|uma)\s+(atendente|pessoa\s+da\s+(nossa\s+)?equipe|especialista|colega)\s+(vai|ir[áa])\s+(te\s+|lhe\s+)?(responder|atender|ajudar|retornar|falar)/i,
+  /\bnossa\s+equipe\s+(vai|ir[áa])\s+(te\s+|lhe\s+)?(responder|retornar|entrar\s+em\s+contato)/i,
+  /\b(voy\s+a\s+(derivar|transferir)|un\s+agente\s+(le|te)\s+va\s+a\s+(responder|atender))/i,
+];
+
+/**
  * O hospede escreveu numa lingua que a Bella nao atende?
  *
  * Deliberadamente conservador: so acusa o que e INEQUIVOCO. Nao importamos a
@@ -263,6 +277,14 @@ export function motivoParaHumano(dados: DadosDaDecisao): string | null {
 
   if (PROMESSA_HUMANA.some((r) => r.test(resposta))) {
     return 'a resposta prometia algo que depende de uma pessoa';
+  }
+
+  // Ela mesma disse que vai passar para alguem: e o "nao sei" dela. Sem
+  // marcar a conversa, a promessa ficava no ar - ninguem era avisado e o
+  // hospede esperava uma pessoa que nunca vinha. Regra do dono (21/10/2026):
+  // o que ela nao souber vai para a equipe, com alerta no painel.
+  if (BELLA_PASSOU_ADIANTE.some((r) => r.test(resposta))) {
+    return 'a Bella não soube responder e passou para a equipe';
   }
 
   // A mesma resposta de novo quer dizer que ela nao esta resolvendo. Repetir
