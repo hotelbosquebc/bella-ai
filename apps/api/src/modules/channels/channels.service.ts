@@ -109,6 +109,41 @@ export class ChannelsService {
     };
   }
 
+  /**
+   * Reinscreve a Pagina no app com os campos de MENSAGEM.
+   *
+   * Achado de 21/10/2026: a Pagina estava inscrita so no campo "name" (aviso
+   * de troca de nome). Sem "messages", a Meta nao entregava nenhuma mensagem
+   * do Messenger nem do Instagram - nem a de um administrador do app. O
+   * hospede via so a resposta automatica do Business Suite.
+   *
+   * E a mesma chamada que a configuracao inicial faz, com o token da Pagina
+   * que ja esta no servidor. Nao mexe nas configuracoes do APP (o que esta
+   * em analise na Meta) - so diz a Meta quais avisos DESTA Pagina mandar.
+   * So roda quando o dono clica no painel.
+   */
+  async religarPagina() {
+    const token = process.env.FACEBOOK_PAGE_ACCESS_TOKEN;
+    const pagina = process.env.FACEBOOK_PAGE_ID;
+    if (!token || !pagina) return { ok: false, erro: 'FACEBOOK_PAGE_ACCESS_TOKEN ou FACEBOOK_PAGE_ID ausente' };
+    const campos = ['messages', 'messaging_postbacks'];
+    try {
+      const r = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${pagina}/subscribed_apps`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `subscribed_fields=${encodeURIComponent(campos.join(','))}`,
+      });
+      const j: any = await r.json();
+      if (j?.error) {
+        return { ok: false, erro: `${j.error.code ?? ''}: ${String(j.error.message ?? '').slice(0, 200)}` };
+      }
+      this.logger.warn(`Pagina ${pagina} reinscrita no app com: ${campos.join(', ')}`);
+      return { ok: Boolean(j?.success), depois: await this.diagnosticoMeta() };
+    } catch (err) {
+      return { ok: false, erro: String(err instanceof Error ? err.message : err).slice(0, 200) };
+    }
+  }
+
   /** As ultimas passagens gravadas no banco (canal, motivo, tempo) - nenhum texto. */
   async percursoGravado() {
     try {

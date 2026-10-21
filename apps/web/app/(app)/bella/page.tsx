@@ -17,6 +17,83 @@ type Settings = {
   cancelPrompt?: string | null;
 };
 
+type Inscricao = { app: string; nome: string; campos: string[] };
+type DiagMeta = {
+  tokenDaPagina?: { valido: boolean; nome?: string; erro?: string };
+  inscricoes?: Inscricao[] | { erro: string };
+  instagram?: { username?: string } | { erro: string } | null;
+  erro?: string;
+};
+
+/**
+ * Instagram e Facebook recebendo mensagens?
+ *
+ * Em 21/10/2026 a Pagina estava inscrita no app so no campo "name": a Meta
+ * nao entregava mensagem nenhuma, e o hospede via so a resposta automatica do
+ * Business Suite. Aqui o dono ve se esta tudo certo e, se nao estiver, religa
+ * com um clique.
+ */
+function CanaisDaMeta() {
+  const [diag, setDiag] = useState<DiagMeta | null>(null);
+  const [religando, setReligando] = useState(false);
+  const [aviso, setAviso] = useState('');
+
+  async function carregar() {
+    try {
+      const r = await apiFetch('/api/channels/diagnostico-meta', { cache: 'no-store' });
+      setDiag(r.ok ? await r.json() : { erro: 'não foi possível consultar a Meta' });
+    } catch {
+      setDiag({ erro: 'não foi possível consultar a Meta' });
+    }
+  }
+
+  useEffect(() => {
+    carregar();
+  }, []);
+
+  const inscricoes = Array.isArray(diag?.inscricoes) ? diag!.inscricoes : [];
+  const recebeMensagens = inscricoes.some((i) => (i.campos || []).includes('messages'));
+
+  async function religar() {
+    setReligando(true);
+    setAviso('');
+    try {
+      const r = await apiFetch('/api/channels/religar-pagina', { method: 'POST' });
+      const j = r.ok ? await r.json() : { ok: false, erro: 'o servidor recusou o pedido' };
+      setAviso(j.ok ? 'Pronto! A Meta voltou a entregar as mensagens para a Bella.' : `Não deu certo: ${j.erro ?? 'erro desconhecido'}`);
+      await carregar();
+    } finally {
+      setReligando(false);
+    }
+  }
+
+  return (
+    <div className="form-card">
+      <strong>Instagram e Facebook</strong>
+      <p className="muted" style={{ fontSize: 13, margin: '4px 0 12px' }}>
+        Para a Bella responder, a Meta precisa entregar as mensagens da Página para ela.
+      </p>
+      {!diag && <p className="muted">Consultando a Meta…</p>}
+      {diag?.erro && <p className="muted">⚠️ {diag.erro}</p>}
+      {diag && !diag.erro && (
+        <>
+          <p style={{ margin: '0 0 12px' }}>
+            {recebeMensagens
+              ? '🟢 Recebendo mensagens do Instagram e do Facebook.'
+              : '🔴 A Meta NÃO está entregando as mensagens para a Bella. O hóspede recebe só a resposta automática.'}
+          </p>
+          {!recebeMensagens && (
+            <button className="btn" onClick={religar} disabled={religando}>
+              {religando ? 'Religando…' : 'Religar Instagram e Facebook'}
+            </button>
+          )}
+        </>
+      )}
+      {aviso && <p style={{ marginTop: 10 }}>{aviso}</p>}
+    </div>
+  );
+}
+
 export default function BellaConfigPage() {
   const [s, setS] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
@@ -111,11 +188,13 @@ export default function BellaConfigPage() {
         </div>
         <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>
           {s.mode === 'auto' &&
-            'Fora do expediente (seg-sex, 9h-12h e 14h30-17h30) a Bella prepara a resposta sozinha. No horário, o atendimento fica com a equipe.'}
+            'Fora do expediente (seg-sex, 9h-12h e 14h30-17h30) a Bella prepara a resposta sozinha. No horário, o atendimento fica com a equipe. No Instagram e no Facebook ela responde sempre.'}
           {s.mode === 'on' && 'A Bella prepara sugestões o tempo todo, inclusive durante o expediente.'}
           {s.mode === 'off' && 'A Bella está parada. O botão de sugerir some da extensão e o servidor recusa pedidos.'}
         </p>
       </div>
+
+      <CanaisDaMeta />
 
       <div className="form-card">
         <strong>Identidade</strong>

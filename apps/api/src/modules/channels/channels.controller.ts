@@ -84,6 +84,13 @@ export class ChannelsController {
     return this.channels.diagnosticoMeta();
   }
 
+  /** Reinscreve a Pagina nos campos de mensagem. Exige login: so o painel chama. */
+  @Privado()
+  @Post('religar-pagina')
+  religarPagina() {
+    return this.channels.religarPagina();
+  }
+
   /**
    * Conclusao do Cadastro Incorporado (coexistencia).
    *
