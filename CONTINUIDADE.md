@@ -1,6 +1,6 @@
 # Bella AI — ponto de partida
 
-**Atualizado em 20/10/2026.** Leia este arquivo antes de qualquer coisa. O
+**Atualizado em 21/10/2026.** Leia este arquivo antes de qualquer coisa. O
 histórico completo do projeto está no `ESTADO.md`; aqui fica só o que importa
 para continuar de onde paramos.
 
@@ -58,7 +58,25 @@ Página com `messages` e `messaging_postbacks`. Teste pelo Messenger às
 14:52: chegou, e a Bella respondeu sozinha em 15 s.
 `/api/channels/diagnostico` agora tem `gravado`, que vem do banco e
 sobrevive ao deploy, e registra até as recusas na porta (assinatura).
-Instagram ainda sem teste confirmado.
+**Instagram: testado em 21/10 por OUTRA conta, sem resposta, e nada chegou ao
+servidor** (nem recusa de assinatura). Ou seja, a Meta não entregou. Duas
+causas possíveis, ambas no painel, que **não se mexe durante a análise**:
+conta sem papel no app (modo desenvolvimento) ou o objeto `instagram` dos
+webhooks do app sem o campo `messages` apontando para
+`/api/channels/instagram/webhook`. Próximo teste: por uma conta de Instagram
+de quem tem papel no app.
+
+**Caixa de entrada (21/10, `d86746e`):** mensagem nova numa conversa antiga
+não subia na lista, que ordena pela atualização da *conversa*. Agora toda
+mensagem gravada atualiza a conversa. Conversas do WhatsApp Web continuam
+fora do painel (vivem só na extensão).
+
+**Divisão "4 pessoas em cada apartamento" (21/10, `a903341`):** virava "pedir
+a divisão de novo" e encaminhar à equipe. Agora sai um link por apartamento
+(`pessoasEmCadaApartamento`). No mesmo caso, a citação da saudação ("crianças
+menores de 10 anos") entrava como fala do hóspede e descartava a divisão
+certa; corrigido no servidor e na extensão **1.10.4** (recarregar a extensão
+no Chrome).
 
 ⚠️ Ainda vale: o app está em **modo desenvolvimento**. Hóspede sem papel
 no app pode não receber resposta até a **segunda análise**
