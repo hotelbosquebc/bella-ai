@@ -995,6 +995,17 @@ export function apartamentosDeCasais(
 }
 
 /**
+ * Quantas criancas o hospede disse, mesmo sem a idade ("4 adultos e tres
+ * criancas" -> 3). Vale a ULTIMA mencao: ao longo da conversa ele corrige.
+ */
+export function quantasCriancasNaFala(falasDoHospede: string): number {
+  const t = semPrefixos(falasDoHospede || '');
+  const re = /(?<![\d\/])(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores|beb[êe]s?|ni[ñn][oa]s?|hij[oa]s?|kids?|children)(?![a-zà-ÿ])/gi;
+  const achados = [...t.matchAll(re)];
+  return achados.length ? Number(achados[achados.length - 1][1]) : 0;
+}
+
+/**
  * "3 em um apto / 4 em outro apto" = 2 apartamentos, de 3 e de 4.
  *
  * Caso real (20/10/2026): a hospede escreveu a divisao com todas as letras, o
@@ -2570,6 +2581,35 @@ export class AssistController implements OnModuleInit {
     // Crianca citada sem idade: o link nao pode sair, porque a categoria depende
     // da idade. Pedir, em vez de terminar a conversa num beco sem saida.
     if (criancaSemIdade(falasDoHospede)) faltam.push('idades');
+
+    // Mais de 6 pessoas e so falta a idade das criancas: a resposta tem de
+    // trazer TUDO de uma vez - quantos apartamentos, como dividir e as idades.
+    //
+    // Caso real (21/10/2026): "12 a 17 de janeiro para 4 adultos e tres
+    // criancas". A regra de "falta idade" vinha antes da de "mais de 6" e
+    // respondia sozinha: a Bella pedia so as idades, e a divisao ficava para
+    // uma segunda rodada. Regra do dono: no maximo 6 por apartamento; informar
+    // o minimo de apartamentos, perguntar a divisao e as idades, e mandar o
+    // link (um por apartamento) com base nas respostas.
+    const criancasDitas = Math.max(
+      quantasCriancasNaFala(falasDoHospede),
+      (Number(stay.children0_6) || 0) + (Number(stay.children7_9) || 0),
+    );
+    const totalDito = (Number(stay.adults) || 0) + criancasDitas;
+    if (totalDito > 6 && totalDito <= 15 && faltam.length && faltam.every((f) => f === 'idades')) {
+      const minimo = Math.ceil(totalDito / 6);
+      this.registrarDecisao(`${totalDito} pessoas sem idades: informar ${minimo} apartamentos, pedir divisao e idades`, stay);
+      return (
+        `\n\nOCUPAÇÃO ACIMA DO LIMITE (${totalDito} pessoas: ${Number(stay.adults) || 0} adultos e ${criancasDitas} ` +
+        `${criancasDitas === 1 ? 'criança' : 'crianças'}): cada apartamento acomoda no MÁXIMO 6 pessoas. NÃO envie link agora.\n` +
+        `Numa mensagem só, curta e acolhedora:\n` +
+        `1) diga que para ${totalDito} pessoas são necessários no mínimo ${minimo} apartamentos;\n` +
+        `2) pergunte como ele prefere dividir as pessoas em cada apartamento;\n` +
+        `3) peça a idade de cada criança (é o que define a categoria no site).\n` +
+        `Explique em meia frase que, com essas respostas, você envia o link de cada apartamento já com os valores.`
+      );
+    }
+
     if (faltam.length) {
       const rotulos: Record<string, string> = {
         checkin: 'data de entrada',
@@ -2725,6 +2765,35 @@ export class AssistController implements OnModuleInit {
     // numero - e o atendente teve que escrever "sao necessarios 2 apartamentos"
     // na mao. O limite e 6 por apartamento, entao o minimo e o total dividido
     // por 6, arredondado para cima.
+    // A divisao veio escrita, mas a leitura rapida (sem IA) nao a enxerga.
+    //
+    // Caso real (21/10/2026): 7 pessoas; a Bella pediu a divisao, o hospede
+    // respondeu "2 adultos e 2 criancas de 5 e 8 anos em um apto, 2 adultos e
+    // 1 crianca de 12 no outro" - e ela pediu a divisao DE NOVO. A frase tinha
+    // datas e numeros simples, entao a leitura sem IA atendeu sozinha e nao
+    // traz apartamento por apartamento. Quando passa de 6 e ha cara de divisao
+    // na fala, quem le e o extrator, que devolve a lista de apartamentos.
+    if (
+      totalNoPedido > 6 &&
+      detalhe.length <= 1 &&
+      semIA &&
+      /\b(aptos?|apartamentos?|quartos?|su[íi]tes?|outr[oa])\b/i.test(falasDoHospede)
+    ) {
+      try {
+        const lido: any = await this.extrair(conversation);
+        const lista = Array.isArray(lido?.apartamentos_detalhe) ? lido.apartamentos_detalhe : [];
+        const cabe = (a: any) =>
+          (Number(a?.adultos) || 0) + (Number(a?.criancas0_6) || 0) + (Number(a?.criancas7_9) || 0) +
+            (Array.isArray(a?.idades) ? a.idades.length : 0) <= 6;
+        if (lista.length > 1 && lista.every(cabe)) {
+          detalhe = lista;
+          this.registrarDecisao(`divisao lida pelo extrator: ${lista.length} apartamentos`, stay);
+        }
+      } catch (_) {
+        /* extrator fora do ar: segue pedindo a divisao */
+      }
+    }
+
     if (totalNoPedido > 6 && !(detalhe.length > 1)) {
       const minimo = Math.ceil(totalNoPedido / 6);
       this.registrarDecisao(`${totalNoPedido} pessoas: pedir a divisao em ${minimo} apartamentos`, stay);
@@ -2755,9 +2824,13 @@ export class AssistController implements OnModuleInit {
 ${url}`;
       });
 
-      const totalPessoas = detalhe.reduce(
-        (s: number, a: any) =>
-          s + (Number(a.adultos) || 0) + (Number(a.criancas0_6) || 0) + (Number(a.criancas7_9) || 0),
+      // A conta sai da MESMA classificacao dos links. Somar so os campos
+      // deixava de fora quem veio por idade: em 21/10/2026, 4 adultos e 3
+      // criancas (5, 8 e 12 anos) viraram "4 pessoas, cabem juntas" - e a
+      // Bella ofereceria um apartamento so para 7.
+      const classificados = detalhe.map((a: any) => classificarApartamento(a));
+      const totalPessoas = classificados.reduce(
+        (s: number, c: any) => s + c.adultos + c.criancas0_6 + c.criancas7_9,
         0,
       );
 
@@ -2773,9 +2846,9 @@ ${url}`;
         const juntos = this.reservations.buildBookingLink({
           checkin: stay.checkin,
           checkout: stay.checkout,
-          adults: detalhe.reduce((s: number, a: any) => s + (Number(a.adultos) || 0), 0),
-          children0_6: detalhe.reduce((s: number, a: any) => s + (Number(a.criancas0_6) || 0), 0),
-          children7_9: detalhe.reduce((s: number, a: any) => s + (Number(a.criancas7_9) || 0), 0),
+          adults: classificados.reduce((s: number, c: any) => s + c.adultos, 0),
+          children0_6: classificados.reduce((s: number, c: any) => s + c.criancas0_6, 0),
+          children7_9: classificados.reduce((s: number, c: any) => s + c.criancas7_9, 0),
         } as any);
         opcaoJuntos =
           `\n\nATENÇÃO — O HÓSPEDE NÃO DEIXOU CLARO se quer apartamentos SEPARADOS ou TODOS JUNTOS. ` +
