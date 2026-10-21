@@ -70,8 +70,12 @@ export class ChannelsController {
    * depender de login nem do log do Render, que hiberna.
    */
   @Get('diagnostico')
-  diagnosticoCanais() {
-    return { percurso: this.channels.percurso.slice(-30) };
+  async diagnosticoCanais() {
+    // "gravado" vem do banco e sobrevive ao deploy - o "percurso" em memoria
+    // zera a cada publicacao, e em 21/10/2026 um teste pelo Messenger caiu
+    // justo entre duas publicacoes: nao dava para saber se tinha chegado.
+    const gravado = await this.channels.percursoGravado();
+    return { percurso: this.channels.percurso.slice(-30), gravado };
   }
 
   /**

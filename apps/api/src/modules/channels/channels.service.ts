@@ -69,6 +69,20 @@ export class ChannelsService {
     if (this.percurso.length > 50) this.percurso.shift();
   }
 
+  /** As ultimas passagens gravadas no banco (canal, motivo, tempo) - nenhum texto. */
+  async percursoGravado() {
+    try {
+      const linhas = await this.prisma.diagnostico.findMany({
+        where: { tipo: 'canal' },
+        orderBy: { createdAt: 'desc' },
+        take: 30,
+      });
+      return linhas.map((l) => ({ quando: l.createdAt, canal: l.canal, motivo: l.motivo, tipo: l.detalhe, ms: l.ms }));
+    } catch {
+      return [];
+    }
+  }
+
   private get hotelId() {
     return process.env.DEFAULT_HOTEL_ID ?? 'hotel-do-bosque';
   }

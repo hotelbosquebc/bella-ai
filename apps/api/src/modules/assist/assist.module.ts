@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Module, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Module, OnModuleInit, Param, Post, Query } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Public } from '../auth/public.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BellaModule } from '../bella/bella.module';
 import { ModelRouterService } from '../bella/model-router.service';
+import { BellaOrchestratorService } from '../bella/bella-orchestrator.service';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { KnowledgeService } from '../knowledge/knowledge.service';
 import { PoliciesModule } from '../policies/policies.module';
@@ -1950,7 +1951,7 @@ export function contextoDeApresentacao(conversation: string): string {
  * revisa e envia. Não há automação de envio — risco de ban praticamente nulo.
  */
 @Controller('assist')
-export class AssistController {
+export class AssistController implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: ModelRouterService,
@@ -1958,7 +1959,18 @@ export class AssistController {
     private readonly policies: PoliciesService,
     private readonly reservations: ReservationEngineService,
     private readonly disponibilidade: SilbeckAvailabilityService,
+    private readonly orquestrador: BellaOrchestratorService,
   ) {}
+
+  /**
+   * Empresta a leitura do pedido ao caminho automatico (Instagram, Facebook,
+   * WhatsApp oficial): os dois caminhos usam o MESMO bookingContext, entao
+   * toda correcao feita aqui vale tambem para quem responde sem revisao.
+   * Pedido do dono em 21/10/2026. Ver definirLeitorDoPedido no orquestrador.
+   */
+  onModuleInit() {
+    this.orquestrador.definirLeitorDoPedido((conversa) => this.bookingContext(conversa));
+  }
 
   /**
    * Anexos que combinam com o que o hóspede perguntou (regras de pets, catálogo

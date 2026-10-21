@@ -43,6 +43,40 @@ export class BellaOrchestratorService {
     private readonly outbound: OutboundService,
   ) {}
 
+  /**
+   * A leitura do pedido (datas, pessoas, apartamentos, crianças, Réveillon,
+   * período novo...) é a MESMA da extensão.
+   *
+   * Até 21/10/2026 o caminho automático tinha um motor próprio, bem mais
+   * fraco: extraía só da ÚLTIMA mensagem e não tinha nenhuma das travas que a
+   * extensão ganhou com prints reais — divisão em apartamentos, ocupação de
+   * outro dia, período que substitui o já respondido, "pet porte pequeno",
+   * saída no dia da entrada. Pedido do dono: os dois caminhos sempre iguais.
+   * E é o automático que responde SEM ninguém revisar.
+   *
+   * A função mora no AssistController e é registrada aqui quando o servidor
+   * sobe (o módulo de atendimento já depende deste, e importar de volta
+   * fecharia um ciclo). Sem registro, cai no motor antigo — melhor que calar.
+   */
+  private leitorDoPedido: ((conversa: string) => Promise<string>) | null = null;
+
+  definirLeitorDoPedido(fn: (conversa: string) => Promise<string>) {
+    this.leitorDoPedido = fn;
+  }
+
+  /** A conversa do banco no formato que a extensão manda: "Hóspede (hoje): ...", "Nós: ...". */
+  private conversaComoTexto(mensagens: { sender: MessageSender; content: string; timestamp: Date }[]): string {
+    const inicioDeHoje = inicioDoDiaEmSaoPaulo().getTime();
+    return mensagens
+      .filter((m) => (m.content || '').trim())
+      .map((m) => {
+        const quem = m.sender === MessageSender.GUEST ? 'Hóspede' : 'Nós';
+        const hoje = new Date(m.timestamp).getTime() >= inicioDeHoje ? ' (hoje)' : '';
+        return `${quem}${hoje}: ${m.content}`;
+      })
+      .join('\n');
+  }
+
   async handleInbound(inbound: NormalizedInboundMessage): Promise<void> {
     // 1-2. Identificar hóspede e conversa
     const guest = await this.findOrCreateGuest(inbound);
@@ -96,7 +130,23 @@ export class BellaOrchestratorService {
 
     // 7. Motor de reservas: com dados completos, gera link automaticamente
     let bookingContext = '';
-    if (intent === 'booking') {
+    if (this.leitorDoPedido) {
+      try {
+        bookingContext = await this.leitorDoPedido(this.conversaComoTexto(mem.recentMessages as any));
+      } catch (err) {
+        // Extração indisponível (IA fora): sem dado de reserva, a resposta pede
+        // o que falta em vez de inventar.
+        this.logger.warn(`Leitura do pedido falhou: ${err instanceof Error ? err.message : err}`);
+        bookingContext = '';
+      }
+      if (/sbreserva\.silbeck/i.test(bookingContext)) {
+        await this.prisma.lead.update({
+          where: { id: lead.id },
+          data: { stage: LeadStage.QUOTE_SENT },
+        });
+        await this.followUp.scheduleAfterQuote(lead.id);
+      }
+    } else if (intent === 'booking') {
       const result = await this.reservations.process(guest, stay);
       bookingContext = result.contextForPrompt;
       if (result.quoteSent) {
