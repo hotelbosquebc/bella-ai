@@ -20,7 +20,10 @@ node (Join-Path $PSScriptRoot "verificar-extensao.js")
 if ($LASTEXITCODE -ne 0) { throw "Extensao com problema - veja acima. Nada foi empacotado." }
 
 New-Item -ItemType Directory -Force -Path $pasta | Out-Null
-Copy-Item "$origem\*" -Destination $pasta -Recurse
+# So os arquivos da extensao. Em 21/10/2026 havia uma copia antiga extraida
+# DENTRO de whatsapp-extension (Bella-Extensao-WhatsApp\, versao de 14/10), e
+# copiar tudo a levaria junto para o outro PC.
+Get-ChildItem $origem -File | Copy-Item -Destination $pasta
 
 if (Test-Path $destino) { Remove-Item $destino }
 Compress-Archive -Path $pasta -DestinationPath $destino
