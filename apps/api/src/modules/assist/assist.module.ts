@@ -1037,6 +1037,70 @@ export function divisaoPorApartamento(
 }
 
 /**
+ * "4 pessoas em cada apartamento" = o total dividido em partes iguais.
+ *
+ * Caso real (21/10/2026): 8 pessoas; a Bella disse que eram precisos dois
+ * apartamentos e perguntou a divisao, o hospede respondeu "Pode ser 4 pessoas
+ * em cada apartamento" - e ela pediu a divisao de novo e passou para a equipe.
+ * Os outros leitores esperam um numero POR apartamento ("3 em um, 4 no
+ * outro"); aqui e um numero so, que vale para todos.
+ *
+ * Com "2 apartamentos de 4" a conta vem inteira. Com "4 em cada" o numero de
+ * apartamentos sai do total ja dito, e so quando a divisao e exata: 7 pessoas
+ * com "4 em cada" e o hospede pensando em outra coisa.
+ *
+ * Crianca no pedido torna ambiguo (quem fica onde, com que idade): null.
+ */
+export function pessoasEmCadaApartamento(
+  falasDoHospede: string,
+  totalDito: number,
+): { adultos: number; idades: number[]; criancas0_6: number; criancas7_9: number }[] | null {
+  const t = semPrefixos(falasDoHospede || '');
+  const gente = String.raw`(?:pessoas?|adultos?|h[óo]spedes?)`;
+  const aptos = String.raw`(?:aptos?|apartamentos?|quartos?|su[íi]tes?)`;
+  const formas = [
+    // "4 pessoas em cada apartamento", "4 em cada", "4 para cada um"
+    new RegExp(String.raw`(?<![\d\/.,])(\d{1,2})[ \t]*${gente}?[ \t]+(?:em|por|para|pra|no|na)[ \t]+cada(?![a-zà-ÿ])`, 'gi'),
+    // "4 por apartamento"
+    new RegExp(String.raw`(?<![\d\/.,])(\d{1,2})[ \t]*${gente}?[ \t]+por[ \t]+${aptos}(?![a-zà-ÿ])`, 'gi'),
+    // "4 pessoas cada", "2 apartamentos com 4 pessoas cada"
+    new RegExp(String.raw`(?<![\d\/.,])(\d{1,2})[ \t]*${gente}[ \t]+cada(?![a-zà-ÿ])`, 'gi'),
+  ];
+  let porApto = 0;
+  let posicao = -1;
+  for (const re of formas) {
+    for (const m of t.matchAll(re)) {
+      if ((m.index ?? 0) > posicao) {
+        posicao = m.index ?? 0;
+        porApto = Number(m[1]);
+      }
+    }
+  }
+  // "2 apartamentos de 4", "dois quartos com 4 pessoas"
+  let quantos = 0;
+  const reAptos = new RegExp(
+    String.raw`(?<![\d\/.,])(\d{1,2})[ \t]*${aptos}[ \t]+(?:de|com|para|pra)[ \t]+(\d{1,2})(?![\d\/.,])(?:[ \t]*${gente})?`,
+    'gi',
+  );
+  for (const m of t.matchAll(reAptos)) {
+    if ((m.index ?? 0) >= posicao) {
+      posicao = m.index ?? 0;
+      quantos = Number(m[1]);
+      porApto = Number(m[2]);
+    }
+  }
+  if (porApto < 1 || porApto > 6) return null;
+  if (!quantos) {
+    if (!totalDito || totalDito % porApto !== 0) return null;
+    quantos = totalDito / porApto;
+  } else if (totalDito && quantos * porApto !== totalDito) {
+    return null;
+  }
+  if (quantos < 2 || quantos > 5) return null;
+  return Array.from({ length: quantos }, () => ({ adultos: porApto, idades: [], criancas0_6: 0, criancas7_9: 0 }));
+}
+
+/**
  * Quantas criancas o hospede disse, mesmo sem a idade ("4 adultos e tres
  * criancas" -> 3). Vale a ULTIMA mencao: ao longo da conversa ele corrige.
  */
@@ -2739,14 +2803,30 @@ export class AssistController implements OnModuleInit {
     // divisaoPorApartamento. Le primeiro o que ele disse depois da nossa
     // ultima mensagem (a resposta a "como prefere dividir?").
     const recentesParaDivisao = falasDoHospedeDepoisDaNossa(conversation);
-    const divisaoEscrita =
-      divisaoPorApartamento(recentesParaDivisao.trim() ? recentesParaDivisao : falasDoHospede);
+    const fonteDaDivisao = recentesParaDivisao.trim() ? recentesParaDivisao : falasDoHospede;
+    const criancasNoPedido = (Number(stay.children0_6) || 0) + (Number(stay.children7_9) || 0);
+    // "4 pessoas em cada apartamento" - ver pessoasEmCadaApartamento.
+    const emCada =
+      criancasNoPedido > 0
+        ? null
+        : pessoasEmCadaApartamento(fonteDaDivisao, Number(stay.adults) || 0) ||
+          pessoasEmCadaApartamento(falasDoHospede, Number(stay.adults) || 0);
+    const divisaoEscrita = divisaoPorApartamento(fonteDaDivisao) || emCada;
     if (divisaoEscrita) {
       detalhe = divisaoEscrita;
       this.registrarDecisao(`divisao escrita pelo hospede: ${divisaoEscrita.length} apartamentos`, stay);
     } else if (detalhe.length > 1) {
       // Extrator sem crianca quando a fala tem idade: perdeu gente no caminho.
-      const falaTemIdade = /\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(falasDoHospede);
+      //
+      // "Menores de 10 anos" e a NOSSA regra, nao a idade de alguem. Caso real
+      // (21/10/2026): o hospede respondeu citando a saudacao da Bella ("caso
+      // tenha criancas menores de 10 anos..."), a citacao veio junto na fala
+      // dele, e a divisao certa do extrator foi descartada por isso.
+      const semRegraDeIdade = falasDoHospede.replace(
+        /\b(?:menor(?:es)?|maior(?:es)?|menos|mais|acima|abaixo|at[ée]|a\s+partir)\s+(?:de\s+)?\d{1,2}\s*(?:anos?|años?|years?)/gi,
+        '',
+      );
+      const falaTemIdade = /\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(semRegraDeIdade);
       const detalheTemCrianca = detalhe.some(
         (a: any) => (Array.isArray(a?.idades) && a.idades.length) || Number(a?.criancas0_6) || Number(a?.criancas7_9),
       );

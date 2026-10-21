@@ -559,6 +559,14 @@
           m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
           const remetente = m ? m[3] : '';
           t = (el.innerText || '').replace(/ /g, ' ').trim();
+          // Resposta citando outra mensagem: a citacao vem dentro do mesmo
+          // balao. Caso real (21/10/2026): o hospede respondeu citando a
+          // saudacao da Bella, e "criancas menores de 10 anos" entrou como
+          // fala dele. O texto proprio fica no span.selectable-text; so o
+          // usamos quando o balao inteiro TERMINA nele (a citacao vem antes).
+          const proprio = el.querySelector('span.selectable-text');
+          const textoProprio = proprio ? (proprio.innerText || '').replace(/ /g, ' ').trim() : '';
+          if (textoProprio && textoProprio.length < t.length && t.endsWith(textoProprio)) t = textoProprio;
           const d = direcaoDoBalao(row, titulo, remetente);
           isIn = d.isIn;
           fontesDeDirecao[d.fonte] = (fontesDeDirecao[d.fonte] || 0) + 1;
