@@ -253,11 +253,13 @@ link de reservas.
    (`pages_messaging` + `instagram_manage_messages`). **Isso muda o critério de
    ligar o automático.** Começar por Instagram e Facebook depende da medição
    **e** dessa segunda aprovação.
-3. **Mensagem de espera** no caminho automático, para o silêncio de 5 a 12s não
-   parecer abandono. ⚠️ O texto **não pode** dizer "vou verificar os valores e a
-   disponibilidade": ela não informa valores, e `checkAvailability()` naquele
-   fluxo é um esqueleto que devolve `{available:true}` fixo. Versão honesta:
-   avisar que já vai enviar o link com os valores.
+3. ~~**Mensagem de espera** no caminho automático~~ — **feita em 22/10**
+   (`be78158`, `common/mensagem-espera.ts`): "Só um instante, estou
+   verificando e já te respondo! 🌿" (pt/es/en), com a apresentação quando é a
+   primeira do dia, uma por rodada. Não promete valor nem vaga. Fica FORA da
+   leitura da conversa e do histórico da IA (senão "o que o hóspede disse
+   depois da nossa última mensagem" sairia vazio). Regra do dono: "o
+   importante é responder; quanto mais rápido melhor".
 4. ~~Trava de disponibilidade na extensão~~ — **feita em 20/10** (`91c7f30`).
    Só deixa passar "temos disponibilidade" quando o contexto traz a marca
    `VAGA CONFIRMADA`, que só entra quando a consulta real devolve categorias.
