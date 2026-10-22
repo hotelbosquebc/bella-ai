@@ -18,6 +18,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
+import { semCustoDeHorarioExtra } from '../../common/horario-extra';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 // Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
@@ -4111,6 +4112,12 @@ ${url}`;
       if (semPromessa !== draft.text) {
         this.registrarDecisao('resposta PROMETIA registro - frase removida', {});
         draft.text = semPromessa;
+      }
+      // Early/late: custo e com a recepcao (regra do dono, 22/10/2026).
+      const semCusto = semCustoDeHorarioExtra(draft.text);
+      if (semCusto !== draft.text) {
+        this.registrarDecisao('resposta dava CUSTO de early/late - frase removida', {});
+        draft.text = semCusto;
       }
     }
 

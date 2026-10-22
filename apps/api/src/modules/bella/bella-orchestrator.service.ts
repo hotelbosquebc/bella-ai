@@ -9,6 +9,7 @@ import { corrigirLinks, garantirLink } from '../../common/links';
 import { mensagemDeEntregaAoHumano, mensagemForaDoAtendimento } from '../../common/contato';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { semPromessaDeRegistro } from '../../common/registro';
+import { semCustoDeHorarioExtra } from '../../common/horario-extra';
 import { semPrecoInventado } from '../../common/preco';
 import { motivoParaHumano, assuntoForaDoAtendimento } from './escalonamento';
 import { buscarContatoMarcado } from '../contatos/contatos.module';
@@ -283,6 +284,12 @@ export class BellaOrchestratorService {
       if (semPromessa !== draft.text) {
         this.logger.warn('Resposta PROMETIA registro - frase removida');
         draft.text = semPromessa;
+      }
+      // Early/late: custo e com a recepcao (regra do dono, 22/10/2026).
+      const semCusto = semCustoDeHorarioExtra(draft.text);
+      if (semCusto !== draft.text) {
+        this.logger.warn('Resposta dava custo de early/late - frase removida');
+        draft.text = semCusto;
       }
     }
 
