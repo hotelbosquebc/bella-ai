@@ -153,7 +153,7 @@ Marque **OK** se estiver certo, ou corrija:
 - O hotel **não tem piscina**. → R:
 - Máximo de 6 pessoas por apartamento. → R:
 - Setor de reservas: seg a sex, 9h–12h e 14h30–17h30. Recepção 24h pelo (47) 3367-0211. → R:
-- Wi-Fi: senha `bosque00`. Qual o nome da rede? → R:
+- Wi-Fi: senha `Bosque00`. Qual o nome da rede? → R:
 - Não há lavanderia; há tanque no apartamento e lavanderias próximas. → R:
 - Pet-friendly, pequeno porte, sem diária de pet, taxa mínima de R$ 200 em caso de dano/limpeza. → R:
 - Único desconto que a Bella informa: 5% no pix pelo site. → R:

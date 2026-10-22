@@ -61,7 +61,7 @@ estacionamento completo (gratuito, 1 vaga inclusa, 2º carro com reserva prévia
 coberto/descoberto, veículos aceitos), Réveillon, café buffet (pães TÊM glúten),
 pets até 12 kg, check-in (titular ou nome cadastrado), berço, guarda-volumes,
 elevadores (adaptado ocupado sem previsão), pós-reserva, cancelamento
-direto x OTA, Wi-Fi (senha `bosque00`, nome varia por roteador).
+direto x OTA, Wi-Fi (senha `Bosque00`, nome varia por roteador).
 **Atalhos do painel REMOVIDOS** a pedido do dono — a recepção usa os nativos do
 WhatsApp ("/").
 
@@ -215,7 +215,7 @@ A sugestão vem com o arquivo pronto para o atendente enviar (envio segue **manu
 
 ## 📚 Base de conhecimento quase completa (13/08/2026)
 Das 5 lacunas `[REVISAR]`, **4 foram preenchidas com fonte oficial** (folha "Bem Vindo ao Hotel do Bosque" enviada pelo dono + site de reservas):
-- **Wi-Fi:** senha **bosque00**, mesma para todo o hotel ✅
+- **Wi-Fi:** senha **Bosque00** (B maiúsculo), mesma para todo o hotel ✅
 - **Limpeza:** diária 8h-15h, louça é do hóspede, não se limpa com pets/hóspedes no apto ✅
 - **Categorias:** Suíte Bosque (7º-8º, 2 banheiros + aquecimento a gás), Luxo (3º-4º, mais novos), Superior (5º-6º, +1 TV), Standard (1º-2º, mais básicos) — todas cap. 6 ✅
 - **Ingressos:** lista das atrações do material ✅

@@ -157,7 +157,7 @@ const conhecimentos = [
   {
     title: 'Wi-Fi',
     content:
-      'O Wi-Fi é gratuito e a SENHA é sempre "bosque00", em todo o hotel. O NOME DA REDE muda: cada roteador tem um nome diferente, e o hóspede deve se conectar ao mais próximo do apartamento onde estiver. Por isso não informe um nome de rede específico — diga que ele verá algumas redes do hotel, deve escolher a mais próxima e usar essa mesma senha.',
+      'O Wi-Fi é gratuito e a SENHA é sempre "Bosque00" (com B MAIÚSCULO — a senha diferencia maiúsculas), em todo o hotel. Escreva a senha exatamente assim. O NOME DA REDE muda: cada roteador tem um nome diferente, e o hóspede deve se conectar ao mais próximo do apartamento onde estiver. Por isso não informe um nome de rede específico — diga que ele verá algumas redes do hotel, deve escolher a mais próxima e usar essa mesma senha.',
   },
   {
     title: 'Descontos autorizados',
