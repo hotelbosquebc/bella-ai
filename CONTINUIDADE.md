@@ -241,6 +241,57 @@ link de reservas.
 
 ---
 
+## Dia da aprovação do WhatsApp: roteiro para ligar a Bella
+
+Decisão do dono (22/10): caminho **oficial**, por coexistência, ligado **no
+mesmo dia** da aprovação. O código já está pronto (`30cc72c`). Na ordem:
+
+1. **Confirmar** em Análise do app → Solicitações que está **Aprovada**. Só
+   então mexer no painel do app.
+2. **Webhooks do app** (developers.facebook.com → app Bella → Webhooks),
+   objeto **WhatsApp Business Account**: endereço
+   `https://bella-api-nh3h.onrender.com/api/channels/whatsapp/webhook`, token de
+   verificação = o valor de `META_WEBHOOK_VERIFY_TOKEN` no Render. Campos:
+   `messages`, `smb_message_echoes`, `history`, `smb_app_state_sync`,
+   `account_update`. Sem `smb_message_echoes`, a Bella não fica sabendo que a
+   recepção respondeu pelo celular e responde por cima.
+3. Conferir que o app está em modo **Ao vivo**, e que existem
+   `NEXT_PUBLIC_META_APP_ID` e `NEXT_PUBLIC_META_SIGNUP_CONFIG_ID` na Vercel e
+   `META_APP_ID` e `META_APP_SECRET` no Render. A configuração do Login do
+   Facebook para Empresas tem de ser do tipo **Cadastro Incorporado do
+   WhatsApp**.
+4. Painel → **/whatsapp → Conectar o WhatsApp do hotel**. A tela já pede
+   **coexistência** (antes de 22/10 pedia a migração comum, que tira o número
+   do celular). O dono digita o número, toca em **Conectar** no app do
+   celular, aceita compartilhar o histórico e cola o código.
+5. O resultado mostra `passos`: `inscricao: ok`, `contatos: pedida`,
+   `historico: pedida`. A sincronização tem de ser pedida **em até 24h**; se
+   falhar, refazer a conexão no mesmo dia.
+6. **Token permanente:** Gerenciador de Negócios → Usuários do sistema →
+   usuário com acesso à conta do WhatsApp → gerar token com
+   `whatsapp_business_messaging` e `whatsapp_business_management`. O dono cola
+   no Render: `WHATSAPP_ACCESS_TOKEN` e `WHATSAPP_PHONE_NUMBER_ID` (o número
+   que a tela mostrou). Nunca pedir nem receber o token.
+7. **Teste:** de um celular pessoal, "oi" para o (47) 3367-0211 fora do
+   expediente (no modo automático, dentro do expediente quem responde é a
+   equipe). Esperado: a mensagem de espera e depois a resposta. Conferir em
+   `/api/channels/diagnostico`. Responder pelo celular e confirmar que a Bella
+   **para** nessa conversa (`motivo: equipe respondeu pelo app`).
+8. Recarregar a extensão **1.12.0** nos dois PCs. Ela passa a mostrar
+   "respondendo sozinha no WhatsApp" e para de sugerir sozinha.
+9. Enviar a **segunda análise** (`pages_messaging` + `instagram_manage_messages`)
+   para liberar Instagram e Messenger.
+
+Como funciona depois de ligada: a resposta da recepção pelo app ou pelo
+WhatsApp Web **tira a Bella da conversa**. A saudação e a mensagem de
+ausência automáticas não contam. Ela **volta depois de 2h** de silêncio da
+equipe, nunca para guia marcado e nunca com pedido de ajuda em aberto
+(`PAUSA_DA_EQUIPE_MS`). O follow-up **não sai** pelo WhatsApp até existir um
+modelo aprovado (fora da janela de 24h, falharia).
+
+⚠️ **Portfólios divididos** (item 7 abaixo) podem travar o passo 4. Se a
+conexão recusar, é o primeiro suspeito.
+
 ## A fazer
 
 1. **Medir** (ver acima) — decide o resto.
