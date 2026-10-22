@@ -356,8 +356,12 @@ conexão recusar, é o primeiro suspeito.
 
 ## Pendências do dono
 
-- Segundo PC ainda na extensão **1.9.2** (zip pronto na Área de Trabalho;
-  extrair em `C:\`, **nunca** no PC do hotel).
+- ~~Segundo PC na extensão 1.9.2~~ — **atualizado para 1.12.0 em 22/10**.
+  Na próxima vez: o zip vai pelo WhatsApp como **Documento** e chega com o nome
+  "WhatsApp Unknown…"; extrair em `C:\` e conferir que existe
+  `C:\Bella-Extensao-WhatsApp\manifest.json`. Em 22/10 foram enviados por
+  engano 3 prints (260 KB) no lugar do zip (32 KB). **Nunca** extrair no PC do
+  hotel.
 - Apagar `C:\bella-extensao-1.9.2` — confirmado que nenhuma extensão aponta
   para ela.
 - Mensagem de ausência do WhatsApp Business com horário errado.
