@@ -99,7 +99,34 @@ export class ChannelsService {
       ler(`${pagina}/subscribed_apps`),
       ler(`${pagina}?fields=instagram_business_account{id,username}`),
     ]);
+    // Inscricao do APP (nao da Pagina): para quais objetos e campos a Meta
+    // manda webhook. Caso de 22/10/2026: o Messenger chegava e o Instagram
+    // nunca - nem uma tentativa recusada na porta. O Instagram tem inscricao
+    // propria no app (objeto "instagram", campo "messages"). Leitura com o
+    // token do app (id|segredo), que nao sai na resposta.
+    const appId = (inscricoes?.data || [])[0]?.id;
+    const segredo = process.env.META_APP_SECRET;
+    let webhooksDoApp: any = { erro: 'sem META_APP_SECRET ou sem app inscrito' };
+    if (appId && segredo) {
+      try {
+        const r = await fetch(
+          `https://graph.facebook.com/${GRAPH_VERSION}/${appId}/subscriptions?access_token=${encodeURIComponent(`${appId}|${segredo}`)}`,
+        );
+        const j: any = await r.json();
+        webhooksDoApp = j?.error
+          ? { erro: `${j.error.code ?? ''}: ${String(j.error.message ?? '').slice(0, 200)}` }
+          : (j?.data || []).map((s: any) => ({
+              objeto: s.object,
+              ativo: s.active,
+              endereco: s.callback_url,
+              campos: (s.fields || []).map((f: any) => f.name),
+            }));
+      } catch (err) {
+        webhooksDoApp = { erro: String(err instanceof Error ? err.message : err).slice(0, 200) };
+      }
+    }
     return {
+      webhooksDoApp,
       tokenDaPagina: eu?.erro ? { valido: false, erro: eu.erro } : { valido: true, id: eu?.id, nome: eu?.name },
       paginaConfigurada: pagina,
       inscricoes: inscricoes?.erro
