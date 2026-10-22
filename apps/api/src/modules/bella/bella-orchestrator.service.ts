@@ -7,6 +7,7 @@ import { ModelRouterService } from './model-router.service';
 import { normalizar } from '../attachments/attachments.module';
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { mensagemDeEntregaAoHumano, mensagemForaDoAtendimento } from '../../common/contato';
+import { ehMensagemDeEspera, idiomaDaMensagem, mensagemDeEspera } from '../../common/mensagem-espera';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
@@ -151,8 +152,44 @@ export class BellaOrchestratorService {
       return;
     }
 
+    // "Estou verificando" antes de qualquer IA - ver common/mensagem-espera.ts.
+    // Pedido do dono (22/10/2026): mesmo que a resposta demore, o hospede
+    // sabe que ela vem. Uma por rodada: se a ultima mensagem nossa ja e a de
+    // espera (o hospede mandou varias linhas seguidas), nao repete.
+    try {
+      const ultimaNossa = await this.prisma.message.findFirst({
+        where: { conversationId: conversation.id, sender: MessageSender.BELLA },
+        orderBy: { timestamp: 'desc' },
+        select: { content: true },
+      });
+      if (!ultimaNossa || !ehMensagemDeEspera(ultimaNossa.content)) {
+        const falouHoje = await this.prisma.message.findFirst({
+          where: {
+            sender: MessageSender.BELLA,
+            timestamp: { gte: inicioDoDiaEmSaoPaulo() },
+            conversation: { guestId: guest.id },
+          },
+          select: { id: true },
+        });
+        await this.sendReply(
+          conversation.id,
+          inbound,
+          mensagemDeEspera(idiomaDaMensagem(inbound.content), !falouHoje),
+        );
+      }
+    } catch (err) {
+      // Sem a espera, a resposta de verdade ainda sai: nao derruba o atendimento.
+      this.logger.warn(`Mensagem de espera falhou: ${err instanceof Error ? err.message : err}`);
+    }
+
     // 3-4. Memória + extração de intenção/dados de reserva
     const mem = await this.memory.load(guest.id, conversation.id);
+    // A mensagem de espera nao e resposta: fora da leitura e do historico.
+    // Varias leituras usam "o que o hospede disse DEPOIS da nossa ultima
+    // mensagem" - com a espera contando, esse trecho ficaria sempre vazio.
+    mem.recentMessages = mem.recentMessages.filter(
+      (m: any) => !(m.sender === MessageSender.BELLA && ehMensagemDeEspera(m.content)),
+    );
     const today = new Date().toISOString().slice(0, 10);
     const extraction = await this.modelRouter.complete({
       task: 'booking_extraction',
