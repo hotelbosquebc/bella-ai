@@ -274,10 +274,13 @@ link de reservas.
    vindas do histórico guardado pela extensão (`chaveConversa` =
    título do cabeçalho). Falta saber se é histórico legítimo do mesmo número
    ou outro contato caindo no mesmo registro, como no bug da 1.1.6.
-   **Chaves do Gemini:** a chave 2 é INVÁLIDA (400). A chave 3 (projeto
-   Bella 3) funciona só nos 3.x, porque projeto novo não tem a linha 2.5.
-   Para ganhar velocidade, trocar a chave 2 por uma nova do **Gemini
-   Project**.
+   **Chaves do Gemini (22/10):** 1 = AI-Studio-Free (…V-Iw, a única com
+   o 2.5-flash rápido, 20/dia); 2 = **Gemini Project, criada em 22/10**,
+   aceita, mas o Google responde 404 "no longer available to new users"
+   também para o 2.5 nela; 3 = Bella 3 (…pXEQ), só 3.x. Ou seja: chave
+   nova, mesmo em projeto antigo, não ganha a linha 2.5. As chaves 2 e 3
+   somam cota do 3.5-flash-lite (500/dia cada) e servem de reserva no 503.
+   Velocidade extra pelo plano gratuito não existe mais.
    **Nota fiscal — regra do dono (21/10, `5e5348e`):** emitida para PF ou
    PJ, inclusive em reserva do site. Pede-se na recepção no check-out, com
    CPF/CNPJ, razão social, endereço e e-mail, e sai impressa ou por e-mail.
