@@ -3177,7 +3177,11 @@ ${url}`;
     const totalPessoasPedido =
       Number(stay.adults || 0) + Number(stay.children0_6 || 0) + Number(stay.children7_9 || 0);
     if (Number(stay.apartamentos) > 1 && totalPessoasPedido > 6) {
-      const linkBase = this.reservations.buildSearchLink(stay.checkin, stay.checkout);
+      const linkBase = this.reservations.buildSearchLink(
+        stay.checkin,
+        stay.checkout,
+        Math.ceil(totalPessoasPedido / Number(stay.apartamentos)),
+      );
       this.registrarDecisao('varios apartamentos sem composicao clara', stay);
       return (
         `\n\nRESERVA DE ${stay.apartamentos} APARTAMENTOS (composição de cada um não ficou clara): ` +

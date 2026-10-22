@@ -71,7 +71,11 @@ export class ReservationEngineService {
       Number(stay.adults ?? 0) + Number(stay.children0_6 ?? 0) + Number(stay.children7_9 ?? 0);
     const varios = Number((stay as { apartamentos?: number }).apartamentos) > 1 && pessoas > 6;
     const link = varios
-      ? this.buildSearchLink(stay.checkin!, stay.checkout!)
+      ? this.buildSearchLink(
+          stay.checkin!,
+          stay.checkout!,
+          Math.ceil(pessoas / Number((stay as { apartamentos?: number }).apartamentos)),
+        )
       : this.buildBookingLink(stay);
 
     // Registrar reserva pendente + persistir no histórico do hóspede
@@ -154,8 +158,15 @@ export class ReservationEngineService {
    * parâmetros de ocupação o hóspede monta os apartamentos no próprio site —
    * melhor do que enviar "adultos=0", que o motor trataria como busca vazia.
    */
-  buildSearchLink(checkin: string, checkout: string): string {
-    const params = new URLSearchParams({ checkin, checkout });
+  //
+  // ATENCAO (22/10/2026): sem "adultos-000001" o site IGNORA as datas e abre a
+  // busca na data de hoje ("Selecione um periodo e clique em Buscar") - o
+  // link "so com as datas" nunca funcionou. O proprio site gera
+  // ?checkin=...&checkout=...&adultos-000001=1. Vai sempre uma ocupacao de UM
+  // apartamento (quem chama passa a media por apartamento), e o hospede ajusta.
+  buildSearchLink(checkin: string, checkout: string, adultosPorApartamento = 1): string {
+    const adultos = Math.min(6, Math.max(1, Math.round(adultosPorApartamento) || 1));
+    const params = new URLSearchParams({ checkin, checkout, 'adultos-000001': String(adultos) });
     return `${this.searchBase()}?${params.toString()}`;
   }
 
