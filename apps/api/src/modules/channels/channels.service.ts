@@ -94,10 +94,14 @@ export class ChannelsService {
         return { erro: String(err instanceof Error ? err.message : err).slice(0, 200) };
       }
     };
-    const [eu, inscricoes, instagram] = await Promise.all([
+    const [eu, inscricoes, instagram, conversasIg] = await Promise.all([
       ler('me?fields=id,name'),
       ler(`${pagina}/subscribed_apps`),
       ler(`${pagina}?fields=instagram_business_account{id,username}`),
+      // A Meta deixa o app ler as mensagens do Instagram? Com "Permitir
+      // acesso as mensagens" desligado no app do Instagram, isto da erro.
+      // So a data da conversa mais recente: nenhum texto, nenhum nome.
+      ler(`${pagina}/conversations?platform=instagram&limit=1&fields=updated_time`),
     ]);
     // Inscricao do APP (nao da Pagina): para quais objetos e campos a Meta
     // manda webhook. Caso de 22/10/2026: o Messenger chegava e o Instagram
@@ -126,6 +130,9 @@ export class ChannelsService {
       }
     }
     return {
+      acessoAsMensagensDoInstagram: conversasIg?.erro
+        ? { liberado: false, erro: conversasIg.erro }
+        : { liberado: true, conversaMaisRecente: conversasIg?.data?.[0]?.updated_time ?? null },
       webhooksDoApp,
       tokenDaPagina: eu?.erro ? { valido: false, erro: eu.erro } : { valido: true, id: eu?.id, nome: eu?.name },
       paginaConfigurada: pagina,
