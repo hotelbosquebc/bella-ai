@@ -58,6 +58,17 @@ Página com `messages` e `messaging_postbacks`. Teste pelo Messenger às
 14:52: chegou, e a Bella respondeu sozinha em 15 s.
 `/api/channels/diagnostico` agora tem `gravado`, que vem do banco e
 sobrevive ao deploy, e registra até as recusas na porta (assinatura).
+**22/10: a configuração do nosso lado está CERTA** (`/api/channels/diagnostico-meta`,
+campo `webhooksDoApp`, só leitura): o app tem o objeto `instagram` com
+`messages` apontando para `/api/channels/instagram/webhook`, ativo, e a Página
+está inscrita. Mesmo assim, nenhuma mensagem do Instagram chega. O que sobra é
+o lado da Meta: **modo desenvolvimento** (só entrega mensagens de quem tem papel
+no app, até a segunda análise aprovar `instagram_manage_messages` +
+`pages_messaging`) e, no app do Instagram, **Ferramentas conectadas →
+Permitir acesso às mensagens** (o dono vai conferir; não é o painel em análise).
+Vale também para o Messenger: hóspede comum não recebe resposta até essa
+aprovação.
+
 **Instagram: testado em 21/10 por OUTRA conta, sem resposta, e nada chegou ao
 servidor** (nem recusa de assinatura). Ou seja, a Meta não entregou. Duas
 causas possíveis, ambas no painel, que **não se mexe durante a análise**:
