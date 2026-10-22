@@ -81,7 +81,17 @@ export class ModelRouterService {
   private modelosPara(task: AiTask): string[] {
     const env = process.env;
     const lista = (v?: string) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : null);
-    const porVelocidade = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3.5-flash-lite'];
+    // Os dois ultimos so entram quando todos os anteriores falharam (cota ou
+    // 503). Caso de 22/10/2026: 2.5 sem cota nas duas chaves, 3.5-flash-lite
+    // em "alta demanda" - e nao havia mais nada para tentar. Modelo que nao
+    // existir para a chave da 404 e fica 24h fora, sem custo.
+    const porVelocidade = [
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite',
+      'gemini-3.5-flash-lite',
+      'gemini-3.6-flash',
+      'gemini-3.1-flash-lite',
+    ];
 
     if (task === 'booking_extraction') {
       return lista(env.GEMINI_MODEL_FAST) ?? porVelocidade;
@@ -204,8 +214,12 @@ export class ModelRouterService {
               this.marcarEsgotado(idx, modelo, 'retry in 24h');
               continue;
             }
-            // Outro erro (503 congestionado, 500...) e do MODELO, nao da chave:
-            // trocar de chave repetiria o mesmo. Desce para o proximo modelo.
+            // 503 (congestionado): a outra chave e outro projeto e as vezes
+            // passa - em 22/10/2026 o unico modelo com cota deu 503 na chave 1
+            // e a chave 3 nem foi tentada. O pedido de 503 volta rapido, entao
+            // tentar a proxima chave custa pouco.
+            if (motivo.includes('503')) continue;
+            // Outro erro (500...) e do MODELO: desce para o proximo.
             break;
           }
         }

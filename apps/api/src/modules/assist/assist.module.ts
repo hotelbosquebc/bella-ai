@@ -1939,6 +1939,52 @@ export function temIndicioDeData(falasDoHospede: string): boolean {
  * resposta" por "resposta errada", que e pior.
  */
 export function respostaSemIA(reserva: string, conversation: string): string {
+  // VARIOS links prontos (um por apartamento ou um por periodo), cada um ja
+  // rotulado pelo servidor ("Apartamento 1 — 3 adultos:" / "08/11 a 14/11:").
+  //
+  // Caso real (22/10/2026): 7 pessoas, "3 em um apto / 4 em outro", os dois
+  // links montados no codigo - e a IA congestionada (503). A recepcao recebeu
+  // so "A IA nao respondeu". A mensagem de orcamento continua sendo sempre a
+  // mesma; o que muda e a lista. Com "todos juntos" ainda em aberto a escolha
+  // precisa do modelo, e ai nao sai.
+  const porApto = (reserva || '').includes('UM LINK PARA CADA');
+  const porPeriodo = (reserva || '').includes('PERÍODOS DIFERENTES. Monte um orçamento para CADA');
+  if ((porApto || porPeriodo) && !(reserva || '').includes('NÃO DEIXOU CLARO')) {
+    const itens = [...(reserva || '').matchAll(/^([^\n:]{3,80}):\r?\n(https?:\/\/\S+)/gm)].map((m) => ({
+      rotulo: m[1].trim(),
+      url: m[2].replace(/[),.]+$/, ''),
+    }));
+    if (itens.length >= 2) {
+      const idiomaV = idiomaDoHospede(apenasFalasDoHospede(conversation));
+      const tv = {
+        pt: {
+          oi: 'Olá! Sou a Bella, assistente online do Hotel do Bosque.',
+          link: porApto
+            ? 'Segue o link de cada apartamento, já com os valores e a disponibilidade. Por eles você consegue concluir a reserva:'
+            : 'Segue o link de cada período, já com os valores e a disponibilidade, considerando as mesmas pessoas em todos. Por eles você consegue concluir a reserva:',
+          fim: 'Qualquer dúvida, estou à disposição!',
+        },
+        es: {
+          oi: '¡Hola! Soy Bella, asistente online del Hotel do Bosque.',
+          link: porApto
+            ? 'Aquí tiene el enlace de cada apartamento, con los valores y la disponibilidad. Por ellos puede concluir su reserva:'
+            : 'Aquí tiene el enlace de cada período, con los valores y la disponibilidad, considerando las mismas personas en todos. Por ellos puede concluir su reserva:',
+          fim: '¡Cualquier duda, estoy a su disposición!',
+        },
+        en: {
+          oi: "Hello! I'm Bella, the Hotel do Bosque online assistant.",
+          link: porApto
+            ? 'Here is the link for each apartment, with rates and availability. You can complete your booking right there:'
+            : 'Here is the link for each period, with rates and availability, for the same guests in all of them. You can complete your booking right there:',
+          fim: "If you have any questions, I'm here to help!",
+        },
+      }[idiomaV];
+      const jaApresentouV = /JÁ se apresentou/.test(contextoDeApresentacao(conversation));
+      const blocos = itens.map((it) => `${it.rotulo}:\n${it.url}`);
+      return [...(jaApresentouV ? [] : [tv.oi, '']), tv.link, '', blocos.join('\n\n'), '', tv.fim].join('\n');
+    }
+  }
+
   // Link JA montado pelo servidor, mas o modelo nao escreveu a mensagem.
   //
   // Com a leitura de datas sem IA, o caso mais comum chega aqui com o link
