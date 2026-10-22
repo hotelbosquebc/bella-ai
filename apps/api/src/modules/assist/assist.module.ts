@@ -771,10 +771,13 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   // So entram palavras que designam ADULTO: "meninos", "garotas" e afins ficam
   // de fora de proposito, porque mudam a tarifa e quem decide e a IA.
   // Sem \b no fim: depois de letra acentuada ("moças") ele nao casa.
+  //
+  // Hospedagem de empresa (22/10/2026): "estadia para 4 funcionarios" nao
+  // era lida, e a Bella ficou sem a ocupacao. Entram as palavras de equipe.
   const mPessoas = semPref.match(
     // Plural e singular escritos por extenso onde o "s?" nao resolve:
     // "homens?" casaria "homen", nunca "homem".
-    /\b(\d{1,2})[ \t]*(?:pessoas?|hóspedes?|hospedes?|homens|homem|mulheres|mulher|rapazes|rapaz|moças?|mocas?|amigos?|amigas?|colegas?|senhores|senhor|senhoras?)(?![a-zà-ÿ])/i,
+    /\b(\d{1,2})[ \t]*(?:pessoas?|hóspedes?|hospedes?|homens|homem|mulheres|mulher|rapazes|rapaz|moças?|mocas?|amigos?|amigas?|colegas?|senhores|senhor|senhoras?|funcion[áa]ri[oa]s?|colaborador(?:es|as?)?|trabalhador(?:es|as?)?|t[ée]cnic[oa]s?|profissionais|profissional|oper[áa]ri[oa]s?|integrantes?|participantes?|passageir[oa]s?|viajantes?|personas?)(?![a-zà-ÿ])/i,
   );
   const temCrianca = PALAVRA_DE_CRIANCA.test(semPref);
 
@@ -845,7 +848,9 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
 const PALAVRA_DE_CRIANCA =
   // "pequeno" de PORTE nao e crianca: "uma pet porte pequeno" (21/10/2026)
   // virou crianca sem idade e prendeu o link.
-  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|entead[oa]|(?<!(?:porte|pet|c[ãa]o|cachorr[oa]|gat[oa])\s{1,3})pequen[oa](?!\s+porte)|hij[oa]|ni[ñn][oa]|nen[ea]|chic[oa]|nieto|child|kid|son|daughter|baby)/i;
+  // "son" (filho, em ingles) so com quem diz de quem e: solto, casava dentro
+  // de "perSONas" e no "son" do espanhol ("son 4 adultos") - 22/10/2026.
+  /(crian[çc]a|menor|filh[oa]|beb[êe]|net[oa]|menin[oa]|garot[oa]|adolescente|sobrinh[oa]|entead[oa]|(?<!(?:porte|pet|c[ãa]o|cachorr[oa]|gat[oa])\s{1,3})pequen[oa](?!\s+porte)|hij[oa]|ni[ñn][oa]|nen[ea]|chic[oa]|nieto|child|kid|\b(?:my|our|a|one|two|\d)\s+sons?\b|\bsons\b|daughter|baby)/i;
 
 /** Como se diz "pessoa" nos tres idiomas. */
 const PALAVRA_DE_PESSOA = /(pessoa|persona|adulto|adult|h[óo]spede|hu[ée]sped|guest|gente|people|person)/i;
@@ -3890,7 +3895,11 @@ ${url}`;
     // com a disponibilidade real.
     if (!body.disponibilidadeHtml && !body.pularDisponibilidade) {
       const s: any = await this.extrair(conversation);
-      if (s && s.checkin && s.checkout) {
+      // So com a ocupacao lida. Caso real (22/10/2026): "4 funcionarios" nao
+      // foi entendido, a consulta saiu para 1 adulto (o padrao), voltou com
+      // vaga - e a Bella escreveu "temos disponibilidade para 4 pessoas".
+      // Vaga para 1 nao e vaga para 4.
+      if (s && s.checkin && s.checkout && Number(s.adults) > 0) {
         return {
           suggestion: '',
           model: 'aguardando-disponibilidade',
