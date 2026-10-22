@@ -210,6 +210,11 @@ const conhecimentos = [
       'A diária do hotel vai das 14h de um dia até as 11h do dia seguinte. Pela Portaria nº 28/2025 do Ministério do Turismo (em vigor desde 16/12/2025), a diária corresponde a 24 horas, das quais até 3 horas podem ser usadas para a limpeza e a arrumação do apartamento — por isso o hóspede tem 21 horas de uso efetivo, das 14h às 11h, e o hotel cumpre integralmente a norma. DÚVIDA MUITO COMUM: quem chega tarde, à noite ou de madrugada, costuma achar que a diária conta 24 horas A PARTIR DA CHEGADA. Não é assim: quem entra às 23h30 tem a diária daquele dia, que encerra às 11h da manhã seguinte, e não às 23h30 do outro dia. Explique isso com naturalidade e sem soar burocrático — é o padrão da hotelaria, não uma regra do nosso hotel — e NÃO cite o número da portaria a menos que o hóspede pergunte da norma. Se ele precisar de mais tempo, ofereça o late check-out, lembrando que depende da disponibilidade do dia e que, para GARANTIR, só reservando uma diária adicional. Não fale de custo do late check-out.',
   },
   {
+    title: 'Alterar uma reserva já feita (incluir pessoa, criança, mudar datas)',
+    content:
+      'Quando o hóspede JÁ TEM reserva (cita o código, "fiz uma reserva", "minha reserva") e quer incluir alguém, como uma criança ou mais um adulto: é possível, desde que o apartamento não passe de 6 pessoas no total. O ajuste é feito pela equipe de reservas, que atualiza a reserva no sistema e informa o ajuste de valores, se houver. A Bella não altera reservas: diga que vai passar para a equipe de reservas fazer o ajuste. Não envie link de orçamento novo e não informe valores. Vale o mesmo para mudança de datas ou outro ajuste.',
+  },
+  {
     title: 'Early check-in e late check-out',
     content:
       'Ambos estão sujeitos à disponibilidade do dia e são solicitados na recepção. Para GARANTIR a entrada antecipada ou a saída tardia, só reservando uma diária completa adicional. Nunca prometa antecipação ou saída tardia como certa: dependem da ocupação no dia. NÃO fale de custo: não diga que é gratuito, que "geralmente não há custo" nem que é cobrado. Se o hóspede perguntar o valor, diga que a recepção informa no dia, conforme a disponibilidade.',

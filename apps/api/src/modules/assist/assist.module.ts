@@ -26,7 +26,7 @@ export { fraseTemPreco, semPrecoInventado };
 import { motivoParaHumano, falaDeNotaFiscal, fraseOficialNotaFiscal, semNotaFiscalInventada } from '../bella/escalonamento';
 import { blocoDeContato, mensagemForaDoAtendimento } from '../../common/contato';
 import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
-import { hospedePediuAtendente, hospedeTravouNoSite, assuntoForaDoAtendimento } from '../bella/escalonamento';
+import { hospedePediuAtendente, hospedeTravouNoSite, assuntoForaDoAtendimento, alteracaoDeReservaExistente } from '../bella/escalonamento';
 // Reexportado para nao quebrar quem ja importava daqui (e os testes).
 export { corrigirLinks, garantirLink };
 
@@ -2349,6 +2349,27 @@ export class AssistController implements OnModuleInit {
         `Reconheça o que aconteceu em uma frase, pergunte se ele tem interesse em OUTRAS DATAS ` +
         `(muitas vezes é um único dia lotado no meio do período, e mudar a entrada ou a saída resolve) ` +
         `e diga que vai passar para a nossa equipe de reservas verificar no sistema.` +
+        contextoDeEntregaAoHumano(isWithinBusinessHours())
+      );
+    }
+
+    // RESERVA JA FEITA que o hospede quer mudar: quem ajusta e a equipe.
+    // Ver alteracaoDeReservaExistente. Nao e orcamento novo: nada de link nem
+    // de pedir datas de novo.
+    if (
+      alteracaoDeReservaExistente(
+        falasParaTriagem,
+        falasDoHospedeDepoisDaNossa(conversation) || ultimaFalaDoHospede(conversation),
+      )
+    ) {
+      this.registrarDecisao('alteracao de reserva ja feita: entregar a equipe', {});
+      return (
+        `\n\nO HÓSPEDE JÁ TEM UMA RESERVA e quer ALTERAR (incluir pessoa, mudar datas ou outro ajuste).\n` +
+        `NÃO envie link, NÃO peça datas nem quantidade de pessoas como se fosse um orçamento novo.\n` +
+        `Se ele quer INCLUIR alguém: diga que é possível, desde que o apartamento não passe de 6 pessoas no total. ` +
+        `Em seguida diga que, para fazer o ajuste, vai passar para a nossa equipe de reservas, que atualiza a reserva ` +
+        `no sistema e informa o ajuste de valores, se houver. NÃO informe valores e NÃO diga que já alterou nada.\n` +
+        `Para outra alteração, confirme em uma frase o que ele pediu e passe para a equipe do mesmo jeito.` +
         contextoDeEntregaAoHumano(isWithinBusinessHours())
       );
     }

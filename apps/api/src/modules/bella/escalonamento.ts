@@ -262,6 +262,10 @@ export function motivoParaHumano(dados: DadosDaDecisao): string | null {
     return 'o hóspede não conseguiu ver disponibilidade ou usar o link';
   }
 
+  if (alteracaoDeReservaExistente(fala)) {
+    return 'o hóspede quer alterar uma reserva já feita (ajuste no sistema e nos valores)';
+  }
+
   const outraLingua = idiomaNaoAtendido(fala);
   if (outraLingua) {
     return `o hóspede escreveu em ${outraLingua}, idioma que a Bella não atende`;
@@ -317,6 +321,29 @@ export function praticamenteIgual(a: string, b: string): boolean {
     if (B.has(p)) comuns++;
   });
   return comuns / Math.max(A.size, B.size) >= 0.9;
+}
+
+/**
+ * Hospede que JA reservou e quer mudar a reserva: so a equipe faz.
+ *
+ * Caso real (22/10/2026): "Fiz uma reserva ontem pelo site, codigo 032703" e
+ * "gostaria de saber se e possivel incluir uma crianca de 10 anos na mesma
+ * acomodacao". A Bella trataria como orcamento novo e pediria datas. Resposta
+ * do dono: e possivel desde que o apartamento nao passe de 6 pessoas, e o
+ * ajuste - no sistema e nos valores - e feito pela equipe de reservas.
+ *
+ * A reserva pode ter sido dita antes e o pedido de mudanca agora, por isso
+ * sao dois textos: a conversa inteira do hospede e o que ele disse por ultimo.
+ */
+const RESERVA_EXISTENTE =
+  /\b(?:fiz|fizemos|tenho|temos)\s+(?:uma\s+)?reserva\b|\bj[áa]\s+(?:fiz|fizemos|tenho|temos)\s+(?:uma\s+)?reserva\b|\breserv(?:ei|amos)\b|\b(?:minha|nossa|mi|nuestra)\s+reserva\b|\bc[óo]digo\s+(?:da\s+(?:minha\s+)?reserva|\d)|\breserva\s+(?:n[º°o.]|n[úu]mero|c[óo]digo|\d)|\blocalizador\b/i;
+
+const PEDE_MUDANCA =
+  /\b(?:inclu[íi]r|incluo|acrescentar|adicionar|colocar\s+mais|alterar|altera[çc][ãa]o|mudar|trocar|aumentar|diminuir|tirar|remover|estender|prorrogar|antecipar|adiar|levar\s+mais|agregar|cambiar|modificar)(?![a-zà-ÿ])|\bmais\s+(?:uma?|1|2)\s+(?:pessoa|crian[çc]a|adulto|h[óo]spede|di[áa]ria|noite)/i;
+
+export function alteracaoDeReservaExistente(falasDoHospede: string, falaRecente?: string): boolean {
+  const recente = falaRecente && falaRecente.trim() ? falaRecente : falasDoHospede;
+  return RESERVA_EXISTENTE.test(falasDoHospede || '') && PEDE_MUDANCA.test(recente || '');
 }
 
 /**
