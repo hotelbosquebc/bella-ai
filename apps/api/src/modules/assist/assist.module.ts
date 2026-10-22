@@ -520,6 +520,73 @@ const MESES: Record<string, number> = {
 };
 
 /**
+ * Lista de DIAS, um por linha: dias seguidos formam UM periodo.
+ *
+ * Caso real (22/10/2026): a hospede mandou as segundas a quintas de sete
+ * semanas, uma data por linha ("Segunda-feira: 26/10", "Terca-feira: 27/10",
+ * ...). A leitura de periodos juntava as datas de duas em duas (26-27, 28-29)
+ * e saiam treze periodos errados. Regra do dono: em cada sequencia, o PRIMEIRO
+ * dia e a entrada e o ULTIMO e a saida - 26/10 a 29/10, e assim por semana.
+ *
+ * Dias seguidos, e nao o cabecalho "Semana N", e o que separa os periodos:
+ * assim a semana que atravessa o mes (30/11, 01/12, 02/12, 03/12) continua
+ * sendo uma so, e funciona tambem sem cabecalho nenhum.
+ *
+ * So entra com pelo menos quatro linhas que sejam praticamente so a data, e
+ * desiste se sobrar dia solto (sem o dia seguinte, nao da para saber se e
+ * entrada ou saida) - ai a leitura de antes continua valendo.
+ */
+export function periodosDeListaDeDias(
+  texto: string,
+  hoje = new Date(),
+): { checkin: string; checkout: string }[] | null {
+  const linhaDeData =
+    /^\s*[-•*·]?\s*(?:[a-zà-ÿ]+(?:-[a-zà-ÿ]+)?\s*[:,.\-–]?\s*)?(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\s*(?:[-–(]?\s*[a-zà-ÿ]+(?:-[a-zà-ÿ]+)?\)?)?\s*$/i;
+  const datas: { d: number; m: number; a?: string }[] = [];
+  for (const linha of (texto || '').split(/\r?\n/)) {
+    const m = linha.match(linhaDeData);
+    if (m) datas.push({ d: Number(m[1]), m: Number(m[2]), a: m[3] });
+  }
+  if (datas.length < 4) return null;
+
+  const hojeUTC = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const DIA = 86400000;
+  const tempos: number[] = [];
+  for (const x of datas) {
+    if (x.d < 1 || x.d > 31 || x.m < 1 || x.m > 12) return null;
+    let ano = x.a ? Number(x.a.length === 2 ? '20' + x.a : x.a) : new Date(hojeUTC).getUTCFullYear();
+    let t = Date.UTC(ano, x.m - 1, x.d);
+    if (new Date(t).getUTCMonth() !== x.m - 1) return null; // 31/11 e afins
+    // Sem ano: data que ja passou e do ano que vem; e a lista anda para a
+    // frente - uma data "menor" que a anterior virou o ano.
+    if (!x.a && t < hojeUTC) t = Date.UTC(++ano, x.m - 1, x.d);
+    const anterior = tempos[tempos.length - 1];
+    if (anterior !== undefined && t < anterior && !x.a) t = Date.UTC(ano + 1, x.m - 1, x.d);
+    tempos.push(t);
+  }
+
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const saida: { checkin: string; checkout: string }[] = [];
+  let inicio = tempos[0];
+  let fim = tempos[0];
+  for (let i = 1; i <= tempos.length; i++) {
+    const t = tempos[i];
+    if (t !== undefined && t - fim === DIA) {
+      fim = t;
+      continue;
+    }
+    if (fim === inicio) return null; // dia solto: nao da para dizer se e entrada ou saida
+    saida.push({ checkin: iso(inicio), checkout: iso(fim) });
+    if (t !== undefined) {
+      if (t <= fim) return null; // repetida ou fora de ordem: nao e uma lista de dias
+      inicio = t;
+      fim = t;
+    }
+  }
+  return saida.length ? saida : null;
+}
+
+/**
  * Todos os periodos que o hospede escreveu, em qualquer das formas usuais.
  *
  * Antes so lia "10/10 a 12/10". Mas em conversa de hotel o periodo vem escrito
@@ -555,6 +622,10 @@ export function intervalosNaFala(
       `${d1}/${m1}${a1 ? '/' + a1 : ''} ${sep} ${d2}/${m2}${a2 ? '/' + a2 : ''}`,
   );
   const mes = (p: string) => MESES[(p || '').slice(0, 3).toLowerCase()] || 0;
+
+  // Lista de dias, um por linha: ver periodosDeListaDeDias.
+  const daLista = periodosDeListaDeDias(t, hoje);
+  if (daLista) return daLista;
 
   const brutos: { d1: number; m1: number; a1?: string; d2: number; m2: number; a2?: string }[] = [];
   const push = (d1: any, m1: any, d2: any, m2: any, a1?: string, a2?: string) => {
@@ -2738,7 +2809,7 @@ export class AssistController implements OnModuleInit {
           `\n\nO HÓSPEDE PEDIU ${periodos.length} PERÍODOS DIFERENTES. Monte um orçamento para CADA um.\n` +
           `Envie os links ABAIXO, na mesma ordem, cada um identificado pelas datas e SOZINHO em sua linha, ` +
           `com uma linha em branco antes e depois.\n` +
-          `Diga, em UMA frase curta, que montou os três considerando a mesma ocupação que ele informou ` +
+          `Diga, em UMA frase curta, que montou todos considerando a mesma ocupação que ele informou ` +
           `(${adultos} ${adultos === 1 ? 'pessoa' : 'pessoas'}), e que é só avisar se mudar em algum período.\n` +
           `NÃO informe preços — quem mostra o valor é cada link.\n\n` +
           linhas.join('\n\n') +
@@ -2750,7 +2821,7 @@ export class AssistController implements OnModuleInit {
         `\n\nO HÓSPEDE PEDIU ${periodos.length} PERÍODOS DIFERENTES (${periodos.join(' e ')}) — ` +
         `e cada um pode ter quantidade de pessoas própria.\n` +
         `NÃO mande link nesta mensagem: um link só misturaria as datas de um pedido com as pessoas do outro. ` +
-        `Responda reconhecendo os DOIS períodos, um por um, e confirme numa frase curta quantas pessoas ficam em cada. ` +
+        `Responda reconhecendo os ${periodos.length} períodos (liste-os, um por linha) e pergunte quantas pessoas são - e se são as mesmas em todos. ` +
         `Assim que ele confirmar, você monta um orçamento para cada período.` +
         ofertaAtendimento
       );
