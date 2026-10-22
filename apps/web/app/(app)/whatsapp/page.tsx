@@ -116,7 +116,11 @@ export default function WhatsAppPage() {
         config_id: CONFIG_ID,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {} },
+        // COEXISTENCIA. Sem o featureType, o Cadastro Incorporado faz a
+        // migracao comum - que TIRA o numero do aplicativo e do WhatsApp Web.
+        // Estava assim ate 22/10/2026, antes de qualquer uso. O
+        // sessionInfoVersion 3 faz a janela devolver a conta e o numero no fim.
+        extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' },
       },
     );
   }

@@ -29,6 +29,9 @@ import { isWithinBusinessHours, contextoDeHorario, inicioDoDiaEmSaoPaulo } from 
  * mensagem → hóspede → histórico → memória → políticas → base vetorial →
  * disponibilidade → resposta → validação anti-prejuízo → envio → auditoria.
  */
+/** Silencio da equipe depois do qual a Bella volta a responder no WhatsApp. */
+const PAUSA_DA_EQUIPE_MS = 2 * 60 * 60 * 1000;
+
 @Injectable()
 export class BellaOrchestratorService {
   private readonly logger = new Logger(BellaOrchestratorService.name);
@@ -98,6 +101,39 @@ export class BellaOrchestratorService {
     // Hóspede respondeu → interromper follow-ups pendentes
     const lead = await this.findOrCreateLead(guest.id);
     if (lead.nextFollowUpAt) await this.followUp.cancel(lead.id);
+
+    // WhatsApp por coexistencia: a equipe respondeu pelo aplicativo e ficou
+    // quieta por 2h - a Bella volta. Sem isso, uma resposta da recepcao de
+    // manha calaria a Bella na conversa para sempre, e a duvida da noite
+    // ficaria sem ninguem ("o importante e responder", dono, 22/10/2026).
+    // So quando a pausa veio de uma resposta da equipe (sem pedido de ajuda
+    // em aberto) e nunca para guia marcado.
+    if (
+      conversation.status === ConversationStatus.PENDING_HUMAN &&
+      !conversation.escalationReason &&
+      inbound.channel === 'WHATSAPP'
+    ) {
+      const ultimaDaEquipe = await this.prisma.message.findFirst({
+        where: { conversationId: conversation.id, sender: MessageSender.HUMAN_AGENT },
+        orderBy: { timestamp: 'desc' },
+        select: { timestamp: true },
+      });
+      const quieta = ultimaDaEquipe && Date.now() - new Date(ultimaDaEquipe.timestamp).getTime() > PAUSA_DA_EQUIPE_MS;
+      const guia = quieta
+        ? await buscarContatoMarcado(this.prisma, guest.hotelId, {
+            identificador: inbound.senderExternalId,
+            nome: inbound.senderName ?? guest.name,
+          })
+        : null;
+      if (quieta && !guia) {
+        await this.prisma.conversation.update({
+          where: { id: conversation.id },
+          data: { status: ConversationStatus.OPEN, assignedUserId: null },
+        });
+        conversation.status = ConversationStatus.OPEN;
+        this.logger.log('Equipe quieta ha mais de 2h nesta conversa: a Bella volta a responder.');
+      }
+    }
 
     // Conversa sob controle humano → Bella não responde
     if (conversation.status === ConversationStatus.PENDING_HUMAN) return;
@@ -482,6 +518,41 @@ export class BellaOrchestratorService {
     // O texto vive em common/contato.ts: estava escrito a mao aqui e divergiu
     // do atalho /dados que a recepcao manda. O dono confirmou: 9h-12h30, 14h30-17h30.
     return mensagemDeEntregaAoHumano(isWithinBusinessHours());
+  }
+
+  /**
+   * A recepcao respondeu pelo aplicativo do WhatsApp (coexistencia).
+   *
+   * A Meta avisa com um "eco" (webhook smb_message_echoes) cada mensagem que
+   * sai pelo celular ou pelo WhatsApp Web. E a equipe assumindo: a Bella para
+   * de responder nesta conversa, e o pedido de ajuda (se havia) conta como
+   * atendido. Ela volta sozinha depois de 2h de silencio da equipe - ver
+   * handleInbound.
+   */
+  async registrarRespostaDaEquipe(dados: {
+    hotelId: string;
+    channel: NormalizedInboundMessage['channel'];
+    guestExternalId: string;
+    content: string;
+  }) {
+    const inbound = {
+      hotelId: dados.hotelId,
+      channel: dados.channel,
+      senderExternalId: dados.guestExternalId,
+      content: dados.content,
+      contentType: 'text',
+      receivedAt: new Date(),
+      raw: null,
+    } as unknown as NormalizedInboundMessage;
+    const guest = await this.findOrCreateGuest(inbound);
+    const conversation = await this.findOrCreateConversation(guest.id, inbound);
+    await this.prisma.message.create({
+      data: { conversationId: conversation.id, sender: MessageSender.HUMAN_AGENT, content: dados.content, type: 'text' },
+    });
+    await this.prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { status: ConversationStatus.PENDING_HUMAN, escalationReason: null, updatedAt: new Date() },
+    });
   }
 
   /**

@@ -1502,8 +1502,11 @@
     if (!r || !r.ok) return null;
     modo = r.data;
     const rotulo = { on: '🟢 Bella ligada', off: '🔴 Bella desligada', auto: '🌙 Bella automática' }[modo.mode];
-    const detalhe =
-      modo.mode === 'auto'
+    // WhatsApp ligado pela API: a Bella responde sozinha pelo servidor, e a
+    // extensao nao sugere junto (seria resposta dobrada).
+    const detalhe = modo.whatsappAutomatico
+      ? ' — respondendo sozinha no WhatsApp'
+      : modo.mode === 'auto'
         ? modo.dentroDoHorario
           ? ' — no horário, quem atende é a equipe'
           : ' — fora do horário, sugerindo sozinha'

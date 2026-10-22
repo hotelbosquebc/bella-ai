@@ -3927,13 +3927,21 @@ ${url}`;
     const settings = await this.prisma.aiSettings.findUnique({ where: { hotelId: id } });
     const mode = settings?.mode ?? 'auto';
     const dentroDoHorario = isWithinBusinessHours();
-    const autoSuggest = mode === 'on' || (mode === 'auto' && !dentroDoHorario);
+    const bellaRespondendo = mode === 'on' || (mode === 'auto' && !dentroDoHorario);
+    // WhatsApp ligado pela API (coexistencia): nesse horario quem responde e a
+    // propria Bella, pelo servidor. A extensao sugerir junto seria convite a
+    // resposta dobrada - a recepcao enviaria a sugestao por cima.
+    const whatsappAutomatico =
+      bellaRespondendo && Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
+    const autoSuggest = bellaRespondendo && !whatsappAutomatico;
     return {
       mode,
       dentroDoHorario,
       horarioTexto: HORARIO_RESERVAS_TEXTO,
       /** sugerir sozinha ao abrir a conversa */
       autoSuggest,
+      /** a Bella esta respondendo o WhatsApp sozinha agora, pela API */
+      whatsappAutomatico,
       /** botão manual disponível (some só com a Bella desligada) */
       manualDisponivel: mode !== 'off',
     };

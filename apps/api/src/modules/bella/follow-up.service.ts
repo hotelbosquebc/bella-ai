@@ -53,7 +53,13 @@ export class FollowUpService {
       });
 
       // Não perturba quem já está sob atendimento humano
-      if (conversation && conversation.status !== ConversationStatus.PENDING_HUMAN && lead.guest.phone) {
+      // WhatsApp: texto livre so ate 24h depois da ultima fala do hospede, e o
+      // primeiro follow-up ja sai com 24h. Sem modelo aprovado pela Meta o
+      // envio falharia sempre - e a mensagem ficaria no historico como se
+      // tivesse saido. Ate existir o modelo, nao envia (o passo avanca igual).
+      const whatsappSemModelo = conversation?.channel === 'WHATSAPP';
+      if (whatsappSemModelo) this.logger.log(`Follow-up do WhatsApp pulado (falta modelo aprovado) - lead ${lead.id}`);
+      if (conversation && !whatsappSemModelo && conversation.status !== ConversationStatus.PENDING_HUMAN && lead.guest.phone) {
         const delivered = await this.outbound.send(conversation.channel, lead.guest.phone, next.message);
         await this.prisma.message.create({
           data: { conversationId: conversation.id, sender: MessageSender.BELLA, content: next.message },

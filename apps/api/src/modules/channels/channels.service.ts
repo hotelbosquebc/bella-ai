@@ -4,6 +4,7 @@ import { NormalizedInboundMessage } from './channel.types';
 import { BellaOrchestratorService } from '../bella/bella-orchestrator.service';
 import { ModelRouterService } from '../bella/model-router.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
 
 const GRAPH_VERSION = 'v21.0';
 
@@ -233,6 +234,27 @@ export class ChannelsService {
     for (const entry of payload?.entry ?? []) {
       // Formato WhatsApp (changes/value/messages)
       for (const change of entry.changes ?? []) {
+        // Coexistencia: mensagem que a RECEPCAO mandou pelo aplicativo ou pelo
+        // WhatsApp Web chega como eco. E a equipe assumindo a conversa - ver
+        // registrarRespostaDaEquipe. A saudacao e a mensagem de ausencia do
+        // WhatsApp Business saem sozinhas e NAO sao uma pessoa respondendo.
+        for (const eco of change.value?.message_echoes ?? []) {
+          if (channel !== Channel.WHATSAPP || !eco?.to) continue;
+          if (eco.group_id || change.value?.group_id) continue;
+          const texto: string = eco.text?.body ?? '';
+          if (texto && ehMensagemAutomatica(texto)) continue;
+          try {
+            await this.bella.registrarRespostaDaEquipe({
+              hotelId: this.hotelId,
+              channel,
+              guestExternalId: String(eco.to),
+              content: texto || `[${eco.type ?? 'mensagem'} enviada pela equipe]`,
+            });
+            this.registrarPercurso({ canal: String(channel), tipo: 'eco', caracteres: texto.length, respondeu: false, motivo: 'equipe respondeu pelo app' });
+          } catch (err) {
+            this.logger.error(`Falha ao registrar resposta da equipe: ${err instanceof Error ? err.message : err}`);
+          }
+        }
         const contacts = change.value?.contacts ?? [];
         for (const msg of change.value?.messages ?? []) {
           // Mensagem de GRUPO nao e atendimento: a Bella nao responde la
