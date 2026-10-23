@@ -1405,6 +1405,29 @@ export function idadesEmLinhaSeparada(texto: string): number[] {
 }
 
 /**
+ * Idade de bebe em MESES vira anos completos.
+ *
+ * Caso real (23/10/2026): "3 adultos e um bebe de 6 meses". Toda leitura de
+ * idade procura "anos", entao o bebe ficou "sem idade", a Bella ja tinha
+ * pedido dados duas vezes e passou para a equipe - sem link, com datas e
+ * pessoas certas em maos. 6 meses e 0 ano: cortesia (0 a 6).
+ *
+ * So na linha que fala de crianca: "daqui a 2 meses vamos viajar" nao e idade.
+ * "1 ano e 6 meses" e 1 ano - os meses que sobram nao viram outra crianca.
+ */
+export function mesesViramAnos(texto: string): string {
+  return (texto || '')
+    .split(/\r?\n/)
+    .map((linha) => {
+      if (!PALAVRA_DE_CRIANCA.test(linha)) return linha;
+      return linha
+        .replace(/(\d{1,2})\s*(anos?|años?)\s*(?:e|y)\s*\d{1,2}\s*(?:meses|m[êe]s)(?![a-zà-ÿ])/gi, '$1 $2')
+        .replace(/(\d{1,2})\s*(?:meses|m[êe]s|months?)(?![a-zà-ÿ])/gi, (_t, n) => `${Math.floor(Number(n) / 12)} anos`);
+    })
+    .join('\n');
+}
+
+/**
  * Adultos e idades lidos DIRETO do que o hospede escreveu.
  *
  * A regra "10 anos ou mais conta como adulto" nao pode depender do extrator:
@@ -1422,7 +1445,7 @@ export function idadesEmLinhaSeparada(texto: string): number[] {
  * viraria um hospede.
  */
 export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idades: number[] } | null {
-  const t = semPrefixos(falasDoHospede);
+  const t = mesesViramAnos(semPrefixos(falasDoHospede));
 
   // A ULTIMA declaracao vence, como em extrairDeterminista: ao longo da
   // conversa o hospede corrige ("2 adultos" e depois "somos 3 adultos").
@@ -1603,7 +1626,7 @@ export function orcamentoJaEnviado(conversation: string, checkin: string, checko
  * "Ficamos a disposicao!", sem link e sem perguntar nada: beco sem saida.
  */
 export function criancaSemIdade(falasDoHospede: string): boolean {
-  const t = semPrefixos(falasDoHospede);
+  const t = mesesViramAnos(semPrefixos(falasDoHospede));
   if (!PALAVRA_DE_CRIANCA.test(t)) return false;
   if (/\b(sem|nenhuma?|n[ãa]o\s+(tem|temos|vai|vao|vão)|sin|no\s+hay)\s+(crian|filh|beb|ni[ñn]|hij|menor|child|kid)/i.test(t)) return false;
   if (/\d{1,2}\s*(?:anos?|años?|years?)\b/i.test(t)) return false;
