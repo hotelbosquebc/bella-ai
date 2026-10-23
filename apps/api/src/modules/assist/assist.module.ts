@@ -1424,7 +1424,10 @@ export function idadesEmLinhaSeparada(texto: string): number[] {
 export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idades: number[] } | null {
   const t = semPrefixos(falasDoHospede);
 
-  const mAdultos = t.match(/\b(\d{1,2})[ \t]*adultos?\b/i);
+  // A ULTIMA declaracao vence, como em extrairDeterminista: ao longo da
+  // conversa o hospede corrige ("2 adultos" e depois "somos 3 adultos").
+  // Aqui ficava a primeira, e esta leitura tem prioridade sobre a outra.
+  const mAdultos = [...t.matchAll(/\b(\d{1,2})[ \t]*adultos?\b/gi)].pop() ?? null;
   // Quantidade escrita vence; sem ela, "casal" (pessoas, nao cama) vale 2.
   const adultosDeclarados = mAdultos ? Number(mAdultos[1]) : adultosDeCasal(t) ?? adultosDeFrase(t);
   if (!adultosDeclarados) return null;
@@ -1440,6 +1443,7 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
     if (!palavraDeCrianca.test(linha) && !(falaDeCrianca && soIdades.test(linha))) continue;
     // Reinicia a cada linha: uma linha com "anos" nao pode calar a seguinte.
     let achouNaLinha = false;
+    const antesDaLinha = idades.length;
     // "5 e 10 anos", "5, 7 e 10 anos", "20 15 14 10 años" - a hospede paraguaia
     // separou so por espaco, e nos tres idiomas o "anos" muda de grafia.
     const lista = /((?:\d{1,2}[\s,\/]*(?:e|y|and)?[\s,\/]*)*\d{1,2})\s*(?:anos?|años?|years?)\b/gi;
@@ -1458,6 +1462,16 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
     if (!achouNaLinha) {
       const curtas = idadesSemAPalavraAnos(linha);
       if (curtas) idades.push(...curtas);
+    }
+    // "2 criancas 12 anos": UMA idade para VARIAS criancas e cada uma com
+    // essa idade. Caso real (23/10/2026): "3 adultos / 2 criancas 12 anos"
+    // virou 3 adultos e uma crianca de 12 - link para 4, quando eram 5 (com
+    // 12 anos as duas contam como adultas).
+    const quantasNaLinha = linha.match(
+      /(?<![\d\/])(\d)[ \t]*(?:crian[çc]as|filh[oa]s|menin[oa]s|garot[oa]s|net[oa]s|sobrinh[oa]s|hij[oa]s|ni[ñn][oa]s|kids|children)(?![a-zà-ÿ])/i,
+    );
+    if (quantasNaLinha && idades.length - antesDaLinha === 1) {
+      for (let k = 1; k < Number(quantasNaLinha[1]); k++) idades.push(idades[idades.length - 1]);
     }
   }
   // Idades que vieram em mensagens separadas ("2 crianças" / "1 de 10").
