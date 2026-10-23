@@ -31,7 +31,7 @@ const conhecimentos = [
   {
     title: 'Café da manhã',
     content:
-      'O café da manhã está incluso na diária e é servido no restaurante do térreo, das 7h às 10h. É um BUFFET: frutas, pães, frios, bolos e opções vegetarianas. RESTRIÇÕES: para quem não consome lactose, as opções disponíveis são frutas e pães. Os pães contêm glúten — não há opção sem glúten, e é importante informar isso com clareza a quem perguntar, em vez de dizer apenas que "há opções". Nunca prometa preparo especial ou item fora do buffet.',
+      'O café da manhã está incluso na diária e é servido no restaurante do térreo, das 7h às 10h. COMO RESPONDER (regra do dono, 23/10/2026): se o hóspede só pergunta se o café está incluso, confirme que sim e diga o horário, numa frase, e PARE. O que é servido e as opções vegetarianas só entram se ele perguntar o que tem no café, o cardápio ou falar de dieta/restrição. Para essas perguntas: é um BUFFET com frutas, pães, frios, bolos e opções vegetarianas. RESTRIÇÕES: para quem não consome lactose, as opções disponíveis são frutas e pães. Os pães contêm glúten — não há opção sem glúten, e é importante informar isso com clareza a quem perguntar, em vez de dizer apenas que "há opções". Nunca prometa preparo especial ou item fora do buffet.',
   },
   {
     title: 'Piscina',
