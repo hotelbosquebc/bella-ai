@@ -4167,7 +4167,13 @@ ${url}`;
     // resposta dobrada - a recepcao enviaria a sugestao por cima.
     const whatsappAutomatico =
       bellaRespondendo && Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
-    const autoSuggest = bellaRespondendo && !whatsappAutomatico;
+    // Decisao do dono (26/10/2026): na extensao a Bella so sugere quando
+    // alguem clica. A sugestao automatica ao abrir a conversa confundia uma
+    // conversa com a outra na troca (o WhatsApp Web ainda carregando, e o
+    // identificador do chat sumiu da marcacao), sugeria em conversa pessoal
+    // e gastava a cota da IA a cada conversa aberta. Quem responde sozinho e
+    // o caminho oficial (WhatsApp pela API), no servidor.
+    const autoSuggest = false;
     return {
       mode,
       dentroDoHorario,

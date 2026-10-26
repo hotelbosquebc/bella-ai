@@ -1512,13 +1512,15 @@
     const rotulo = { on: '🟢 Bella ligada', off: '🔴 Bella desligada', auto: '🌙 Bella automática' }[modo.mode];
     // WhatsApp ligado pela API: a Bella responde sozinha pelo servidor, e a
     // extensao nao sugere junto (seria resposta dobrada).
+    // Desde 26/10/2026 a extensao so sugere no clique (decisao do dono): a
+    // sugestao automatica confundia conversas na troca. O rotulo diz isso.
     const detalhe = modo.whatsappAutomatico
       ? ' — respondendo sozinha no WhatsApp'
-      : modo.mode === 'auto'
-        ? modo.dentroDoHorario
-          ? ' — no horário, quem atende é a equipe'
-          : ' — fora do horário, sugerindo sozinha'
-        : '';
+      : modo.autoSuggest
+        ? ' — sugerindo sozinha'
+        : modo.mode === 'off'
+          ? ''
+          : ' — clique em Sugerir quando precisar';
     panel.querySelector('#bella-modo').textContent = rotulo + detalhe;
     panel.querySelector('#bella-suggest').style.display = modo.manualDisponivel ? 'block' : 'none';
     return modo;
