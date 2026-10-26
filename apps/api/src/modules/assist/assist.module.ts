@@ -1270,8 +1270,17 @@ export function idadesSemAPalavraAnos(linha: string): number[] | null {
   // de 9, 9, 10 e 10 anos - formato de uma hospede argentina em 16/10/2026.
   // A guarda da quantidade protege o resto: em "2 crianças, custa 1.500" os
   // numeros lidos seriam 1 e 500, e 500 nao e idade de crianca.
+  // O numero seguinte so e idade se NAO for a quantidade de outra coisa.
+  // Caso real (26/10/2026): "1 crianca 1 adulto 1 cama" leu a crianca com 1
+  // ano, e "1 crianca, 2 adultos" com 2 - link com idade inventada.
+  const naoEIdade = String.raw`(?![ \t]*(?:adult|pesso|h[óo]sped|cama|quart|apto|apart|su[íi]t|noite|di[áa]ri|crian|beb|casal|pet|cachorr))`;
   const m = (linha || '').match(
-    /(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores?|ni[ñn][oa]s?|kids?|children)\b[^\d\n]{0,14}(\d{1,2}(?:\s*(?:[\/,;.e-]|y|and)\s*\d{1,2})*)/i,
+    new RegExp(
+      String.raw`(\d{1,2})\s*(?:crian[çc]as?|filh[oa]s?|menores?|ni[ñn][oa]s?|kids?|children)\b[^\d\n]{0,14}(\d{1,2}` +
+        naoEIdade +
+        String.raw`(?:\s*(?:[\/,;.e-]|y|and)\s*\d{1,2})*)`,
+      'i',
+    ),
   );
   // Sem quantidade, no SINGULAR, vale 1: "4 adulto e criança 7" (caso real de
   // 16/10/2026, pedido de Reveillon que ficou sem link). Exigir o singular e o
@@ -1280,7 +1289,10 @@ export function idadesSemAPalavraAnos(linha: string): number[] | null {
   const mUm = m
     ? null
     : (linha || '').match(
-        /\b(?:um|uma|1)?\s*(?:crian[çc]a|filh[oa]|menor|ni[ñn][oa]|kid|child)\b[^\d\n]{0,14}(\d{1,2})\b/i,
+        new RegExp(
+          String.raw`\b(?:um|uma|1)?\s*(?:crian[çc]a|filh[oa]|menor|ni[ñn][oa]|kid|child)\b[^\d\n]{0,14}(\d{1,2})\b` + naoEIdade,
+          'i',
+        ),
       );
   if (!m && !mUm) return null;
 
@@ -1434,11 +1446,16 @@ export function adultosNaFala(texto: string): { adultos: number | null; chegamDe
   for (const m of t.matchAll(/\b(\d{1,2})[ \t]*adultos?\b/gi)) {
     const i = m.index ?? 0;
     const n = Number(m[1]);
-    if (acrescimo.test(t.slice(Math.max(0, i - 12), i))) {
+    const antes = t.slice(Math.max(0, i - 12), i);
+    if (acrescimo.test(antes)) {
       const ini = Math.max(t.lastIndexOf('.', i), t.lastIndexOf('!', i), t.lastIndexOf('?', i), t.lastIndexOf('\n', i)) + 1;
       const fimRel = t.slice(i).search(/[.!?\n]/);
       const frase = t.slice(ini, fimRel < 0 ? t.length : i + fimRel);
       if (parteDaEstadia.test(frase)) depois += n;
+      // Sem quantidade dita antes nao ha o que somar: "1 crianca + 2 adultos"
+      // e "eu e mais 2 adultos" SAO a declaracao (corrigido no mesmo dia, 26/10:
+      // essas frases ficavam sem adultos). "Eu e mais 2" sao 3.
+      else if (base === null) base = n + (/\beu\s+e\s+mais[ \t]*$/i.test(antes) ? 1 : 0);
       else soma += n;
       continue;
     }
