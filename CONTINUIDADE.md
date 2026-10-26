@@ -241,6 +241,10 @@ link de reservas.
 
 - **A Bella não informa preços.** Nunca. Quem mostra valor é o link.
 - **A Bella não fecha reserva.** Manda o link e tira dúvidas.
+- **Na extensão, a Bella só sugere no clique** (26/10, `785dccb`). A sugestão
+  automática ao abrir a conversa confundia uma conversa com outra na troca,
+  sugeria em conversa pessoal e gastava a cota da IA. O servidor devolve
+  `autoSuggest=false`. Quem responde sozinho é o WhatsApp oficial, no servidor.
 - **Custo zero**, sempre.
 - **Nunca arriscar o número principal** (47) 3367-0211.
 - **Tokens, chaves e senhas**: o dono cola direto no Render ou na página do
