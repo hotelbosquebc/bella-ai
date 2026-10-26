@@ -96,6 +96,19 @@ conferir('bateria', 'tem vaga sabado nao escala', esc.motivoParaHumano({ falaDoH
   conferir('analise', 'orcamento nao e andamento', esc.reservaEmAndamento('Nós: Segue o link com os valores e a disponibilidade'), false);
 }
 
+// --- apartamento pelo tipo (26/10/2026) ---------------------------------
+{
+  const tipo = (s) => {
+    const r = m.apartamentosPorTipo('Hóspede: ' + s);
+    return r ? `${r.length}x${r[0].adultos}` : null;
+  };
+  conferir('tipo', '4 apartamentos Superior duplos', tipo('disponibilidade do dia 24 a 29 de março 4 apartamentos Superior duplos.'), '4x2');
+  conferir('tipo', '2 quartos triplos', tipo('2 quartos triplos'), '2x3');
+  conferir('tipo', '3 aptos de casal', tipo('3 aptos de casal de 10/11 a 12/11'), '3x2');
+  conferir('tipo', 'pergunta da planta', tipo('o apartamento tem 2 quartos de casal?'), null);
+  conferir('tipo', 'com crianca nao decide', tipo('2 apartamentos duplos e 1 criança'), null);
+}
+
 // --- pedido de atendente (26/10/2026) ------------------------------------
 for (const t of ['quero falar com um atendente', 'pode me passar para uma pessoa?', 'atendente por favor', 'quero atendimento humano',
   'pode me ligar?', 'falar com a recepção', 'quero falar com o Victor', 'Atendente', 'hablar con una persona']) {

@@ -1205,6 +1205,43 @@ export function pessoasEmCadaApartamento(
 }
 
 /**
+ * "4 apartamentos Superior duplos" = 4 apartamentos de 2 adultos.
+ *
+ * Caso real (26/10/2026): agencia pediu "24 a 29 de marco 4 apartamentos
+ * Superior duplos". O tipo do apartamento JA diz a ocupacao, mas nenhuma
+ * leitura entendia: faltou "quantidade de adultos", e a IA improvisou
+ * perguntando se havia criancas. Regra do dono: sem crianca citada, sao so
+ * adultos.
+ *
+ * Entre a quantidade e o tipo cabem ate duas palavras (a categoria:
+ * "Superior", "Suite Bosque"). Com crianca na fala, nao decide.
+ */
+export function apartamentosPorTipo(
+  falasDoHospede: string,
+): { adultos: number; idades: number[]; criancas0_6: number; criancas7_9: number }[] | null {
+  const t = semPrefixos(falasDoHospede || '');
+  if (PALAVRA_DE_CRIANCA.test(t)) return null;
+  const ocupacao: Record<string, number> = { individua: 1, single: 1, dupl: 2, casal: 2, tripl: 3, 'quádrupl': 4, quadrupl: 4, 'quíntupl': 5, quintupl: 5, 'sêxtupl': 6, sextupl: 6 };
+  const m = t.match(
+    /(?<![\d\/])(\d{1,2})[ \t]*(?:apartamentos?|aptos?|quartos?|su[íi]tes?|unidades?)[ \t]+(?:(?:de[ \t]+)?[a-zà-ÿ]+[ \t]+){0,2}?(?:de[ \t]+)?(individua(?:l|is)|single|dupl[oa]s?|casal|tripl[oa]s?|qu[áa]drupl[oa]s?|qu[íi]ntupl[oa]s?|s[êe]xtupl[oa]s?)(?![a-zà-ÿ])/i,
+  );
+  if (!m) return null;
+  // "o apartamento tem 2 quartos de casal?" e pergunta sobre a PLANTA, nao
+  // pedido de dois apartamentos: fora quando e pergunta ou vem depois de
+  // "tem/possui/com".
+  const i = m.index ?? 0;
+  if (/\b(?:tem|t[êe]m|possui|possuem|com)[ \t]*$/i.test(t.slice(Math.max(0, i - 15), i))) return null;
+  const fimRel = t.slice(i).search(/[.!\n]|\?/);
+  if (fimRel >= 0 && t[i + fimRel] === '?') return null;
+  const quantos = Number(m[1]);
+  const tipo = m[2].toLowerCase();
+  const chave = Object.keys(ocupacao).find((k) => tipo.startsWith(k));
+  const porApto = chave ? ocupacao[chave] : 0;
+  if (!porApto || quantos < 1 || quantos > 10) return null;
+  return Array.from({ length: quantos }, () => ({ adultos: porApto, idades: [], criancas0_6: 0, criancas7_9: 0 }));
+}
+
+/**
  * Quantas criancas o hospede disse, mesmo sem a idade ("4 adultos e tres
  * criancas" -> 3). Vale a ULTIMA mencao: ao longo da conversa ele corrige.
  */
@@ -2784,6 +2821,15 @@ export class AssistController implements OnModuleInit {
     // antes de qualquer trava ou montagem de link. Ver normalizarOcupacao.
     normalizarOcupacao(stay);
 
+    // "4 apartamentos duplos": o tipo diz a ocupacao - ver apartamentosPorTipo.
+    // Sem isto faltava "quantidade de adultos" e a Bella pedia de volta.
+    const porTipo = apartamentosPorTipo(falasDoHospede);
+    if (porTipo && !Number(stay.adults)) {
+      stay.adults = porTipo.reduce((s, a) => s + a.adultos, 0);
+      stay.apartamentos = porTipo.length;
+      this.registrarDecisao(`ocupacao pelo tipo de apartamento: ${porTipo.length}x${porTipo[0].adultos}`, stay);
+    }
+
     // Trava contra data inventada.
     //
     // Caso real: a hospede escreveu apenas "valor para 5 adultos, seria 1
@@ -3127,7 +3173,10 @@ export class AssistController implements OnModuleInit {
         ? null
         : pessoasEmCadaApartamento(fonteDaDivisao, Number(stay.adults) || 0) ||
           pessoasEmCadaApartamento(falasDoHospede, Number(stay.adults) || 0);
-    const divisaoEscrita = divisaoPorApartamento(fonteDaDivisao) || emCada;
+    const divisaoEscrita =
+      divisaoPorApartamento(fonteDaDivisao) ||
+      emCada ||
+      (criancasNoPedido > 0 ? null : apartamentosPorTipo(fonteDaDivisao) || apartamentosPorTipo(falasDoHospede));
     if (divisaoEscrita) {
       detalhe = divisaoEscrita;
       this.registrarDecisao(`divisao escrita pelo hospede: ${divisaoEscrita.length} apartamentos`, stay);
