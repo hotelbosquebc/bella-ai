@@ -21,6 +21,18 @@ const PEDIU_HUMANO: RegExp[] = [
   /\b(quero|queria|gostaria de)\s+(falar|conversar)\s+com\s+algu[eé]m\b/i,
   // "preciso de uma pessoa", "preciso falar com alguem" (bateria de 26/10/2026)
   /\bpreciso\s+(de\s+uma\s+pessoa|falar\s+com\s+algu[eé]m|de\s+um\s+atendente)\b/i,
+  // Pergunta do dono (26/10/2026): "se o hospede pedir atendimento humano,
+  // atendente ou algo similar". Formas que escapavam:
+  // "falar com a recepcao", "falar com o setor de reservas"
+  /\b(falar|conversar)\s+com\s+(a|o)\s+(recep[cç][aã]o|equipe|setor|gerente|gerência|respons[aá]vel|atendente|atendimento)/i,
+  // "pode me passar para uma pessoa?", "encaminha pra um atendente"
+  /\b(passa|passar|transfere|transferir|encaminha|encaminhar)\s+(para|pra|pro)\s+(um|uma|o|a)?\s*(atendente|humano|pessoa|gerente|recep|equipe|algu[eé]m)/i,
+  // "quero atendimento humano", "atendente humano", "atendente por favor"
+  /\batendimento\s+humano\b|\batendente\s+(humano|real|de\s+verdade|por\s+favor)\b|^\s*atendente\s*[?!.]*\s*$/im,
+  // "pode me ligar?", "me liga" - ligacao e com uma pessoa
+  /\b(me\s+liga|me\s+ligue|pode(ria)?\s+me\s+ligar|liga\s+pra\s+mim|me\s+chama\s+no\s+telefone)\b/i,
+  // O "Victor, especialista em reservas" do roteiro da recepcao
+  /\b(falar|conversar)\s+com\s+o\s+victor\b/i,
   /\b(me\s+)?(passa|transfere|transferir)\s+para\s+(um|uma)?\s*(atendente|humano|pessoa|gerente)\b/i,
   // Sem \b no fim: 'robô' termina em acento, e acento nao conta como letra
   // para a borda de palavra - "isso é um robô?" nao casava.

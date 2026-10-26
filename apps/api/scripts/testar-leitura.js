@@ -96,6 +96,22 @@ conferir('bateria', 'tem vaga sabado nao escala', esc.motivoParaHumano({ falaDoH
   conferir('analise', 'orcamento nao e andamento', esc.reservaEmAndamento('Nós: Segue o link com os valores e a disponibilidade'), false);
 }
 
+// --- pedido de atendente (26/10/2026) ------------------------------------
+for (const t of ['quero falar com um atendente', 'pode me passar para uma pessoa?', 'atendente por favor', 'quero atendimento humano',
+  'pode me ligar?', 'falar com a recepção', 'quero falar com o Victor', 'Atendente', 'hablar con una persona']) {
+  conferir('atendente', t, esc.hospedePediuAtendente(t), true);
+}
+for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção funciona 24h?', 'quero falar sobre a reserva',
+  'quero passar o réveillon aí', 'o Victor me atendeu ontem, obrigado']) {
+  conferir('atendente', 'NAO: ' + t, esc.hospedePediuAtendente(t), false);
+}
+{
+  const fonte = require('fs').readFileSync(require('path').join(__dirname, '../src/modules/assist/assist.module.ts'), 'utf8');
+  const cedo = fonte.indexOf('PEDIU UMA PESSOA, no que disse por ultimo');
+  const faltam = fonte.indexOf("'faltam dados (' +");
+  conferir('ordem', 'pedido de atendente antes do faltam dados', cedo > 0 && cedo < faltam, true);
+}
+
 // --- ordem das guardas na extensao --------------------------------------
 // Achado de 26/10/2026: o texto final era montado ANTES das guardas, e todas
 // as criadas desde 13/10 nao tinham efeito na extensao. Se esta conferencia

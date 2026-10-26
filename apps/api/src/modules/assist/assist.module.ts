@@ -2596,6 +2596,22 @@ export class AssistController implements OnModuleInit {
       );
     }
 
+    // PEDIU UMA PESSOA, no que disse por ultimo: entrega antes de tudo.
+    //
+    // A mesma regra existia mais abaixo, mas depois do "faltam dados": quem
+    // pedia atendente sem ter dito datas recebia de volta o pedido de periodo
+    // e pessoas (pergunta do dono, 26/10/2026). Aqui olha so o que ele disse
+    // depois da nossa ultima mensagem - um pedido antigo, ja atendido, nao
+    // pode prender a conversa para sempre.
+    if (hospedePediuAtendente(falasDoHospedeDepoisDaNossa(conversation) || ultimaFalaDoHospede(conversation))) {
+      this.registrarDecisao('hospede pediu atendente: entregar contato', {});
+      return (
+        `\n\nO HÓSPEDE PEDIU PARA FALAR COM UMA PESSOA. NÃO insista, NÃO tente responder a dúvida ` +
+        `você mesma, NÃO peça dados e NÃO envie link. Reconheça o pedido com simpatia e encaminhe.` +
+        blocoDeContato(isWithinBusinessHours())
+      );
+    }
+
     // RESERVA JA FEITA que o hospede quer mudar: quem ajusta e a equipe.
     // Ver alteracaoDeReservaExistente. Nao e orcamento novo: nada de link nem
     // de pedir datas de novo.
