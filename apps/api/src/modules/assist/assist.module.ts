@@ -4266,7 +4266,12 @@ ${url}`;
 
     // Curriculo e venda: resposta pronta e atendimento humano, sem IA.
     // Mesma regra do automatico - ver assuntoForaDoAtendimento.
-    const naoEHospede = assuntoForaDoAtendimento(falasDoHospedeAgora);
+    // Nunca em conversa que ja e de hospede (orcamento/link enviado, reserva em
+    // andamento). Falso positivo real de 26/10/2026: hospede reclamando que
+    // "o desconto nao esta refletindo" recebeu "vou encaminhar ao setor
+    // responsavel", como se fosse vendedor.
+    const conversaDeHospede = /silbeck/i.test(conversation) || reservaEmAndamento(apenasNossasFalas(conversation));
+    const naoEHospede = conversaDeHospede ? null : assuntoForaDoAtendimento(falasDoHospedeAgora);
     if (naoEHospede) {
       this.registrarDecisao(naoEHospede === 'curriculo' ? 'curriculo: direto para humano' : 'venda: direto para humano', {});
       return {

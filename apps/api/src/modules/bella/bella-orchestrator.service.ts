@@ -167,7 +167,13 @@ export class BellaOrchestratorService {
       identificador: inbound.senderExternalId,
       nome: inbound.senderName ?? guest.name,
     });
-    const naoEHospede = marcado ? null : assuntoForaDoAtendimento(inbound.content);
+    // Conversa que ja teve orcamento (link do site) e de hospede, diga ele o
+    // que disser - ver o falso positivo de 26/10/2026 no caminho da extensao.
+    const jaTeveOrcamento = await this.prisma.message.findFirst({
+      where: { conversationId: conversation.id, content: { contains: 'silbeck' } },
+      select: { id: true },
+    });
+    const naoEHospede = marcado || jaTeveOrcamento ? null : assuntoForaDoAtendimento(inbound.content);
     if (marcado || naoEHospede) {
       const motivo = marcado
         ? marcado.tipo === 'guia'
