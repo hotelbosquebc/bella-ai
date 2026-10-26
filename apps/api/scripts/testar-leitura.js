@@ -125,6 +125,19 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   conferir('ordem', 'pedido de atendente antes do faltam dados', cedo > 0 && cedo < faltam, true);
 }
 
+// --- auditoria diaria: o que ela aponta (26/10/2026) --------------------
+{
+  const aud = require('../dist/common/auditoria-respostas.js');
+  const tipos = (t) => aud.auditarResposta(t).map((x) => x.tipo).sort();
+  conferir('auditoria', 'ja anotei', tipos('Já anotei o aviso de chegada após as 18h para a equipe.'), ['prometeu registro/aviso interno']);
+  conferir('auditoria', 'preco', tipos('O valor da diária é de R$ 430,00 para o casal.'), ['preço em reais']);
+  conferir('auditoria', 'late gratuito', tipos('O late check-out é gratuito quando há disponibilidade.'), ['custo de early/late check-out']);
+  conferir('auditoria', 'link de fora', tipos('Veja em https://www.booking.com/hotel/br/bosque.html'), ['link que não é do hotel']);
+  conferir('auditoria', 'texto quebrado', tipos('Olá {{nome}}, segue undefined'), ['texto quebrado ou instrução interna']);
+  conferir('auditoria', 'resposta boa com link', tipos('Segue o link:\n\nhttps://sbreserva.silbeck.com.br/hotelbosque/pt-br/reserva/busca/?checkin=2026-11-10&checkout=2026-11-12&adultos-000001=2'), []);
+  conferir('auditoria', 'resposta boa do cafe', tipos('Sim, o café da manhã está incluso na diária e é servido das 7h às 10h.'), []);
+}
+
 // --- ordem das guardas na extensao --------------------------------------
 // Achado de 26/10/2026: o texto final era montado ANTES das guardas, e todas
 // as criadas desde 13/10 nao tinham efeito na extensao. Se esta conferencia

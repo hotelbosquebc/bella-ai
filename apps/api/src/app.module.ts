@@ -22,6 +22,7 @@ import { QuickRepliesModule } from './modules/quick-replies/quick-replies.module
 import { AssistModule } from './modules/assist/assist.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { ContatosModule } from './modules/contatos/contatos.module';
+import { AuditoriaModule } from './modules/auditoria/auditoria.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ContatosModule } from './modules/contatos/contatos.module';
     AssistModule,
     AttachmentsModule,
     ContatosModule,
+    AuditoriaModule,
   ],
   controllers: [HealthController],
 })
