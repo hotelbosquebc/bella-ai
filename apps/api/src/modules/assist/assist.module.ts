@@ -2932,6 +2932,14 @@ export class AssistController implements OnModuleInit {
         `no Réveillon a estadia é um pacote de 5 diárias, e por isso o link mostra o período completo. ` +
         `Diga que o valor total é o mesmo de 1 a 5 diárias, então ele pode aproveitar os dias extras sem custo ` +
         `adicional — é um ganho, e vale apresentar assim. Nada de "não é possível" ou "infelizmente".`;
+    } else if (stay.checkin && stay.checkout && stay.checkin <= `${stay.checkin.slice(0, 4)}-12-31` && stay.checkout > `${stay.checkin.slice(0, 4)}-12-31` && stay.checkin.slice(5, 7) === '12') {
+      // Pega a virada com 5 diarias ou mais: o pacote ja esta cumprido.
+      // Caso real (26/10/2026): 27/12 a 03/01 (7 diarias) e a resposta falou
+      // do "pacote fechado de no minimo 5 diarias" e de "dias extras sem
+      // custo" - coisa que so faz sentido para quem pediu menos de 5.
+      contextoReveillon =
+        `\n\nRÉVEILLON: o período pedido já tem 5 diárias ou mais. NÃO fale de pacote, de mínimo de diárias, ` +
+        `de "valor igual de 1 a 5 diárias" nem de "dias extras sem custo". Só envie o link normalmente.`;
     }
 
     // UMA vez por conversa, e só isso.
