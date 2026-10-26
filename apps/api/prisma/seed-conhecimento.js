@@ -217,7 +217,7 @@ const conhecimentos = [
   {
     title: 'Early check-in e late check-out',
     content:
-      'Ambos estão sujeitos à disponibilidade do dia e são solicitados na recepção. Para GARANTIR a entrada antecipada ou a saída tardia, só reservando uma diária completa adicional. Nunca prometa antecipação ou saída tardia como certa: dependem da ocupação no dia. NÃO fale de custo: não diga que é gratuito, que "geralmente não há custo" nem que é cobrado. Se o hóspede perguntar o valor, diga que a recepção informa no dia, conforme a disponibilidade.',
+      'O check-in é a partir das 14h. Quem quer ENTRAR PELA MANHÃ precisa reservar uma diária a mais (a da noite anterior): diga isso sempre que o hóspede falar em chegar de manhã ou cedo (regra do dono, 26/10/2026). Early check-in e late check-out estão sujeitos à disponibilidade do dia e são solicitados na recepção. Para GARANTIR a entrada antecipada ou a saída tardia, só reservando uma diária completa adicional. Nunca prometa antecipação ou saída tardia como certa: dependem da ocupação no dia. NÃO fale de custo: não diga que é gratuito, que "geralmente não há custo" nem que é cobrado. Se o hóspede perguntar o valor, diga que a recepção informa no dia, conforme a disponibilidade.',
   },
   {
     title: 'Nota fiscal',

@@ -1222,8 +1222,12 @@ export function apartamentosPorTipo(
   const t = semPrefixos(falasDoHospede || '');
   if (PALAVRA_DE_CRIANCA.test(t)) return null;
   const ocupacao: Record<string, number> = { individua: 1, single: 1, dupl: 2, casal: 2, tripl: 3, 'quádrupl': 4, quadrupl: 4, 'quíntupl': 5, quintupl: 5, 'sêxtupl': 6, sextupl: 6 };
+  // A quantidade pode vir por extenso e com o numero entre parenteses. Caso
+  // real (26/10/2026): "por ora dois (02) quartos individuais standard" nao
+  // casava, e a Bella perguntou "juntos ou separados?" a quem ja tinha pedido
+  // dois individuais.
   const m = t.match(
-    /(?<![\d\/])(\d{1,2})[ \t]*(?:apartamentos?|aptos?|quartos?|su[íi]tes?|unidades?)[ \t]+(?:(?:de[ \t]+)?[a-zà-ÿ]+[ \t]+){0,2}?(?:de[ \t]+)?(individua(?:l|is)|single|dupl[oa]s?|casal|tripl[oa]s?|qu[áa]drupl[oa]s?|qu[íi]ntupl[oa]s?|s[êe]xtupl[oa]s?)(?![a-zà-ÿ])/i,
+    /(?<![\d\/a-zà-ÿ])(\d{1,2}|uma?|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez)(?:[ \t]*\(\d{1,2}\))?[ \t]*(?:apartamentos?|aptos?|quartos?|su[íi]tes?|unidades?)[ \t]+(?:(?:de[ \t]+)?[a-zà-ÿ]+[ \t]+){0,2}?(?:de[ \t]+)?(individua(?:l|is)|single|dupl[oa]s?|casal|tripl[oa]s?|qu[áa]drupl[oa]s?|qu[íi]ntupl[oa]s?|s[êe]xtupl[oa]s?)(?![a-zà-ÿ])/i,
   );
   if (!m) return null;
   // "o apartamento tem 2 quartos de casal?" e pergunta sobre a PLANTA, nao
@@ -1233,12 +1237,26 @@ export function apartamentosPorTipo(
   if (/\b(?:tem|t[êe]m|possui|possuem|com)[ \t]*$/i.test(t.slice(Math.max(0, i - 15), i))) return null;
   const fimRel = t.slice(i).search(/[.!\n]|\?/);
   if (fimRel >= 0 && t[i + fimRel] === '?') return null;
-  const quantos = Number(m[1]);
+  const porExtenso: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10 };
+  const quantos = /^\d+$/.test(m[1]) ? Number(m[1]) : porExtenso[m[1].toLowerCase()] || 0;
   const tipo = m[2].toLowerCase();
   const chave = Object.keys(ocupacao).find((k) => tipo.startsWith(k));
   const porApto = chave ? ocupacao[chave] : 0;
   if (!porApto || quantos < 1 || quantos > 10) return null;
   return Array.from({ length: quantos }, () => ({ adultos: porApto, idades: [], criancas0_6: 0, criancas7_9: 0 }));
+}
+
+/**
+ * "entrada terca-feira 03/11 pela manha" - chegada antes do check-in.
+ *
+ * Regra do dono (26/10/2026): o check-in e a partir das 14h; para entrar
+ * pela manha e preciso reservar uma diaria a mais (a noite anterior). A
+ * resposta tem que dizer isso, e nao deixar o hospede achar que entra cedo.
+ * So olha o trecho da ENTRADA: "saida 05/11 pela manha" nao conta.
+ */
+export function entradaPelaManha(falasDoHospede: string): boolean {
+  const t = semPrefixos(falasDoHospede || '');
+  return /(?:entrada|chegada|chegar|chego|chegamos|chegaremos|check[- ]?in|entrar|entramos)(?:(?!sa[íi]d|sair|sa[íi]mos|check[- ]?out)[^.\n]){0,40}?(?:pela[ \t]+manh[ãa]|de[ \t]+manh[ãa]|cedinho|cedo|antes[ \t]+das?[ \t]+1[0-4][ \t]*h|(?<![\d\/])(?:[6-9]|1[0-2])[ \t]*(?:h|hs|horas)(?![a-zà-ÿ])(?![ \t]*da[ \t]+(?:tarde|noite)))/i.test(t);
 }
 
 /**
@@ -2942,6 +2960,14 @@ export class AssistController implements OnModuleInit {
         `de "valor igual de 1 a 5 diárias" nem de "dias extras sem custo". Só envie o link normalmente.`;
     }
 
+    // Entrada pela manha: check-in e as 14h - ver entradaPelaManha.
+    const contextoEntradaCedo = entradaPelaManha(falasDoHospede)
+      ? `\n\nENTRADA PELA MANHÃ: o hóspede disse que chega cedo. Informe, em uma frase, que o check-in é a partir das 14h ` +
+        `e que, para entrar pela manhã, é necessário reservar uma diária a mais (a da noite anterior). ` +
+        `O link continua com as datas que ele pediu. NÃO fale de custo, NÃO prometa entrada antecipada e NÃO passe para a equipe por isso.`
+      : '';
+    if (contextoEntradaCedo) this.registrarDecisao('entrada pela manha: avisar check-in 14h e diaria a mais', stay);
+
     // UMA vez por conversa, e só isso.
     //
     // A oferta é injetada em seis ramos diferentes, e o texto já pedia "sem
@@ -3378,6 +3404,14 @@ ${url}`;
           `num só; veja as duas e me diga qual prefere". Ofereça primeiro a que ele parece querer, mas mostre ambas.`;
       }
 
+      // Ele mesmo pediu os apartamentos ("dois quartos individuais"): a escolha
+      // esta feita. Caso real (26/10/2026): a Bella perguntou "juntos ou
+      // separados?" e ainda colou o horario do setor de reservas, sem link.
+      const jaEscolheu = divisaoEscrita
+        ? `\nO HÓSPEDE JÁ ESCOLHEU apartamentos separados: NÃO pergunte se prefere ficar no mesmo apartamento ` +
+          `e NÃO explique que os apartamentos têm dois dormitórios. NÃO fale do horário do setor de reservas nem ` +
+          `encaminhe para a equipe: é só confirmar e enviar o(s) link(s).`
+        : '';
       const muitos = detalhe.length >= 4;
       this.registrarDecisao('varios apartamentos: um link para cada', stay);
       return (
@@ -3388,7 +3422,7 @@ ${url}`;
         `então o hóspede vê o valor separado de cada um — que foi o que ele pediu.\n` +
         `NÃO junte tudo num link só e NÃO envie um link sem ocupação.\n\n` +
         linhas.join('\n\n') +
-        `\n\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` + opcaoJuntos +
+        `\n\nNÃO informe preços, NÃO trate isso como grupo/excursão e NÃO some todos os hóspedes num apartamento só.` + opcaoJuntos + jaEscolheu + contextoEntradaCedo +
         (muitos
           ? `\nComo são vários apartamentos, ofereça também que a nossa equipe monte o orçamento completo, ` +
             (isWithinBusinessHours()
@@ -3528,7 +3562,7 @@ ${url}`;
       `o hóspede não sabe se aquilo é um orçamento, uma foto ou onde deve clicar.\n` +
       `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois — ` +
       `nunca grudado no texto nem logo após dois-pontos, senão o WhatsApp quebra o endereço.\n` +
-      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoChegamDepois + contextoDisponibilidade + contextoReveillon + ofertaAtendimento
+      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoChegamDepois + contextoDisponibilidade + contextoReveillon + contextoEntradaCedo + ofertaAtendimento
     );
   }
 

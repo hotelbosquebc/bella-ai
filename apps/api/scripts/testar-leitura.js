@@ -107,6 +107,20 @@ conferir('bateria', 'tem vaga sabado nao escala', esc.motivoParaHumano({ falaDoH
   conferir('tipo', '3 aptos de casal', tipo('3 aptos de casal de 10/11 a 12/11'), '3x2');
   conferir('tipo', 'pergunta da planta', tipo('o apartamento tem 2 quartos de casal?'), null);
   conferir('tipo', 'com crianca nao decide', tipo('2 apartamentos duplos e 1 criança'), null);
+  conferir('tipo', 'dois (02) quartos individuais', tipo('entrada terça-feira 03/11 pela manhã, saída 05/11 ....por ora dois (02) quartos individuais standard'), '2x1');
+  conferir('tipo', 'duas suites duplas', tipo('preciso de duas suítes duplas'), '2x2');
+  conferir('tipo', 'tem dois quartos de casal?', tipo('vocês tem dois quartos de casal?'), null);
+}
+
+// --- entrada pela manha (26/10/2026) -------------------------------------
+{
+  const cedo = (s) => m.entradaPelaManha('Hóspede: ' + s);
+  conferir('manha', 'entrada 03/11 pela manha', cedo('entrada terça-feira 03/11 pela manhã, saída 05/11'), true);
+  conferir('manha', 'chegamos as 9h', cedo('chegamos dia 10 às 9h'), true);
+  conferir('manha', 'chegada cedo', cedo('a chegada vai ser cedo'), true);
+  conferir('manha', 'NAO: saida pela manha', cedo('entrada 03/11, saída 05/11 pela manhã'), false);
+  conferir('manha', 'NAO: chegada 20h', cedo('chegada às 20h'), false);
+  conferir('manha', 'NAO: so datas', cedo('entrada 03/11 saída 05/11'), false);
 }
 
 // --- pedido de atendente (26/10/2026) ------------------------------------
