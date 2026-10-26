@@ -102,6 +102,36 @@ telas). O automático usa o **mesmo `bookingContext`** da extensão
 
 ---
 
+## Análise das respostas (26/10, `ca04a08`)
+
+As 200 últimas sugestões comparadas com o que a recepção enviou (via
+`/api/assist/feedback`, que exige login; o campo `conversa` é só um código, sem
+texto do hóspede).
+
+- **Erro grave, corrigido:** na extensão, o texto final era montado ANTES das
+  guardas desde 09/2026. Todas as guardas criadas desde 13/10 só registravam
+  "frase removida" no diagnóstico, e a frase chegava inteira ao atendente. A
+  troca de idioma também era descartada. O teste `scripts/testar-leitura.js`
+  agora confere a ordem. **Os números antigos de "preço removido" e "promessa
+  removida" mediam a IA, não o que a recepção recebia.**
+- **Medição inflada, corrigida:** 72 de 196 "divergências" eram textos-modelo
+  repetidos (promoção do café 10×, roteiro "Solicitação de reserva realizada"
+  21×, ausência 13×). Texto enviado igual 3 ou mais vezes não conta mais como
+  correção. Os 87% de "reescreveu do zero" de 20/10 estavam inflados.
+- **Corrigido:** sugestão automática em conversa sem nada de hotel (pessoal,
+  financiamento) não sai mais; reserva em andamento não pede dados nem manda
+  link novo; pergunta do hóspede respondida antes de pedir o que falta.
+- **Ainda aberto, decisão do dono:**
+  1. A Bella **se apresenta em ~50% das sugestões**, todo dia (regra "uma vez
+     por dia por contato"). A saudação automática do WhatsApp já apresenta a
+     Bella; a recepção corta a apresentação.
+  2. **Tamanho:** mediana de 299 caracteres na sugestão contra 69 no que a
+     recepção envia.
+- **Fora do alcance da Bella (esperado):** pagamento, comprovante, e-mail para
+  cadastro, voucher, preço de grupo e de pessoa extra. Ela passa para a equipe.
+- **Ruído na leitura do enviado:** 8 casos com "Você" ou telefone na frente
+  (a extensão pega o cabeçalho da citação). Baixo impacto; corrigir depois.
+
 ## A próxima tarefa: medir
 
 É o que decide se ela pode ir ao ar. Os 20 dias de espera da Meta são tempo de
