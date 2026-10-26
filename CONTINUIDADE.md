@@ -234,6 +234,15 @@ link de reservas.
 - **`\b` não funciona depois de letra acentuada** ("moças", "robô", "café").
   Usar `(?![a-zà-ÿ])`.
 - **`nest build` pode passar com erro de tipo.** Rodar `npx tsc --noEmit`.
+- **Antes de publicar qualquer mudança na leitura** (datas, pessoas, idades,
+  divisão): `cd apps/api && npx nest build && node scripts/testar-leitura.js`.
+  Em 26/10, uma correção quebrou outra frase no mesmo dia ("1 criança + 2
+  adultos" ficou sem adultos). Todo caso real novo entra nesse arquivo, com o
+  lado positivo **e** o negativo.
+- **O Write e o heredoc mexem nas barras invertidas:** `̀` vira o próprio
+  caractere e `'\n'` dentro de um texto gerado vira quebra de linha real.
+  Regex nova vai por Edit, ou com `String.raw`, e precisa ser conferida no
+  arquivo depois.
 - **A IA da Meta sugere textos com afirmações falsas** ("já integramos vários
   hotéis"). Não usar.
 - O build local do Next estoura a memória desta máquina — quem compila é a
