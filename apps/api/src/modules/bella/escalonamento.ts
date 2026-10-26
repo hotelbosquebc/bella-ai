@@ -19,6 +19,8 @@
 const PEDIU_HUMANO: RegExp[] = [
   /\b(falar|conversar)\s+com\s+(uma?\s+)?(pessoa|humano|atendente|gerente|recep[cç][aã]o|respons[aá]vel)\b/i,
   /\b(quero|queria|gostaria de)\s+(falar|conversar)\s+com\s+algu[eé]m\b/i,
+  // "preciso de uma pessoa", "preciso falar com alguem" (bateria de 26/10/2026)
+  /\bpreciso\s+(de\s+uma\s+pessoa|falar\s+com\s+algu[eé]m|de\s+um\s+atendente)\b/i,
   /\b(me\s+)?(passa|transfere|transferir)\s+para\s+(um|uma)?\s*(atendente|humano|pessoa|gerente)\b/i,
   // Sem \b no fim: 'robô' termina em acento, e acento nao conta como letra
   // para a borda de palavra - "isso é um robô?" nao casava.
@@ -33,6 +35,8 @@ const RECLAMACAO: RegExp[] = [
   /\b(reclama[cç][aã]o|reclamar|procon|processar|advogado|justi[cç]a)\b/i,
   /\b(nojento|sujo|imundo|barata|rato|mofo|infiltra[cç][aã]o)\b/i,
   /\b(fui\s+mal\s+atendid|me\s+trataram\s+mal|falta\s+de\s+respeito)/i,
+  // "estou muito insatisfeito com o atendimento" (bateria de 26/10/2026)
+  /\b(insatisfeit[oa]s?|decepcionad[oa]s?|indignad[oa]s?|lament[áa]vel)\b/i,
   /\b(quero\s+meu\s+dinheiro\s+de\s+volta)\b/i,
   /\b(terrible|awful|unacceptable|disgusting)\b/i,
   /\b(p[ée]simo|horrible|inaceptable|asqueroso)\b/i,

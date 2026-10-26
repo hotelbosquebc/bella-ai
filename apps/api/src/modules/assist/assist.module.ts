@@ -521,6 +521,29 @@ const MESES: Record<string, number> = {
 };
 
 /**
+ * Datas em espanhol viram o formato que a leitura ja conhece.
+ *
+ * Hospede argentino e rotina aqui, e "del 10 al 15 de enero" nao era lido:
+ * "al" nao era separador e "enero", "febrero", "octubre"... nao eram mes
+ * (bateria de 26/10/2026). Sem leitura no codigo, o periodo dependia da IA -
+ * e com a IA congestionada a resposta nao saia.
+ */
+export function datasEmEspanhol(texto: string): string {
+  const meses: Record<string, string> = {
+    enero: 'janeiro', febrero: 'fevereiro', marzo: 'março', abril: 'abril', mayo: 'maio', junio: 'junho',
+    julio: 'julho', agosto: 'agosto', septiembre: 'setembro', setiembre: 'setembro', octubre: 'outubro',
+    noviembre: 'novembro', diciembre: 'dezembro',
+  };
+  return (texto || '')
+    .replace(
+      /\b(enero|febrero|marzo|mayo|junio|julio|septiembre|setiembre|octubre|noviembre|diciembre)\b/gi,
+      (mes) => meses[mes.toLowerCase()] ?? mes,
+    )
+    .replace(/(\d{1,2})\s+al\s+(\d{1,2})/gi, '$1 a $2')
+    .replace(/\bdel\s+(\d{1,2})\s+a\s+/gi, 'de $1 a ');
+}
+
+/**
  * Lista de DIAS, um por linha: dias seguidos formam UM periodo.
  *
  * Caso real (22/10/2026): a hospede mandou as segundas a quintas de sete
@@ -617,7 +640,7 @@ export function intervalosNaFala(
   //
   // semPrefixos tambem normaliza pontuacao e numero por extenso, e aplicar
   // duas vezes nao muda nada - entao quem ja limpava continua igual.
-  const t = semPrefixos(texto || '').replace(
+  const t = semPrefixos(datasEmEspanhol(texto || '')).replace(
     /\b(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\s*(a|até|ate|-|–)\s*(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?\b/gi,
     (_todo, d1, m1, a1, sep, d2, m2, a2) =>
       `${d1}/${m1}${a1 ? '/' + a1 : ''} ${sep} ${d2}/${m2}${a2 ? '/' + a2 : ''}`,
@@ -694,7 +717,9 @@ export function intervalosNaFala(
     const rEntre =
       /\bentre\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\s*e\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\b(?!\s*(?:pessoas?|adultos?|crian|h[óo]spedes?|noites?|di[áa]rias?|di[áa]rias|quartos?|apartamentos?|anos?))/gi;
     const rDoDiaAo = /\bdo\s*dia\s*(\d{1,2})\s*(?:a|ao|at[ée])\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\b/gi;
-    const rEntrandoSaindo = /\bentrando\s*(?:no\s*)?(?:dia\s*)?(\d{1,2})\b[^\d\n]{0,20}\bsaindo\s*(?:no\s*)?(?:dia\s*)?(\d{1,2})\b/gi;
+    // Tambem "chegamos dia 20 e saimos dia 23 de novembro" (bateria de 26/10/2026).
+    const rEntrandoSaindo =
+      /\b(?:entrando|chegando|chegamos|chego|chegaremos|entramos|entro)\s*(?:no\s*)?(?:dia\s*)?(\d{1,2})\b[^\d\n]{0,20}\b(?:saindo|sa[íi]mos|saio|sairemos|voltamos|volto)\s*(?:no\s*)?(?:dia\s*)?(\d{1,2})\b/gi;
     const rMesSolto = /\b(janeiro|fevereiro|mar[cç]o|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/gi;
     const citados = new Set<number>();
     let mm: RegExpExecArray | null;
@@ -1385,7 +1410,8 @@ export function adultosDeFrase(texto: string): number | null {
     if (n >= 1 && n <= 15) return n;
   }
 
-  if (/\beu\s+e\s+(?:a\s+|o\s+)?(?:minha|meu)\s+(?:esposa|esposo|marido|mulher|namorad[oa]|companheir[oa]|noiv[oa])\b/i.test(t)) {
+  // "para mim e minha esposa" tambem (bateria de 26/10/2026).
+  if (/\b(?:eu|mim)\s+e\s+(?:a\s+|o\s+)?(?:minha|meu)\s+(?:esposa|esposo|marido|mulher|namorad[oa]|companheir[oa]|noiv[oa])\b/i.test(t)) {
     return 2;
   }
 

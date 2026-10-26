@@ -70,5 +70,20 @@ conferir('periodos', 'lista por semana', per('26/10\n27/10\n28/10\n29/10\n02/11\
 conferir('periodos', 'semana virando o mes', per('Segunda: 30/11\nTerça: 01/12\nQuarta: 02/12\nQuinta: 03/12'), '30/11 a 03/12');
 conferir('periodos', 'dois periodos com a', per('10/11 a 12/11 ou 20/11 a 22/11'), '10/11 a 12/11 | 20/11 a 22/11');
 
+// --- bateria de 26/10/2026 (formatos que dependiam da IA) ---------------
+const hoje26 = new Date('2026-10-26T12:00:00-03:00');
+const det26 = (s) => {
+  const d = m.extrairDeterminista('Hóspede: ' + s, hoje26);
+  return d ? [d.checkin, d.checkout, d.adults, d.idades || []] : null;
+};
+conferir('bateria', 'chegamos/saimos', det26('chegamos dia 20 e saímos dia 23 de novembro, somos 4'), ['2026-11-20', '2026-11-23', 4, []]);
+conferir('bateria', 'espanhol del/al', det26('dos adultos y un niño de 6 años del 10 al 15 de enero'), ['2027-01-10', '2027-01-15', 2, [6]]);
+conferir('bateria', 'espanhol 2 ninos', det26('2 adultos y 2 niños de 8 y 11 años, del 3 al 8 de febrero'), ['2027-02-03', '2027-02-08', 2, [8, 11]]);
+conferir('bateria', 'mim e minha esposa', det26('Quero reservar de 1 a 3 de dezembro para mim e minha esposa'), ['2026-12-01', '2026-12-03', 2, []]);
+const esc = require('../dist/modules/bella/escalonamento.js');
+conferir('bateria', 'preciso de uma pessoa', esc.hospedePediuAtendente('tem alguém aí? preciso de uma pessoa'), true);
+conferir('bateria', 'insatisfeito = reclamacao', Boolean(esc.motivoParaHumano({ falaDoHospede: 'Estou muito insatisfeito com o atendimento', resposta: 'texto suficientemente longo aqui', respostasAnteriores: [] })), true);
+conferir('bateria', 'tem vaga sabado nao escala', esc.motivoParaHumano({ falaDoHospede: 'Tem vaga para sábado?', resposta: 'texto suficientemente longo aqui', respostasAnteriores: [] }), null);
+
 console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
 process.exit(falhas ? 1 : 0);
