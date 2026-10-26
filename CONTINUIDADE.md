@@ -102,6 +102,24 @@ telas). O automático usa o **mesmo `bookingContext`** da extensão
 
 ---
 
+## Auditoria diária (26/10, `14e0d34` + `3dc5757`)
+
+Pedido do dono: "análise completa diária para evitar erros e alucinações".
+Todo dia às **9h30** (cron no servidor; o Render dorme sem uso, e a essa hora
+a extensão já o acordou) ou no botão **"Conferir agora"** da tela
+**Aprendizado**, o servidor confere tudo o que a Bella escreveu nas últimas
+24h (sugestões da extensão e respostas automáticas):
+- **no código** (`common/auditoria-respostas.ts`): preço, promessa de registro,
+  rascunho, custo de early/late, link de fora, texto quebrado = **grave**;
+  nota fiscal, vaga afirmada, estrutura inexistente, resposta longa = atenção;
+- **conferência da IA contra a base de conhecimento** → lista **"para
+  revisar"** (não conta como grave: na 1ª rodada ela marcou falas oficiais
+  do hotel; a conferidora agora conhece essas falas);
+- pedidos que ela não conseguiu ler (formatos).
+Só aponta; nada muda sozinho. Relatório: `Diagnostico` tipo `auditoria`,
+`GET /api/auditoria/ultima` (exige login). **Ao começar uma conversa nova,
+olhar a última auditoria.**
+
 ## Análise das respostas (26/10, `ca04a08`)
 
 As 200 últimas sugestões comparadas com o que a recepção enviou (via
