@@ -26,8 +26,8 @@ import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 export { fraseTemPreco, semPrecoInventado };
 import { motivoParaHumano, falaDeNotaFiscal, fraseOficialNotaFiscal, semNotaFiscalInventada } from '../bella/escalonamento';
 import { blocoDeContato, mensagemForaDoAtendimento } from '../../common/contato';
-import { ehMensagemAutomatica } from '../../common/mensagem-automatica';
-import { hospedePediuAtendente, hospedeTravouNoSite, assuntoForaDoAtendimento, alteracaoDeReservaExistente } from '../bella/escalonamento';
+import { ehMensagemAutomatica, chaveDeModelo, modelosRepetidos } from '../../common/mensagem-automatica';
+import { hospedePediuAtendente, hospedeTravouNoSite, assuntoForaDoAtendimento, alteracaoDeReservaExistente, reservaEmAndamento, conversaSemAssuntoDeHotel } from '../bella/escalonamento';
 // Reexportado para nao quebrar quem ja importava daqui (e os testes).
 export { corrigirLinks, garantirLink };
 
@@ -2617,6 +2617,30 @@ export class AssistController implements OnModuleInit {
       );
     }
 
+    // RESERVA EM ANDAMENTO: a conversa ja esta em pagamento/confirmacao.
+    //
+    // Analise de 26/10/2026: depois de "Solicitacao de reserva realizada!",
+    // comprovante, voucher ou "PAGAMENTO CONFIRMADO", a Bella seguia pedindo
+    // periodo e pessoas, ou mandava link de orcamento novo - a recepcao jogava
+    // fora. Nessa fase so cabe responder a duvida; o resto e com a equipe.
+    // Periodo NOVO pedido depois da nossa ultima mensagem continua sendo
+    // orcamento novo.
+    if (
+      reservaEmAndamento(apenasNossasFalas(conversation)) &&
+      !intervalosNaFala(falasDoHospedeDepoisDaNossa(conversation)).length
+    ) {
+      this.registrarDecisao('reserva em andamento: nao pedir dados nem mandar link', {});
+      return (
+        `\n\nRESERVA EM ANDAMENTO: esta conversa já está na fase de pagamento/confirmação da reserva com a nossa equipe ` +
+        `(solicitação feita, comprovante, voucher ou pagamento).\n` +
+        `NÃO peça período nem quantidade de pessoas e NÃO envie link de orçamento.\n` +
+        `Se ele fez uma pergunta sobre o hotel, responda com a base de conhecimento, em poucas linhas. ` +
+        `Se for sobre pagamento, comprovante, voucher, valor ou alteração, diga numa frase que a nossa equipe de ` +
+        `reservas acompanha a reserva dele e já responde.` +
+        contextoDeEntregaAoHumano(isWithinBusinessHours())
+      );
+    }
+
     // Antes de gastar chamada: a frase se le sozinha?
     //
     // "10/10 a 12/10 / 2 adultos" nao precisa de modelo. Isso corta a maior
@@ -3023,6 +3047,12 @@ export class AssistController implements OnModuleInit {
       return (
         `\n\nRESERVA: faltam dados para gerar o link. Peça ao hóspede APENAS: ` +
         `${faltam.map((c) => rotulos[c]).join(', ')}. Não pergunte o que ele já informou. ` +
+        // "APENAS" vale para os DADOS pedidos, nao para calar a pergunta dele.
+        // Analise de 26/10/2026: hospede perguntou das camas, a recepcao
+        // respondeu "todos os apartamentos tem 1 cama de casal e 2 de
+        // solteiro", e a Bella so pediu "quantas pessoas seriam?".
+        `Se na conversa ele fez uma PERGUNTA que ainda não foi respondida (camas, café, estacionamento, pet, horário...), ` +
+        `RESPONDA a pergunta primeiro, em uma frase, com a base de conhecimento — e só depois peça o que falta. ` +
         `NÃO prometa verificar valores ou disponibilidade — quem consulta é o próprio hóspede no link.` +
         avisoVago +
         avisoOcupacaoAntiga +
@@ -3868,9 +3898,10 @@ ${url}`;
       soAjusteFino: 0,
     };
 
+    const repetidos = modelosRepetidos(linhas.map((l: any) => l.enviado || ''));
     for (const l of linhas) {
-      // Mensagem automatica do hotel nao e correcao do atendente.
-      if (ehMensagemAutomatica(l.enviado)) continue;
+      // Mensagem automatica e texto-modelo repetido nao sao correcao do atendente.
+      if (ehMensagemAutomatica(l.enviado) || repetidos.has(chaveDeModelo(l.enviado))) continue;
       const s = l.sugestao || '';
       const e = l.enviado || '';
       if (temLink(e) && !temLink(s)) conta.acrescentouLink++;
@@ -3921,9 +3952,10 @@ ${url}`;
       porAcao: {} as Record<string, number>,
     };
 
+    const repetidos = modelosRepetidos(linhas.map((l: any) => l.enviado || ''));
     for (const l of linhas) {
-      // Mensagem automatica do hotel nao e correcao do atendente.
-      if (ehMensagemAutomatica(l.enviado)) continue;
+      // Mensagem automatica e texto-modelo repetido nao sao correcao do atendente.
+      if (ehMensagemAutomatica(l.enviado) || repetidos.has(chaveDeModelo(l.enviado))) continue;
       const s = temLink(l.sugestao);
       const e = temLink(l.enviado);
       if (s) placar.sugestaoComLink++;
@@ -3957,8 +3989,8 @@ ${url}`;
       aindaSemExplicacao: 0,
     };
     for (const l of linhas) {
-      // Mensagem automatica do hotel nao e correcao do atendente.
-      if (ehMensagemAutomatica(l.enviado)) continue;
+      // Mensagem automatica e texto-modelo repetido nao sao correcao do atendente.
+      if (ehMensagemAutomatica(l.enviado) || repetidos.has(chaveDeModelo(l.enviado))) continue;
       if (!(temLink(l.enviado) && !temLink(l.sugestao))) continue;
       const s = l.sugestao || '';
       if (pediuDados.test(s)) noLugarDoLink.pediuDadosQueTalvezJaTivesse++;
@@ -4084,7 +4116,7 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; historico?: { fonte?: string; naTela?: number; guardadas?: number }; anterior?: string }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; historico?: { fonte?: string; naTela?: number; guardadas?: number }; anterior?: string; automatica?: boolean }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     // Cronometro das etapas. "Esta demorando muito" precisa virar numero: sem
     // isso a gente otimiza no escuro. Nenhum texto entra aqui, so tempos.
@@ -4159,6 +4191,13 @@ ${url}`;
       };
     }
     const focus = body.lastMessage || conversation;
+
+    // Sugestao AUTOMATICA em conversa sem nada de hotel: nao sugere - ver
+    // conversaSemAssuntoDeHotel. No clique a Bella responde normalmente.
+    if (body.automatica && conversaSemAssuntoDeHotel(conversation, falasDoHospedeAgora)) {
+      this.registrarDecisao('automatica: conversa sem assunto de hotel', {});
+      return { suggestion: '', model: 'sem-assunto', attachments: [] };
+    }
 
     // Curriculo e venda: resposta pronta e atendimento humano, sem IA.
     // Mesma regra do automatico - ver assuntoForaDoAtendimento.
@@ -4328,7 +4367,6 @@ ${url}`;
     // do Silbeck bloqueia o IP do Render (403 "Just a moment").
     // Troca qualquer endereco inventado pelo link oficial que montamos.
     const oficiais = (reserva.match(/https?:\/\/\S+/g) || []).map((u) => u.replace(/[),.]+$/, ''));
-    const textoFinal = garantirLink(corrigirLinks(draft.text, oficiais), oficiais);
 
     // Saiu no idioma certo, e SEM mistura?
     //
@@ -4482,6 +4520,16 @@ ${url}`;
         attachments: [],
       };
     }
+
+    // O texto final sai DEPOIS de todas as guardas e da refacao de idioma.
+    //
+    // Achado de 26/10/2026: esta linha ficava ANTES delas desde 09/2026, e as
+    // guardas criadas depois (preco, registro, vaga, custo de early/late,
+    // nota fiscal, rascunho, assunto nao perguntado) alteravam draft.text sem
+    // efeito nenhum - registravam "frase removida" no diagnostico e a frase
+    // chegava inteira ao atendente. Ex. real de 23/10: "Ja anotei o aviso de
+    // chegada" com a guarda de registro ativa.
+    const textoFinal = garantirLink(corrigirLinks(draft.text, oficiais), oficiais);
 
     marcos.total = Date.now() - t0;
     this.tempos.push({ quando: new Date().toISOString(), ...marcos });

@@ -351,6 +351,42 @@ export function alteracaoDeReservaExistente(falasDoHospede: string, falaRecente?
 }
 
 /**
+ * Conversa que nao tem NADA de hotel: pessoal, fornecedor, outro assunto.
+ *
+ * Analise de 26/10/2026: a sugestao automatica disparava em toda conversa
+ * aberta no WhatsApp Web, e a Bella "respondia" papo de financiamento de moto,
+ * "vou trazer seu pote", compras - com coisas como "parece que voce mandou
+ * mensagem para o numero errado". Na sugestao AUTOMATICA, conversa assim fica
+ * sem sugestao; no clique, a Bella responde como sempre.
+ *
+ * Os sinais sao especificos de hotel de proposito ("valor" e "pessoas"
+ * aparecem em qualquer conversa). Com menos de 3 falas do outro lado nao
+ * decide: pode ser um hospede que so disse "bom dia".
+ */
+const SINAL_DE_HOTEL =
+  /hotel|bosque|reserv|di[áa]rias?|hosped|h[óo]spede|apartamento|\bapto|su[íi]te|check-?\s?in|check-?\s?out|estadia|pernoite|or[çc]amento|disponibilidade|caf[ée] da manh|estacionamento|piscina|praia|wi-?fi|silbeck|\bbella\b|adultos?|crian[çc]as?|beb[êe]|r[ée]veillon|feriado|\b\d{1,2}\s*\/\s*\d{1,2}\b|habitaci|hospedaje|alojamiento|\broom\b|booking|ingresso|recep[çc][ãa]o|excurs|grupo de|cachorr|\bpets?\b|animais|animal|quartos?|aceitam|voc[êe]s t[êe]m|tem vaga/i;
+
+export function conversaSemAssuntoDeHotel(conversa: string, falasDoOutroLado: string): boolean {
+  const linhas = (falasDoOutroLado || '').split(/\r?\n/).filter((l) => l.trim());
+  if (linhas.length < 3) return false;
+  // Sem os rotulos "Hospede:"/"Nos:" - "hospede" e sinal de hotel, e o rotulo
+  // esta em toda linha de qualquer conversa.
+  const semRotulos = (conversa || '').replace(/^[ \t]*(?:H[óo]spede|N[óo]s)[ \t]*(?:\(hoje\))?[ \t]*:/gim, '');
+  return !SINAL_DE_HOTEL.test(semRotulos);
+}
+
+/**
+ * A conversa ja passou do orcamento: a reserva esta em pagamento/confirmacao.
+ * Le so as NOSSAS falas - sao os textos fixos que a recepcao manda nessa fase.
+ */
+const FASE_DE_RESERVA =
+  /solicita[çc][ãa]o de reserva realizada|pagamento confirmado|reserva confirmada|reserva efetivada|voucher|comprovante|sinal de 50|encaminhad[oa] ao financeiro/i;
+
+export function reservaEmAndamento(nossasFalas: string): boolean {
+  return FASE_DE_RESERVA.test(nossasFalas || '');
+}
+
+/**
  * Curriculo e venda nao sao hospede: vao direto para uma pessoa, sem IA.
  *
  * Regra do dono (21/10/2026): quem manda curriculo ou oferece produto e

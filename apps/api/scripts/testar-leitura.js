@@ -85,5 +85,29 @@ conferir('bateria', 'preciso de uma pessoa', esc.hospedePediuAtendente('tem algu
 conferir('bateria', 'insatisfeito = reclamacao', Boolean(esc.motivoParaHumano({ falaDoHospede: 'Estou muito insatisfeito com o atendimento', resposta: 'texto suficientemente longo aqui', respostasAnteriores: [] })), true);
 conferir('bateria', 'tem vaga sabado nao escala', esc.motivoParaHumano({ falaDoHospede: 'Tem vaga para sábado?', resposta: 'texto suficientemente longo aqui', respostasAnteriores: [] }), null);
 
+// --- analise de 26/10/2026: conversa sem hotel e reserva em andamento -----
+{
+  const L = (...l) => l.join('\n');
+  const sem = (c) => esc.conversaSemAssuntoDeHotel(c, m.apenasFalasDoHospede(c));
+  conferir('analise', 'conversa pessoal (moto)', sem(L('Hóspede: oi Victor', 'Nós: fala', 'Hóspede: sobre o financiamento da moto', 'Hóspede: consegue segurar ela até sexta', 'Hóspede: quero dar uns 5mil de entrada')), true);
+  conferir('analise', 'hospede so com bom dia', sem(L('Hóspede: Bom dia')), false);
+  conferir('analise', 'hospede pergunta de pet', sem(L('Hóspede: boa tarde', 'Hóspede: vocês aceitam cachorro?', 'Hóspede: é pequeno')), false);
+  conferir('analise', 'reserva em andamento', esc.reservaEmAndamento('Nós: Solicitação de reserva realizada! Para confirmar, leia atentamente'), true);
+  conferir('analise', 'orcamento nao e andamento', esc.reservaEmAndamento('Nós: Segue o link com os valores e a disponibilidade'), false);
+}
+
+// --- ordem das guardas na extensao --------------------------------------
+// Achado de 26/10/2026: o texto final era montado ANTES das guardas, e todas
+// as criadas desde 13/10 nao tinham efeito na extensao. Se esta conferencia
+// falhar, alguem voltou a montar o texto antes delas.
+{
+  const fonte = require('fs').readFileSync(require('path').join(__dirname, '../src/modules/assist/assist.module.ts'), 'utf8');
+  const posTextoFinal = fonte.indexOf('const textoFinal = garantirLink');
+  const guardas = ['semPrecoInventado(draft.text', 'semPromessaDeRegistro(draft.text)', 'semGarantiaDeVaga(draft.text', 'semRaciocinioVazado(draft.text)'];
+  for (const g of guardas) {
+    conferir('ordem', `${g.split('(')[0]} antes do texto final`, fonte.indexOf(g) > 0 && fonte.indexOf(g) < posTextoFinal, true);
+  }
+}
+
 console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
 process.exit(falhas ? 1 : 0);

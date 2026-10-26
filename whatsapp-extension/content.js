@@ -1284,7 +1284,7 @@
           : 'Pensando… (pode levar alguns segundos)') + (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, historico: historico, anterior: anterior || undefined });
+      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, historico: historico, anterior: anterior || undefined, automatica: automatica || undefined });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
@@ -1311,6 +1311,14 @@
       }
       if (r.data.model === 'desligada') {
         status('A Bella está desligada no painel.', true);
+        return;
+      }
+      // Conversa sem nada de hotel (pessoal, fornecedor...): na sugestao
+      // automatica a Bella fica quieta. Analise de 26/10/2026.
+      if (r.data.model === 'sem-assunto') {
+        status('Conversa sem assunto de hotel: a Bella não sugere sozinha. Clique em Sugerir se quiser.');
+        panel.querySelector('#bella-suggestion').style.display = 'none';
+        sugestaoPendente = null;
         return;
       }
       // Nenhum modelo respondeu. NAO mostramos o texto de emergencia como se
