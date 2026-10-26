@@ -11,6 +11,7 @@ import { ehMensagemDeEspera, idiomaDaMensagem, mensagemDeEspera } from '../../co
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
+import { semRaciocinioVazado, semAssuntoNaoPerguntado } from '../../common/resposta-limpa';
 import { semPrecoInventado } from '../../common/preco';
 import { motivoParaHumano, assuntoForaDoAtendimento } from './escalonamento';
 import { buscarContatoMarcado } from '../contatos/contatos.module';
@@ -364,6 +365,13 @@ export class BellaOrchestratorService {
         this.logger.warn('Resposta dava custo de early/late - frase removida');
         draft.text = semCusto;
       }
+      // Rascunho da IA e assunto que ninguem perguntou - ver common/resposta-limpa.
+      draft.text = semRaciocinioVazado(draft.text);
+      const falasDoHospede = [
+        ...mem.recentMessages.filter((m: any) => m.sender === MessageSender.GUEST).map((m: any) => m.content),
+        inbound.content,
+      ].join(String.fromCharCode(10));
+      draft.text = semAssuntoNaoPerguntado(draft.text, falasDoHospede);
     }
 
     // PRECO INVENTADO nunca chega ao hospede.

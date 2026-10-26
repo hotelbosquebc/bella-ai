@@ -19,6 +19,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
+import { semRaciocinioVazado, semAssuntoNaoPerguntado } from '../../common/resposta-limpa';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 // Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
@@ -835,8 +836,9 @@ export function extrairDeterminista(falasDoHospede: string, hoje = new Date()): 
   // primeira ocorrencia, o orcamento sairia para 2 pessoas. Ao longo de uma
   // conversa o hospede corrige e precisa o que disse - o numero mais recente e
   // o que vale.
-  const ultimoAdultos = [...semPref.matchAll(/\b(\d{1,2})[ \t]*adultos?\b/gi)].pop();
-  const mAdultos = ultimoAdultos ?? null;
+  // "mais 1 adulto" nao e a quantidade: ver adultosNaFala.
+  const lidosAdultos = adultosNaFala(semPref).adultos;
+  const mAdultos = lidosAdultos === null ? null : [String(lidosAdultos), String(lidosAdultos)];
   // Alem de "pessoas" e "hospedes", as palavras com que o hospede realmente diz
   // quem sao. Caso real (16/10/2026): "Entrada 17/10 Saida 20/10 / 3 homens" -
   // o periodo foi lido, "3 homens" nao, e a Bella nao montou o link.
@@ -1405,6 +1407,49 @@ export function idadesEmLinhaSeparada(texto: string): number[] {
 }
 
 /**
+ * Quantos adultos o hospede disse - e quantos chegam DEPOIS.
+ *
+ * Caso real (26/10/2026): "3 adultos e uma crianca de 5 anos [...] Em uns 2
+ * ou tres dias tera mais um adulto que vai ficar com nos no apto". A regra
+ * "a ultima quantidade vence" (22/10) pegou "mais 1 adulto" e o link saiu
+ * para UM adulto.
+ *
+ * - "mais N adultos" / "+N" / "outro adulto" e ACRESCIMO, nao declaracao.
+ * - Com aviso de tempo na mesma frase ("em 2 dias", "depois", "vai chegar",
+ *   "vai ficar") e alguem que fica so PARTE da estadia: o link sai com a
+ *   ocupacao de entrada, e a resposta avisa do valor adicional (regra do
+ *   dono, 26/10/2026).
+ * - Sem aviso de tempo ("3 adultos e mais 1 adulto") soma no total.
+ * - Declaracao nova ("somos 4 adultos") substitui a anterior e zera os
+ *   acrescimos ditos antes dela.
+ */
+export function adultosNaFala(texto: string): { adultos: number | null; chegamDepois: number } {
+  const t = texto || '';
+  const acrescimo = /(?:mais|\+|outr[oa]s?)[ \t]*$/i;
+  const parteDaEstadia =
+    /\b(?:dias?|depois|chega|chegar[aã]?|chegando|vai ficar|v[aã]o ficar|ficar[aã]|a partir|metade|parte da|juntar|ap[oó]s|semana)\b/i;
+  let base: number | null = null;
+  let soma = 0;
+  let depois = 0;
+  for (const m of t.matchAll(/\b(\d{1,2})[ \t]*adultos?\b/gi)) {
+    const i = m.index ?? 0;
+    const n = Number(m[1]);
+    if (acrescimo.test(t.slice(Math.max(0, i - 12), i))) {
+      const ini = Math.max(t.lastIndexOf('.', i), t.lastIndexOf('!', i), t.lastIndexOf('?', i), t.lastIndexOf('\n', i)) + 1;
+      const fimRel = t.slice(i).search(/[.!?\n]/);
+      const frase = t.slice(ini, fimRel < 0 ? t.length : i + fimRel);
+      if (parteDaEstadia.test(frase)) depois += n;
+      else soma += n;
+      continue;
+    }
+    base = n;
+    soma = 0;
+    depois = 0;
+  }
+  return { adultos: base === null ? null : base + soma, chegamDepois: depois };
+}
+
+/**
  * Idade de bebe em MESES vira anos completos.
  *
  * Caso real (23/10/2026): "3 adultos e um bebe de 6 meses". Toda leitura de
@@ -1450,9 +1495,10 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
   // A ULTIMA declaracao vence, como em extrairDeterminista: ao longo da
   // conversa o hospede corrige ("2 adultos" e depois "somos 3 adultos").
   // Aqui ficava a primeira, e esta leitura tem prioridade sobre a outra.
-  const mAdultos = [...t.matchAll(/\b(\d{1,2})[ \t]*adultos?\b/gi)].pop() ?? null;
+  // "Mais 1 adulto em 2 dias" e acrescimo, nao a quantidade - ver adultosNaFala.
+  const lidosAdultos = adultosNaFala(t).adultos;
   // Quantidade escrita vence; sem ela, "casal" (pessoas, nao cama) vale 2.
-  const adultosDeclarados = mAdultos ? Number(mAdultos[1]) : adultosDeCasal(t) ?? adultosDeFrase(t);
+  const adultosDeclarados = lidosAdultos ?? adultosDeCasal(t) ?? adultosDeFrase(t);
   if (!adultosDeclarados) return null;
 
   const idades: number[] = [];
@@ -3316,6 +3362,16 @@ ${url}`;
 
     const link = this.reservations.buildBookingLink(stay);
     this.registrarDecisao('link montado', stay);
+    // Alguem chega depois e fica so parte da estadia (regra do dono,
+    // 26/10/2026): o link e da ocupacao de entrada, e a resposta avisa que
+    // nos dias com hospede a mais ha valor adicional na diaria.
+    const chegamDepois = adultosNaFala(semPrefixos(falasDoHospede)).chegamDepois;
+    const contextoChegamDepois = chegamDepois
+      ? `\nO HÓSPEDE AVISOU QUE MAIS ${chegamDepois} ${chegamDepois === 1 ? 'ADULTO CHEGA' : 'ADULTOS CHEGAM'} DEPOIS e ` +
+        `${chegamDepois === 1 ? 'fica' : 'ficam'} só parte da estadia. O link acima é da ocupação de ENTRADA - diga isso numa frase. ` +
+        `Em seguida informe que, nos dias em que houver hóspede a mais, é cobrado um valor adicional nas diárias, ` +
+        `e que a nossa equipe ajusta isso na reserva. NÃO diga para ele escolher outra ocupação no site e NÃO informe o valor.`
+      : '';
     return (
       `\n\nRESERVA: envie ESTE link ao hóspede, exatamente como está, para ele ver ` +
       `disponibilidade e valores e reservar pelo site:\n${link}\n` +
@@ -3325,7 +3381,7 @@ ${url}`;
       `o hóspede não sabe se aquilo é um orçamento, uma foto ou onde deve clicar.\n` +
       `O link deve ficar SOZINHO em uma linha, com uma linha em branco antes e outra depois — ` +
       `nunca grudado no texto nem logo após dois-pontos, senão o WhatsApp quebra o endereço.\n` +
-      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoDisponibilidade + contextoReveillon + ofertaAtendimento
+      `NÃO informe preços nem prometa verificar disponibilidade — o link já mostra tudo isso.` + contextoChegamDepois + contextoDisponibilidade + contextoReveillon + ofertaAtendimento
     );
   }
 
@@ -4305,6 +4361,17 @@ ${url}`;
       if (semCusto !== draft.text) {
         this.registrarDecisao('resposta dava CUSTO de early/late - frase removida', {});
         draft.text = semCusto;
+      }
+      // Rascunho da IA e assunto que ninguem perguntou - ver common/resposta-limpa.
+      const semRascunho = semRaciocinioVazado(draft.text);
+      if (semRascunho !== draft.text) {
+        this.registrarDecisao('resposta trazia RASCUNHO da IA - cortado', {});
+        draft.text = semRascunho;
+      }
+      const soOPerguntado = semAssuntoNaoPerguntado(draft.text, falasDoHospedeAgora);
+      if (soOPerguntado !== draft.text) {
+        this.registrarDecisao('resposta falava de estrutura NAO perguntada - frase removida', {});
+        draft.text = soOPerguntado;
       }
     }
 
