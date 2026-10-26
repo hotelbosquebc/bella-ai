@@ -122,7 +122,7 @@ texto do hóspede).
   financiamento) não sai mais; reserva em andamento não pede dados nem manda
   link novo; pergunta do hóspede respondida antes de pedir o que falta.
 - **Ainda aberto, decisão do dono:**
-  1. A Bella **se apresenta em ~50% das sugestões**, todo dia (regra "uma vez
+  1. ~~Apresentação~~ — **dono decidiu manter "uma vez por dia por contato" (26/10).** A Bella se apresenta em ~50% das sugestões (regra "uma vez
      por dia por contato"). A saudação automática do WhatsApp já apresenta a
      Bella; a recepção corta a apresentação.
   2. **Tamanho:** mediana de 299 caracteres na sugestão contra 69 no que a
