@@ -2688,8 +2688,9 @@ export class AssistController implements OnModuleInit {
         `(solicitação feita, comprovante, voucher ou pagamento).\n` +
         `NÃO peça período nem quantidade de pessoas e NÃO envie link de orçamento.\n` +
         `Se ele fez uma pergunta sobre o hotel, responda com a base de conhecimento, em poucas linhas. ` +
-        `Se for sobre pagamento, comprovante, voucher, valor ou alteração, diga numa frase que a nossa equipe de ` +
-        `reservas acompanha a reserva dele e já responde.` +
+        `Se for sobre pagamento, comprovante, voucher, valor ou alteração, diga numa frase que quem cuida disso é a ` +
+        `nossa equipe de reservas, que responde por aqui. NÃO diga que ela "já está verificando" nem que algo foi ` +
+        `conferido: você não sabe disso.` +
         contextoDeEntregaAoHumano(isWithinBusinessHours())
       );
     }

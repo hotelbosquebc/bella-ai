@@ -101,9 +101,10 @@ export class AuditoriaService {
         .map(([motivo, n]) => ({ motivo, n }));
       const naoLidos = principaisMotivos.filter((m) => /^faltam dados/.test(m.motivo));
 
-      const graves =
-        Object.values(porTipo).filter((g) => g.gravidade === 'grave').reduce((s, g) => s + g.quantas, 0) +
-        alucinacoes.length;
+      // Grave e o que o CODIGO acha. O que a IA aponta e para revisar: a
+      // primeira rodada (26/10/2026) marcou como "alucinacao" textos oficiais
+      // do hotel - julgamento de IA nao pode pintar o painel de vermelho sozinho.
+      const graves = Object.values(porTipo).filter((g) => g.gravidade === 'grave').reduce((s, g) => s + g.quantas, 0);
 
       const relatorio = {
         periodo: { desde: desde.toISOString(), ate: ate.toISOString() },
@@ -151,6 +152,9 @@ export class AuditoriaService {
         `Para cada resposta, encontre AFIRMAÇÕES SOBRE O HOTEL que a base não sustenta ou que a contradizem ` +
         `(horários, estrutura, serviços, regras, distâncias, política de crianças, pet, estacionamento, café, etc.).\n` +
         `Ignore: saudações, pedidos de dados, links, frases de cortesia, a data e a ocupação do hóspede.\n` +
+        `São FALAS OFICIAIS DO HOTEL, permitidas mesmo sem estar na base: encaminhar ao setor responsável ou à equipe de reservas; ` +
+        `"um atendente assume"; oferecer fazer a reserva pelo WhatsApp com pagamento via PIX com o especialista; o horário do setor ` +
+        `de reservas e o telefone da recepção 24h; dizer que o link mostra valores e disponibilidade; a apresentação "Sou a Bella".\n` +
         `Só aponte o que for afirmação concreta e errada ou inventada. Na dúvida, não aponte.\n` +
         `Responda SOMENTE com JSON: {"achados":[{"resposta":N,"afirmacao":"trecho curto","motivo":"o que a base diz"}]}. ` +
         `Sem achados: {"achados":[]}.\n\nBASE DE CONHECIMENTO:\n${base}`,
@@ -183,7 +187,7 @@ export class AuditoriaService {
     const a: string[] = [];
     const graves = Object.entries(porTipo).filter(([, g]) => g.gravidade === 'grave');
     if (graves.length) a.push(`Erros graves passaram pelas travas (${graves.map(([t, g]) => `${t}: ${g.quantas}`).join('; ')}). Peça ao Claude para investigar a trava correspondente.`);
-    if (alucinacoes.length) a.push(`${alucinacoes.length} afirmação(ões) que a base de conhecimento não sustenta. Corrija a base ou peça ao Claude uma trava.`);
+    if (alucinacoes.length) a.push(`Para revisar: ${alucinacoes.length} afirmação(ões) que, pela conferência da IA, a base de conhecimento não sustenta. Veja se é erro de verdade; se for, corrija a base ou peça ao Claude uma trava.`);
     if (naoLidos.length) a.push(`Pedidos que a Bella não conseguiu ler (${naoLidos.reduce((s: number, m: any) => s + m.n, 0)} vezes). Os formatos estão listados; peça ao Claude para ensinar a leitura.`);
     if (!a.length) a.push('Nada grave no período. Nenhuma ação necessária.');
     return a;

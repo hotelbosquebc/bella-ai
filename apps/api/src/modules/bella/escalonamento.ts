@@ -428,6 +428,10 @@ const VENDAS: RegExp[] = [
   /\b(?:sou|somos)\s+(?:fornecedor(?:es)?|distribuidor(?:a|es)?)\b/i,
   /\b(?:tr[áa]fego\s+pago|marketing\s+digital|gest[ãa]o\s+de\s+redes|google\s+meu\s+neg[óo]cio)\b/i,
   /\b(?:aumentar|alavancar|dobrar)\s+(?:as\s+|suas\s+|a\s+sua\s+|o\s+seu\s+)?(?:vendas|reservas|faturamento|ocupa[çc][ãa]o)\b/i,
+  // Operadora/agencia tratando do acordo comercial (auditoria de 26/10/2026:
+  // "a oferta com o markup ainda nao aparece para a equipe da CVC"). "Comprei
+  // pela CVC" e hospede e nao cai aqui.
+  /\bmark-?up\b|\btarif[áa]rio\b|\bacordo\s+comercial\b|\bcomiss[ãa]o\s+(?:da|de)\s+(?:ag[êe]ncia|operadora)\b|\btarifa\s+net\b/i,
 ];
 
 const FALA_DE_ESTADIA =

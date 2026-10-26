@@ -98,12 +98,12 @@ function QuadroAuditoria() {
           ))}
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 8, marginTop: 8 }}>
             <strong style={{ fontSize: 14 }}>
-              Afirmações que a base não sustenta: {(a.alucinacoes ?? []).length}
+              Para revisar — afirmações que a base não sustenta (conferência da IA): {(a.alucinacoes ?? []).length}
             </strong>
             <span className="muted" style={{ fontSize: 12 }}> · conferência com a base: {a.conferenciaComABase}</span>
             {(a.alucinacoes ?? []).map((h, i) => (
               <div key={i} style={{ fontSize: 13, marginTop: 4 }}>
-                🔴 “{h.afirmacao}” — <span className="muted">{h.motivo}</span>
+                🟡 “{h.afirmacao}” — <span className="muted">{h.motivo}</span>
               </div>
             ))}
           </div>
