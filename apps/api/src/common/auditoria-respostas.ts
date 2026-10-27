@@ -61,7 +61,7 @@ export function auditarResposta(texto: string): Achado[] {
   }
 
   // Texto quebrado: variavel nao preenchida, marcador interno.
-  const quebrado = t.search(/\{\{|\}\}|\bundefined\b|\bNaN\b|\[object Object\]|\bnull\b|RESERVA:|VAGA CONFIRMADA|DADOS DE RESERVA/);
+  const quebrado = t.search(/\{\{|\}\}|\bundefined\b|\bNaN\b|\[object Object\]|\bnull\b|RESERVA:|VAGA CONFIRMADA|DADOS DE RESERVA|INVENT[ÁA]RIO|^\s*\([a-c]\)\s/im);
   if (quebrado >= 0) add('texto quebrado ou instrução interna', 'grave', trechoEm(t, quebrado));
 
   // Nota fiscal: so a frase oficial. Qualquer outra afirmacao e atencao.

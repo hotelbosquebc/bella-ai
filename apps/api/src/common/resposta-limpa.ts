@@ -23,10 +23,24 @@ export function semRaciocinioVazado(texto: string): string {
     const ultima = partes[partes.length - 1].trim();
     if (ultima.length >= 20) t = ultima;
   }
-  // Linhas de checklist e narracao sobre o hospede em terceira pessoa.
+  // Rascunho antes da saudacao: a resposta comeca no "Ola". Caso real
+  // (27/10/2026): a sugestao abriu com "INVENTARIO:" - o titulo do checklist
+  // do prompt - e so depois vinha "Ola! Sou a Bella...". So corta quando o
+  // que vem antes tem cara de anotacao interna.
+  const linhas = t.split(/\r?\n/);
+  const saudacao = linhas.findIndex((l) => /^\s*(?:Ol[áa]|Oi|Bom dia|Boa tarde|Boa noite|Hola|Buen[oa]s)(?![a-zà-ÿ])/i.test(l));
+  if (saudacao > 0) {
+    const antes = linhas.slice(0, saudacao).join('\n');
+    if (/invent[áa]rio|rascunho|checklist|^\s*\(?[a-e]\)\s|per[íi]odo\s*[:—-]|quantidade de pessoas\s*[:—-]|^\s*[A-ZÁÉÍÓÚÂÊÔÃÕÇ ]{4,}:\s*$/im.test(antes)) {
+      t = linhas.slice(saudacao).join('\n');
+    }
+  }
+  // Linhas de checklist, titulos internos e narracao sobre o hospede em
+  // terceira pessoa.
   const limpo = t
     .split(/\r?\n/)
-    .filter((linha) => !/^\s*\([a-e]\)\s/i.test(linha))
+    .filter((linha) => !/^\s*\(?[a-e]\)\s/i.test(linha))
+    .filter((linha) => !/^\s*\**\s*(?:invent[áa]rio|rascunho|resposta|an[áa]lise|checklist)\b[^\n]{0,30}:?\s*\**\s*$/i.test(linha))
     .filter((linha) => !/^\s*O\s+h[óo]spede\s+(?:tamb[ée]m\s+)?(?:perguntou|informou|disse|quer|pediu|mencionou|est[áa])\b/i.test(linha))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')

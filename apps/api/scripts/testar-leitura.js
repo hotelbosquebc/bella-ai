@@ -150,6 +150,17 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   conferir('auditoria', 'texto quebrado', tipos('Olá {{nome}}, segue undefined'), ['texto quebrado ou instrução interna']);
   conferir('auditoria', 'resposta boa com link', tipos('Segue o link:\n\nhttps://sbreserva.silbeck.com.br/hotelbosque/pt-br/reserva/busca/?checkin=2026-11-10&checkout=2026-11-12&adultos-000001=2'), []);
   conferir('auditoria', 'resposta boa do cafe', tipos('Sim, o café da manhã está incluso na diária e é servido das 7h às 10h.'), []);
+  conferir('auditoria', 'inventario vazado', tipos('INVENTÁRIO:\n\nOlá! Sou a Bella'), ['texto quebrado ou instrução interna']);
+}
+
+// --- rascunho vazado antes da saudacao (27/10/2026) ----------------------
+{
+  const limpa = require('../dist/common/resposta-limpa.js');
+  conferir('vazado', 'INVENTARIO: antes do Ola', limpa.semRaciocinioVazado('INVENTÁRIO:\n\nOlá! Sou a Bella, assistente online do Hotel do Bosque.\n\nQue bom que você já tem as datas.'),
+    'Olá! Sou a Bella, assistente online do Hotel do Bosque.\n\nQue bom que você já tem as datas.');
+  conferir('vazado', 'inventario com lista', limpa.semRaciocinioVazado('INVENTÁRIO:\n(a) período: 17/03 a 23/03\n(b) 4 pessoas\n\nOlá! Segue o link.'), 'Olá! Segue o link.');
+  conferir('vazado', 'inventario sem saudacao', limpa.semRaciocinioVazado('**Inventário:**\n(a) 17 a 23/03\n\nPerfeito, para 4 pessoas segue o link.'), 'Perfeito, para 4 pessoas segue o link.');
+  conferir('vazado', 'resposta normal intacta', limpa.semRaciocinioVazado('Perfeito!\n\nOlá de novo, segue o link.'), 'Perfeito!\n\nOlá de novo, segue o link.');
 }
 
 // --- ordem das guardas na extensao --------------------------------------
