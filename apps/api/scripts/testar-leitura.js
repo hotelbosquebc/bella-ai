@@ -199,6 +199,27 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   const r1 = await pedido(saudacao + '\nHóspede: Gostaria de efetuar uma reserva de 31/10 a 03/11, seriam dois quartos para casal.\nHóspede (hoje): Olá,bom dia!!');
   conferir('pedido', 'dois quartos para casal + bom dia hoje', r1.decisoes, ['ocupacao pelo tipo de apartamento: 2x2', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada']);
   conferir('pedido', 'dois quartos para casal: nao pergunta juntos', /JÁ ESCOLHEU/.test(r1.ctx), true);
+  // 27/10/2026: "do dia 08/11 ao dia 13" + "03 adultos e um bebê" -> pediu a idade do bebe, sem link.
+  const r2 = await pedido('Hóspede: preciso saber se a internet é boa\nNós: Olá! Esta é uma mensagem automática.\nHóspede (hoje): do dia 08/11 ao dia 13\nHóspede (hoje): para 03 adultos e um bebê\nHóspede (hoje): qual é o valor dos quartos por nome para que eu faça a escolha');
+  conferir('pedido', '08/11 ao dia 13, 3 adultos e um bebe', r2.decisoes, ['link montado']);
+  conferir('pedido', 'bebe vai como crianca 0-6', /checkin=2026-11-08&checkout=2026-11-13&adultos-000001=3&criancas-000003=1/.test(r2.ctx), true);
+
+  // Bebe sem idade = crianca de 0 a 6 (regra do dono: bebe e sempre menor de 6).
+  const oc = (s) => JSON.stringify(m.ocupacaoNaFala('Hóspede: ' + s));
+  conferir('bebe', '3 adultos e um bebe', oc('para 03 adultos e um bebê'), JSON.stringify({ adultos: 3, idades: [1] }));
+  conferir('bebe', '2 adultos e dois bebes', oc('2 adultos e dois bebês'), JSON.stringify({ adultos: 2, idades: [1, 1] }));
+  conferir('bebe', 'bebe de 2 anos fica 2', oc('2 adultos e 1 bebê de 2 anos'), JSON.stringify({ adultos: 2, idades: [2] }));
+  conferir('bebe', 'NAO: pergunta "aceitam bebe?"', m.ocupacaoNaFala('Hóspede: aceitam bebê?'), null);
+  conferir('bebe', '2 adultos e o bebe', oc('somos 2 adultos e o bebê'), JSON.stringify({ adultos: 2, idades: [1] }));
+  conferir('bebe', 'casal com bebe nao pede idade', m.criancaSemIdade('Hóspede: 2 adultos com bebê'), false);
+  conferir('bebe', 'NAO: tem berco para bebe?', m.criancaSemIdade('Hóspede: tem berço para o bebê?'), true);
+
+  // Mes so na primeira data.
+  const per = (s) => JSON.stringify(m.intervalosNaFala('Hóspede: ' + s, hoje));
+  conferir('periodo', '08/11 a 13', per('do dia 08/11 ao dia 13'), JSON.stringify([{ checkin: '2026-11-08', checkout: '2026-11-13' }]));
+  conferir('periodo', '28/11 a 2 vira dezembro', per('28/11 a 2'), JSON.stringify([{ checkin: '2026-11-28', checkout: '2026-12-02' }]));
+  conferir('periodo', 'NAO: 10/11 a 12 pessoas', per('10/11 a 12 pessoas'), '[]');
+  conferir('periodo', 'NAO: dia 10/11 à 14h', per('dia 10/11 à 14h'), '[]');
 
   console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
   process.exit(falhas ? 1 : 0);

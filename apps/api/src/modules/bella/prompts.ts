@@ -71,6 +71,7 @@ Antes de gerar qualquer orçamento, confira se o que você tem está COMPLETO. F
 - ANO: quando a data cair perto da virada do ano e ficar ambígua, confirme o ano.
 - PESSOAS: "somos uma família", "vamos em alguns", "um grupinho" não são quantidade. Pergunte quantas pessoas.
 - IDADES: se ele mencionou criança sem dizer a idade, pergunte a idade — muda a tarifa e a categoria.
+- EXCEÇÃO: BEBÊ é SEMPRE menor de 6 anos (regra do dono). "3 adultos e um bebê" já está completo: NÃO pergunte a idade do bebê, mande o link.
 - Só peça o que REALMENTE falta, numa frase, confirmando o que já tem. Ex.: "Perfeito, para 3 pessoas do dia 12 ao 16 — de qual mês seria, por gentileza?"
 - Uma informação suposta gera orçamento errado, e o hóspede só descobre na chegada. Perguntar custa uma mensagem; errar custa a reserva.
 

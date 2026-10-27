@@ -696,6 +696,20 @@ export function intervalosNaFala(
   if (!brutos.length) {
     while ((m = rUmMesNumerico.exec(t)) !== null) push(m[1], m[3], m[2], m[3], m[4], m[4]);
   }
+  // "do dia 08/11 ao dia 13": o mes vem so na PRIMEIRA data. Caso real
+  // (27/10/2026): datas e pessoas ditas, nenhum periodo lido, e a Bella pediu
+  // a idade do bebe em vez de mandar o link. Saida menor que a entrada vira
+  // o mes seguinte ("28/11 a 2" = 28/11 a 02/12).
+  if (!brutos.length) {
+    const rMesSoNaPrimeira =
+      /\b(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\s*(?:a|à|ao|até|ate|-|–)\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\b(?!\s*\/)(?!\s*(?:de\s+)?(?:pessoas?|adultos?|crian|h[óo]spedes?|noites?|di[áa]rias?|quartos?|apartamentos?|anos?|h\b|hs\b|horas|jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez))/gi;
+    while ((m = rMesSoNaPrimeira.exec(t)) !== null) {
+      const d1 = Number(m[1]);
+      const m1 = Number(m[2]);
+      const d2 = Number(m[4]);
+      push(d1, m1, d2, d2 > d1 ? m1 : (m1 % 12) + 1, m[3]);
+    }
+  }
 
   // Dias num balao, mes em outro.
   //
@@ -1565,7 +1579,25 @@ export function mesesViramAnos(texto: string): string {
       if (!PALAVRA_DE_CRIANCA.test(linha)) return linha;
       return linha
         .replace(/(\d{1,2})\s*(anos?|años?)\s*(?:e|y)\s*\d{1,2}\s*(?:meses|m[êe]s)(?![a-zà-ÿ])/gi, '$1 $2')
-        .replace(/(\d{1,2})\s*(?:meses|m[êe]s|months?)(?![a-zà-ÿ])/gi, (_t, n) => `${Math.floor(Number(n) / 12)} anos`);
+        .replace(/(\d{1,2})\s*(?:meses|m[êe]s|months?)(?![a-zà-ÿ])/gi, (_t, n) => `${Math.floor(Number(n) / 12)} anos`)
+        // "3 adultos e um bebe": bebe JA diz a faixa (0 a 6, cortesia). Caso
+        // real (27/10/2026): datas e pessoas ditas, e a Bella pediu "a idade
+        // do bebe" em vez de mandar o link. Com quantidade na frente e sem
+        // idade depois, vira "de 1 ano".
+        .replace(
+          /(?<![a-zà-ÿ\d])(um|uma|1|dois|duas|2|tr[êe]s|3)[ \t]+(beb[êe]s?|nen[ée]m|nen[ée]ns|babys?|babies|beb[ée]s?)(?![a-zà-ÿ])(?![ \t]*(?:de|com|tem|y|con)?[ \t]*\d)/gi,
+          (_t, n, palavra) => {
+            const qtd = /^\d$/.test(n) ? Number(n) : /^(dois|duas)$/i.test(n) ? 2 : /^tr/i.test(n) ? 3 : 1;
+            return `${qtd} ${palavra} de 1 ano`;
+          },
+        )
+        // "e o bebe", "com bebe", "nosso bebe": bebe e SEMPRE menor de 6
+        // (regra do dono, 27/10/2026), mesmo sem numero. Pergunta ("aceitam
+        // bebe?") nao e pedido: fica de fora.
+        .replace(
+          /(?<![a-zà-ÿ\d])(o|a|nosso|nossa|meu|minha|com|e|mais)[ \t]+(beb[êe]|nen[ée]m|nen[êe])(?![a-zà-ÿ])(?![ \t]*(?:de|com|tem|y|con)?[ \t]*\d)(?![^\n]*\?)/gi,
+          '$1 1 $2 de 1 ano',
+        );
     })
     .join('\n');
 }
@@ -1635,7 +1667,7 @@ export function ocupacaoNaFala(falasDoHospede: string): { adultos: number; idade
     // virou 3 adultos e uma crianca de 12 - link para 4, quando eram 5 (com
     // 12 anos as duas contam como adultas).
     const quantasNaLinha = linha.match(
-      /(?<![\d\/])(\d)[ \t]*(?:crian[çc]as|filh[oa]s|menin[oa]s|garot[oa]s|net[oa]s|sobrinh[oa]s|hij[oa]s|ni[ñn][oa]s|kids|children)(?![a-zà-ÿ])/i,
+      /(?<![\d\/])(\d)[ \t]*(?:crian[çc]as|filh[oa]s|menin[oa]s|garot[oa]s|net[oa]s|sobrinh[oa]s|hij[oa]s|ni[ñn][oa]s|kids|children|beb[êe]s|nen[ée]ns|babies)(?![a-zà-ÿ])/i,
     );
     if (quantasNaLinha && idades.length - antesDaLinha === 1) {
       for (let k = 1; k < Number(quantasNaLinha[1]); k++) idades.push(idades[idades.length - 1]);
