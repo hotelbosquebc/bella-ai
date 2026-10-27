@@ -11,9 +11,9 @@ import { ehMensagemDeEspera, idiomaDaMensagem, mensagemDeEspera } from '../../co
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
-import { semRaciocinioVazado, semAssuntoNaoPerguntado } from '../../common/resposta-limpa';
+import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semPrecoInventado } from '../../common/preco';
-import { motivoParaHumano, assuntoForaDoAtendimento } from './escalonamento';
+import { motivoParaHumano, assuntoForaDoAtendimento, hospedePediuAtendente } from './escalonamento';
 import { buscarContatoMarcado } from '../contatos/contatos.module';
 import { GuardrailsService } from './guardrails.service';
 import { FollowUpService } from './follow-up.service';
@@ -378,6 +378,9 @@ export class BellaOrchestratorService {
         inbound.content,
       ].join(String.fromCharCode(10));
       draft.text = semAssuntoNaoPerguntado(draft.text, falasDoHospede);
+      // Atendimento online primeiro (regra do dono, 27/10/2026).
+      draft.text = semOfertaDeAtendente(draft.text, falasDoHospede, hospedePediuAtendente(falasDoHospede));
+      draft.text = semPedidoDeDadosComLink(draft.text);
     }
 
     // PRECO INVENTADO nunca chega ao hospede.

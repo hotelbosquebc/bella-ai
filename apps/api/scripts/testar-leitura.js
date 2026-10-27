@@ -167,6 +167,13 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
     'Olá! Sou a Bella, assistente online do Hotel do Bosque.\n\nQue bom que você já tem as datas.');
   conferir('vazado', 'inventario com lista', limpa.semRaciocinioVazado('INVENTÁRIO:\n(a) período: 17/03 a 23/03\n(b) 4 pessoas\n\nOlá! Segue o link.'), 'Olá! Segue o link.');
   conferir('vazado', 'inventario sem saudacao', limpa.semRaciocinioVazado('**Inventário:**\n(a) 17 a 23/03\n\nPerfeito, para 4 pessoas segue o link.'), 'Perfeito, para 4 pessoas segue o link.');
+  // Atendimento online primeiro (27/10/2026).
+  const link = 'https://sbreserva.silbeck.com.br/hotelbosque/pt-br/reserva/busca/?checkin=2026-10-28&checkout=2026-11-04&adultos-000001=2';
+  conferir('online', 'tira oferta de pix', limpa.semOfertaDeAtendente(`Segue o link:\n\n${link}\n\nSe preferir fazer a reserva por aqui mesmo pelo WhatsApp com pagamento via pix, basta pedir que eu encaminho para o nosso especialista em reservas.`, 'Casal com bebê\n28/10 a 04/11', false), `Segue o link:\n\n${link}`);
+  conferir('online', 'NAO tira quando hospede pediu pix', limpa.semOfertaDeAtendente('Se preferir pelo WhatsApp com pix, eu encaminho.', 'posso pagar no pix?', false), 'Se preferir pelo WhatsApp com pix, eu encaminho.');
+  conferir('online', 'NAO tira quando pediu atendente', limpa.semOfertaDeAtendente('Se preferir, encaminho para a equipe.', 'quero falar com alguém', true), 'Se preferir, encaminho para a equipe.');
+  conferir('online', 'tira pedido de dados com link', limpa.semPedidoDeDadosComLink(`Olá! Sou a Bella, assistente online do Hotel do Bosque.\n\nPara verificarmos os valores e disponibilidade por gentileza me informe:\n\n· Período da estadia (data de entrada e saída);\n· Quantidade total de pessoas;\n· Caso tenha crianças menores de 10 anos, gentileza informar as idades.\n\nSegue o link:\n\n${link}`), `Olá! Sou a Bella, assistente online do Hotel do Bosque.\n\nSegue o link:\n\n${link}`);
+  conferir('online', 'pedido de dados SEM link fica', limpa.semPedidoDeDadosComLink('Por gentileza me informe:\n· Período da estadia (data de entrada e saída);'), 'Por gentileza me informe:\n· Período da estadia (data de entrada e saída);');
   conferir('vazado', 'resposta normal intacta', limpa.semRaciocinioVazado('Perfeito!\n\nOlá de novo, segue o link.'), 'Perfeito!\n\nOlá de novo, segue o link.');
 }
 

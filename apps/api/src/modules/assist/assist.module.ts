@@ -19,7 +19,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
-import { semRaciocinioVazado, semAssuntoNaoPerguntado } from '../../common/resposta-limpa';
+import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
 // Mudaram para common/ para o orquestrador dos canais usar a mesma trava.
@@ -3028,14 +3028,16 @@ export class AssistController implements OnModuleInit {
       /\bpix\b|especialista em reservas|setor de reservas|encaminh/i.test(
         apenasNossasFalas(conversation),
       );
-    const ofertaAtendimento = isWithinBusinessHours() && !jaOfereceuAtendente
-      ? `\n\nOFERTA DE ATENDIMENTO HUMANO (o setor de reservas está atendendo AGORA): ` +
-        `logo DEPOIS do link, acrescente UMA frase curta oferecendo que, se ele preferir fazer a reserva ` +
-        `por aqui mesmo pelo WhatsApp com pagamento via pix, basta pedir que você encaminha para o nosso ` +
-        `especialista em reservas. Diga de forma natural, sem insistir e sem repetir em toda mensagem. ` +
-        `NÃO prometa valor, desconto, prazo nem condição: só ofereça o encaminhamento. ` +
-        `Se ele aceitar, encaminhe para a equipe.`
-      : '';
+    // Pedido do dono (27/10/2026): a oferta SAIU. "A ideia e ser um
+    // atendimento online, de preferencia, para facilitar e agilizar" - o
+    // humano entra so quando necessario (pedido do hospede, problema no site,
+    // grupo). Caso real: o hospede aceitou "reservar pelo WhatsApp com pix" e
+    // a recepcao teve que fechar na mao uma reserva que o link resolvia.
+    void jaOfereceuAtendente;
+    const ofertaAtendimento =
+      `\n\nNÃO ofereça atendimento humano, especialista, reserva "por aqui pelo WhatsApp" nem pagamento via pix: ` +
+      `a reserva se faz pelo link, sozinha e na hora. A equipe só entra se o hóspede PEDIR uma pessoa ` +
+      `ou disser que teve problema no site.`;
     // Dois periodos diferentes no mesmo pedido.
     //
     // A extracao devolve UM orcamento so, e o que sai e a combinacao errada -
@@ -4616,6 +4618,17 @@ ${url}`;
       if (soOPerguntado !== draft.text) {
         this.registrarDecisao('resposta falava de estrutura NAO perguntada - frase removida', {});
         draft.text = soOPerguntado;
+      }
+      // Atendimento online primeiro (regra do dono, 27/10/2026).
+      const semOferta = semOfertaDeAtendente(draft.text, falasDoHospedeAgora, hospedePediuAtendente(falasDoHospedeAgora));
+      if (semOferta !== draft.text) {
+        this.registrarDecisao('resposta OFERECIA atendente sem pedido - frase removida', {});
+        draft.text = semOferta;
+      }
+      const semPedidoDuplo = semPedidoDeDadosComLink(draft.text);
+      if (semPedidoDuplo !== draft.text) {
+        this.registrarDecisao('resposta pedia dados JUNTO do link - lista removida', {});
+        draft.text = semPedidoDuplo;
       }
     }
 

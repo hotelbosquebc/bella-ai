@@ -74,3 +74,58 @@ export function semAssuntoNaoPerguntado(texto: string, falasDoHospede: string): 
     .trim();
   return limpo || original;
 }
+
+const frasesDe = (texto: string, fora: (frase: string) => boolean): string =>
+  texto
+    .split(/\r?\n/)
+    .map((linha) =>
+      linha
+        .split(/(?<=[.!?])\s+/)
+        .filter((frase) => !fora(frase))
+        .join(' ')
+        .trimEnd(),
+    )
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+/**
+ * Oferta de atendente que ninguem pediu.
+ *
+ * Pedido do dono (27/10/2026): "a ideia e ser um atendimento online, de
+ * preferencia, para facilitar e agilizar". A resposta com link terminava em
+ * "se preferir fazer a reserva por aqui pelo WhatsApp com pix, e so pedir que
+ * eu encaminho para o especialista" - o hospede aceitou e a recepcao fechou na
+ * mao uma reserva que o link resolvia. Sai a frase, a menos que o hospede
+ * tenha pedido gente, WhatsApp ou pix.
+ */
+export function semOfertaDeAtendente(texto: string, falasDoHospede: string, hospedePediu: boolean): string {
+  const original = texto || '';
+  if (hospedePediu || /\bpix\b|pelo (?:whats|zap)|atendente|humano/i.test(falasDoHospede || '')) return original;
+  const oferta = (f: string) =>
+    /(?:se preferir|caso prefira|se quiser|caso queira|se desejar|caso deseje|tamb[ée]m posso|posso (?:te )?encaminhar)[^.!?]*(?:whats|pix|especialista|equipe|atendente|setor de reservas|encaminh)/i.test(f);
+  const limpo = frasesDe(original, oferta);
+  return limpo || original;
+}
+
+/**
+ * Pedido de dados junto do link: o hospede ja deu os dados.
+ *
+ * Caso real (27/10/2026): "Casal com bebe / 28/10 a 04/11" e a resposta
+ * colou a saudacao inteira ("por gentileza me informe: periodo, quantidade
+ * de pessoas, criancas menores de 10...") e logo abaixo o link pronto. Com o
+ * link na mensagem, a lista de pedido sai.
+ */
+export function semPedidoDeDadosComLink(texto: string): string {
+  const original = texto || '';
+  if (!/sbreserva\.silbeck/i.test(original)) return original;
+  const linhas = original.split(/\r?\n/);
+  const pedido =
+    /verificarmos os valores e disponibilidade|por gentileza,? me informe|per[íi]odo da estadia \(data|quantidade total de pessoas|caso tenha crian[çc]as menores de 10 anos/i;
+  const limpo = linhas
+    .filter((l) => !pedido.test(l))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return limpo || original;
+}
