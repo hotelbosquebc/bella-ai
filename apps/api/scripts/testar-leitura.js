@@ -153,6 +153,13 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   conferir('auditoria', 'inventario vazado', tipos('INVENTÁRIO:\n\nOlá! Sou a Bella'), ['texto quebrado ou instrução interna']);
 }
 
+// --- pedidos de esclarecimento contam por MENSAGEM (27/10/2026) ---------
+{
+  const saudacao = 'Nós: Olá! Sou a Bella, assistente online do Hotel do Bosque.\nPara verificarmos os valores e disponibilidade por gentileza me informe:\n📆 Período da estadia (data de entrada e saída);\n👪 Quantidade total de pessoas;';
+  conferir('esclarecimento', 'saudacao padrao = 1 pedido', m.tentativasDeEsclarecimento(saudacao + '\nHóspede: de 31/10 a 03/11'), 1);
+  conferir('esclarecimento', 'saudacao + nova pergunta = 2', m.tentativasDeEsclarecimento(saudacao + '\nHóspede: oi\nNós: Não entendi, pode me explicar?'), 2);
+}
+
 // --- rascunho vazado antes da saudacao (27/10/2026) ----------------------
 {
   const limpa = require('../dist/common/resposta-limpa.js');
@@ -176,5 +183,26 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   }
 }
 
-console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
-process.exit(falhas ? 1 : 0);
+// --- leitura completa do pedido (bookingContext), sem IA e sem banco -----
+// Casos reais em que cada funcao isolada acertava e o conjunto errava.
+(async () => {
+  const R = require('../dist/modules/reservations/reservation-engine.service.js');
+  const banco = new Proxy({}, { get: () => new Proxy({}, { get: () => async () => null }) });
+  const semIA = { complete: async () => { throw new Error('sem ia nos testes'); } };
+  const pedido = async (conversa) => {
+    const c = new m.AssistController(banco, semIA, {}, {}, new R.ReservationEngineService({}), {}, { definirLeitorDoPedido() {} });
+    const ctx = await c.bookingContext(conversa);
+    return { ctx, decisoes: c.decisoesLink.map((d) => d.motivo) };
+  };
+  const saudacao = 'Nós: Olá! Sou a Bella, assistente online do Hotel do Bosque.\nPara verificarmos os valores e disponibilidade por gentileza me informe:\n📆 Período da estadia (data de entrada e saída);\n👪 Quantidade total de pessoas;';
+  // 27/10/2026: pedido ontem, so "bom dia" hoje -> passou para humano sem link.
+  const r1 = await pedido(saudacao + '\nHóspede: Gostaria de efetuar uma reserva de 31/10 a 03/11, seriam dois quartos para casal.\nHóspede (hoje): Olá,bom dia!!');
+  conferir('pedido', 'dois quartos para casal + bom dia hoje', r1.decisoes, ['ocupacao pelo tipo de apartamento: 2x2', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada']);
+  conferir('pedido', 'dois quartos para casal: nao pergunta juntos', /JÁ ESCOLHEU/.test(r1.ctx), true);
+
+  console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
+  process.exit(falhas ? 1 : 0);
+})().catch((e) => {
+  console.log('FALHA nos testes de pedido:', e.message);
+  process.exit(1);
+});

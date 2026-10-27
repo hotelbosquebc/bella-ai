@@ -1799,7 +1799,12 @@ export function tentativasDeEsclarecimento(conversation: string): number {
   const nossas = apenasNossasFalas(conversation || '');
   const pedido =
     /me informe|por gentileza|n[ãa]o entendi|pode (me )?explicar|poderia (me )?esclarecer|me confirme|qual seria|quantas pessoas|per[íi]odo da estadia/i;
-  return nossas.split(/\r?\n/).filter((l) => pedido.test(l)).length;
+  // Conta MENSAGENS, nao linhas. Caso real (27/10/2026): a nossa saudacao
+  // padrao tem "por gentileza me informe" e "Periodo da estadia" em linhas
+  // separadas - contava como dois pedidos, e a primeira resposta do hospede
+  // ja ia para humano.
+  const mensagens = nossas.split(/\r?\n(?=\s*N[óo]s\s*(?:\(hoje\))?\s*:)/i);
+  return mensagens.filter((msg) => pedido.test(msg)).length;
 }
 
 /**
@@ -2842,9 +2847,12 @@ export class AssistController implements OnModuleInit {
 
     // "4 apartamentos duplos": o tipo diz a ocupacao - ver apartamentosPorTipo.
     // Sem isto faltava "quantidade de adultos" e a Bella pedia de volta.
+    // Tambem quando a leitura contou UM apartamento so: "dois quartos para
+    // casal" saia como 2 adultos - sao 2 casais, 4 adultos.
     const porTipo = apartamentosPorTipo(falasDoHospede);
-    if (porTipo && !Number(stay.adults)) {
-      stay.adults = porTipo.reduce((s, a) => s + a.adultos, 0);
+    const totalPorTipo = porTipo ? porTipo.reduce((s, a) => s + a.adultos, 0) : 0;
+    if (porTipo && (!Number(stay.adults) || (porTipo.length > 1 && Number(stay.adults) === porTipo[0].adultos))) {
+      stay.adults = totalPorTipo;
       stay.apartamentos = porTipo.length;
       this.registrarDecisao(`ocupacao pelo tipo de apartamento: ${porTipo.length}x${porTipo[0].adultos}`, stay);
     }
@@ -2918,7 +2926,11 @@ export class AssistController implements OnModuleInit {
     // data e nao fala de gente, a ocupacao antiga e de OUTRO pedido: pode ter
     // mudado. Pedir para confirmar custa uma mensagem; o link errado custa a
     // venda.
-    const falasDeHoje = apenasFalasDoHospedeDeHoje(conversation);
+    // Sem o rotulo: "Hóspede (hoje):" tem a palavra "hoje", que e data
+    // relativa. Caso real (27/10/2026): o hospede so disse "Ola, bom dia!!"
+    // hoje, o rotulo contou como data, os 4 adultos de ontem foram apagados e
+    // a Bella passou para humano sem orcamento.
+    const falasDeHoje = semPrefixos(apenasFalasDoHospedeDeHoje(conversation));
     if (
       stay.adults &&
       falasDeHoje.trim() &&
