@@ -160,6 +160,17 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   conferir('esclarecimento', 'saudacao + nova pergunta = 2', m.tentativasDeEsclarecimento(saudacao + '\nHóspede: oi\nNós: Não entendi, pode me explicar?'), 2);
 }
 
+// --- disponibilidade: as 4 categorias esgotadas = sem vaga (28/10/2026) --
+{
+  const { SilbeckAvailabilityService } = require('../dist/modules/reservations/silbeck-availability.service.js');
+  const s = new SilbeckAvailabilityService();
+  const sem = (html) => s.interpretar(html).semDisponibilidade;
+  conferir('vaga', 'nenhuma categoria na listagem = sem vaga', sem('<div class="aviso"><p>Nenhum apartamento encontrado para o período selecionado. Tente outras datas.</p></div>'), true);
+  conferir('vaga', 'aviso classico', sem('<p>Não há disponibilidade para o período</p>'), true);
+  conferir('vaga', 'com categoria = tem vaga', sem('<div>Apartamento Luxo</div><div>Apenas 2 disponíveis</div><div>Apartamento Standard</div>'), false);
+  conferir('vaga', 'html vazio nao decide', sem('<div></div>'), false);
+}
+
 // --- rascunho vazado antes da saudacao (27/10/2026) ----------------------
 {
   const limpa = require('../dist/common/resposta-limpa.js');

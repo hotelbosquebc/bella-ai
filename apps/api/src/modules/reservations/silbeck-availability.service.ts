@@ -275,7 +275,17 @@ export class SilbeckAvailabilityService {
     // meio do período para a busca inteira não retornar nada — foi o caso de
     // 22 a 29/11, travado pelo dia 28. Sem detectar isso, a Bella mandava o link
     // dizendo "seguem os valores" e o hóspede batia no aviso de indisponível.
-    const semDisponibilidade = /n[ãa]o h[áa] disponibilidade/i.test(corpo);
+    //
+    // Listagem que veio com conteudo mas sem NENHUMA das quatro categorias
+    // tambem e "sem disponibilidade" (regra do dono, 28/10/2026: "se as 4
+    // categorias estao sem disponibilidade, nao ha disponibilidade nestes
+    // dias"). Caso real: o aviso veio com outra redacao, as quatro foram
+    // listadas como esgotadas, e a Bella respondeu "restam poucas unidades em
+    // outras categorias" - que nao existem - e mandou o link. HTML vazio nao
+    // conta: quem chama ja trata como "nao consultado".
+    const textoVisivel = corpo.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const nenhumaCategoria = categorias.length === 0 && textoVisivel.length > 30;
+    const semDisponibilidade = /n[ãa]o h[áa] disponibilidade/i.test(corpo) || nenhumaCategoria;
 
     // Os dias lotados vêm marcados no calendário de datas próximas.
     const diasIndisponiveis = [
