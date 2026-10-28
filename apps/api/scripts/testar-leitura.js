@@ -207,8 +207,10 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   const R = require('../dist/modules/reservations/reservation-engine.service.js');
   const banco = new Proxy({}, { get: () => new Proxy({}, { get: () => async () => null }) });
   const semIA = { complete: async () => { throw new Error('sem ia nos testes'); } };
-  const pedido = async (conversa) => {
-    const c = new m.AssistController(banco, semIA, {}, {}, new R.ReservationEngineService({}), {}, { definirLeitorDoPedido() {} });
+  // `extraido`: o que a IA devolveria na extracao, para casos que dependem dela.
+  const pedido = async (conversa, extraido) => {
+    const ia = extraido ? { complete: async () => ({ model: 'teste', toolInput: extraido }) } : semIA;
+    const c = new m.AssistController(banco, ia, {}, {}, new R.ReservationEngineService({}), {}, { definirLeitorDoPedido() {} });
     const ctx = await c.bookingContext(conversa);
     return { ctx, decisoes: c.decisoesLink.map((d) => d.motivo) };
   };
@@ -221,6 +223,12 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   const r2 = await pedido('Hóspede: preciso saber se a internet é boa\nNós: Olá! Esta é uma mensagem automática.\nHóspede (hoje): do dia 08/11 ao dia 13\nHóspede (hoje): para 03 adultos e um bebê\nHóspede (hoje): qual é o valor dos quartos por nome para que eu faça a escolha');
   conferir('pedido', '08/11 ao dia 13, 3 adultos e um bebe', r2.decisoes, ['link montado']);
   conferir('pedido', 'bebe vai como crianca 0-6', /checkin=2026-11-08&checkout=2026-11-13&adultos-000001=3&criancas-000003=1/.test(r2.ctx), true);
+
+  // 28/10/2026: "dois quartos individuais" + datas -> perguntou "quantas pessoas?".
+  // "Hoje e sair na sexta" quem le e a IA: o teste entrega o que ela devolveu em producao.
+  const r3 = await pedido('Hóspede (hoje): Gostaria de reservar dois quartos individuais novamente\nHóspede (hoje): Hoje e sair na sexta',
+    { checkin: '2026-10-28', checkout: '2026-10-30', adults: null, intent: 'booking' });
+  conferir('pedido', 'dois quartos individuais = 2 apartamentos de 1', r3.decisoes, ['ocupacao pelo tipo de apartamento: 2x1', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada']);
 
   // Bebe sem idade = crianca de 0 a 6 (regra do dono: bebe e sempre menor de 6).
   const oc = (s) => JSON.stringify(m.ocupacaoNaFala('Hóspede: ' + s));

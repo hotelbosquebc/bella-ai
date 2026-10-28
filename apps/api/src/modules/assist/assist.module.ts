@@ -2934,7 +2934,11 @@ export class AssistController implements OnModuleInit {
     );
     const temPessoasPorExtenso =
       /\b(um|uma|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez|un|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|one|two|three|four|five|six)\s+(pessoa|persona|adulto|adult|h[óo]spede|hu[ée]sped|guest|crian|ni[ñn]|hij|child|kid)/i;
-    const temTipoDeQuarto = /\b(casal|duplo|dupla|triplo|tripla|qu[áa]druplo|individual|single|solteiro|matrimonial|doble|triple|double)\b/i;
+    // Plurais tambem. Caso real (28/10/2026): "dois quartos individuais" nao
+    // casava com "individual", a fala "nao tinha pessoas", os 2 adultos lidos
+    // pelo tipo eram apagados e a Bella perguntava "quantas pessoas?".
+    const temTipoDeQuarto =
+      /\b(casal|casais|dupl[oa]s?|tripl[oa]s?|qu[áa]drupl[oa]s?|individua(?:l|is)|singles?|solteir[oa]s?|matrimonial|dobles?|triples?|doubles?)\b/i;
     const temComposicao =
       /\b(somos|seremos|s[ãa]o|seria|ser[íi]a|vamos)\s+\d+|\bsozinh[oa]\b|\b(eu|yo)\s+(e|y|com|con)\s|\beu e (a |o |minha |meu )/i;
     const falaDePessoas = (t: string) =>
