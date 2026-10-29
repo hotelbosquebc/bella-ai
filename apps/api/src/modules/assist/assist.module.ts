@@ -19,6 +19,7 @@ import { SilbeckAvailabilityService } from '../reservations/silbeck-availability
 import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
+import { comConversaAntiga } from '../../common/conversa-antiga';
 import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
@@ -4280,13 +4281,16 @@ ${url}`;
   }
 
   @Post('suggest')
-  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; historico?: { fonte?: string; naTela?: number; guardadas?: number }; anterior?: string; automatica?: boolean }) {
+  async suggest(@Body() body: { hotelId?: string; conversation: string; lastMessage?: string; disponibilidadeHtml?: string; pularDisponibilidade?: boolean; versao?: string; sinaisAudio?: string[]; fontesDirecao?: Record<string, number>; historico?: { fonte?: string; naTela?: number; guardadas?: number }; anterior?: string; automatica?: boolean; contextoAntigo?: string }) {
     const hotelId = body.hotelId || process.env.DEFAULT_HOTEL_ID || 'hotel-do-bosque';
     // Cronometro das etapas. "Esta demorando muito" precisa virar numero: sem
     // isso a gente otimiza no escuro. Nenhum texto entra aqui, so tempos.
     const t0 = Date.now();
     const marcos: Record<string, number> = {};
     const conversation = (body.conversation || '').slice(-6000); // últimas mensagens
+    // Mensagens de mais de 3 dias: a extensao manda a parte, so como contexto
+    // para o modelo, fora de toda a leitura de pedido - ver common/conversa-antiga.
+    const conversaParaIA = comConversaAntiga(conversation, typeof body.contextoAntigo === 'string' ? body.contextoAntigo : '');
     // Formato da conversa que chegou - so contagens, nenhum texto do hospede.
     //
     // Em 18/09/2026 cinco sugestoes seguidas deram "sem assunto de estadia"
@@ -4501,7 +4505,7 @@ ${url}`;
     const draft = await this.ai.complete({
       task: 'sales',
       system,
-      messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
+      messages: [{ role: 'user', content: `${conversaParaIA}\n\nSugira a próxima resposta ao hóspede.` }],
       temperature: settings?.temperature ?? 0.7,
     });
     marcos.geracao = Date.now() - t0 - marcos.contexto;
@@ -4523,7 +4527,7 @@ ${url}`;
           `${system}\n\nATENÇÃO: você acabou de reescrever praticamente a MESMA mensagem que já tinha sido ` +
           `recusada. Isso não resolve nada. Releia a última pergunta do hóspede e responda OUTRA COISA: ` +
           `a informação que falta, a pergunta que ficou sem resposta, o dado concreto que ele pediu.`,
-        messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
+        messages: [{ role: 'user', content: `${conversaParaIA}\n\nSugira a próxima resposta ao hóspede.` }],
         temperature: Math.min(1, (settings?.temperature ?? 0.7) + 0.2),
       });
       if (outra.text && outra.model !== 'mock' && parecenca(outra.text, pedidoAnterior) < 0.85) {
@@ -4566,7 +4570,7 @@ ${url}`;
         system:
           `${system}\n\nATENÇÃO: ${queixa} ` +
           `Escreva a mensagem INTEIRA em ${nome}, do cumprimento à despedida, sem uma única palavra em outro idioma.`,
-        messages: [{ role: 'user', content: `Conversa até aqui:\n${conversation}\n\nSugira a próxima resposta ao hóspede.` }],
+        messages: [{ role: 'user', content: `${conversaParaIA}\n\nSugira a próxima resposta ao hóspede.` }],
         temperature: settings?.temperature ?? 0.7,
       });
       if (segunda.text && segunda.model !== 'mock') draft.text = segunda.text;

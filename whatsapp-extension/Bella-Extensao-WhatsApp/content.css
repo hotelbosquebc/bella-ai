@@ -90,3 +90,25 @@
   padding: 6px 8px;
   margin-bottom: 8px;
 }
+/* Guia de grupos / grupo do WhatsApp: a cor de fundo vem do contato marcado. */
+#bella-marca {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  border-radius: 8px;
+  padding: 7px 8px;
+  margin-bottom: 8px;
+}
+.bella-link {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  color: #5b3fa8;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}

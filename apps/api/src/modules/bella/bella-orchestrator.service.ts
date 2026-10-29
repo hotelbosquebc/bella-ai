@@ -13,6 +13,7 @@ import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
 import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semPrecoInventado } from '../../common/preco';
+import { contextoDeConversaAntiga, inicioDaConversaRecente } from '../../common/conversa-antiga';
 import { motivoParaHumano, assuntoForaDoAtendimento, hospedePediuAtendente } from './escalonamento';
 import { buscarContatoMarcado } from '../contatos/contatos.module';
 import { GuardrailsService } from './guardrails.service';
@@ -233,6 +234,13 @@ export class BellaOrchestratorService {
     mem.recentMessages = mem.recentMessages.filter(
       (m: any) => !(m.sender === MessageSender.BELLA && ehMensagemDeEspera(m.content)),
     );
+    // Mensagens de mais de 3 dias sao contexto, nao pergunta: saem da leitura
+    // do pedido e do historico e vao ao modelo num bloco a parte - ver
+    // common/conversa-antiga (caso de 29/10/2026).
+    const inicioRecente = inicioDaConversaRecente(inicioDoDiaEmSaoPaulo());
+    const ehAntiga = (m: any) => new Date(m.timestamp).getTime() < inicioRecente;
+    const conversaAntiga = this.conversaComoTexto(mem.recentMessages.filter(ehAntiga) as any);
+    mem.recentMessages = mem.recentMessages.filter((m: any) => !ehAntiga(m));
     const today = new Date().toISOString().slice(0, 10);
     const extraction = await this.modelRouter.complete({
       task: 'booking_extraction',
@@ -310,7 +318,8 @@ export class BellaOrchestratorService {
       .replaceAll('{{guestContext}}', this.memory.buildGuestContext(mem))
       .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
       .replaceAll('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : '')) +
-      contextoDeHorario();
+      contextoDeHorario() +
+      contextoDeConversaAntiga(conversaAntiga);
 
     const history = mem.recentMessages.map((m) => ({
       role: m.sender === MessageSender.GUEST ? ('user' as const) : ('assistant' as const),

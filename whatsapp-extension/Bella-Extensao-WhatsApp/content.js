@@ -116,9 +116,62 @@
    * mesmo balde. O resultado foi a Bella citar, para um contato, a estadia de
    * outro hospede. Sem identificacao segura da conversa nao se grava nada.
    */
-  function chaveConversa() {
-    const t = tituloDaConversa();
-    return t ? 'hist:' + t : null;
+  //
+  // 1.10.3 (20/10/2026): a chave deixou de ser o TITULO e passou a ser o
+  // identificador interno do chat, que o WhatsApp grava em cada balao
+  // (data-id="false_5547...@c.us_ID"). O titulo e o painel de mensagens nao
+  // trocam no mesmo instante: na passagem de uma conversa para outra, as
+  // mensagens de uma podiam ser gravadas com o nome da outra. Caso real: um
+  // contato nao salvo, com 5 mensagens na tela, chegou ao servidor com 29
+  // falas de hospede - e a Bella usou a ocupacao de outro pedido.
+  //
+  // Agora cada mensagem guardada carrega o chat de onde veio, e so entra no
+  // historico de uma conversa o que tem o identificador dela. Sem
+  // identificador legivel, nada e gravado nem lido: a Bella fica so com a
+  // tela, que e menos contexto, mas nunca contexto de outra pessoa.
+  // Os baldes antigos ('hist:' + titulo) deixam de ser lidos.
+  function chaveConversa(chat) {
+    return chat ? 'hist2:' + chat : null;
+  }
+
+  /** O chat a que o balao pertence, pelo data-id ("false_5547...@c.us_ID" -> "5547...@c.us"). */
+  function chatDoBalao(row) {
+    if (!row) return null;
+    const alvo = row.matches && row.matches('[data-id]') ? row : row.querySelector && row.querySelector('[data-id]');
+    const id = (alvo && alvo.getAttribute('data-id')) || '';
+    const m = id.match(/^(?:true|false)_([^_\s]+@[^_\s]+)_/);
+    return m ? m[1] : null;
+  }
+
+  /**
+   * Separa as mensagens de mais de 3 dias, que vao ao servidor so como
+   * contexto. Caso real (29/10/2026): o hospede voltou depois de um mes, hoje
+   * so tinham saido mensagens automaticas, e a Bella respondeu a conversa de
+   * setembro. O servidor nao ve datas - so "(hoje)" -, entao nao distingue
+   * "ontem" (que precisa de resposta) de "setembro". A mensagem sem data (audio)
+   * herda a data da anterior. Sem nada recente, manda tudo como antes.
+   */
+  function dividirPorIdade(mensagens, datas) {
+    const limite = new Date();
+    limite.setHours(0, 0, 0, 0);
+    limite.setDate(limite.getDate() - 3);
+    let ultimaData = null;
+    let corte = 0;
+    for (let i = 0; i < mensagens.length; i++) {
+      if (datas[i]) ultimaData = datas[i];
+      const p = String(ultimaData || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (!p) continue;
+      const ano = p[3].length === 2 ? 2000 + Number(p[3]) : Number(p[3]);
+      if (new Date(ano, Number(p[2]) - 1, Number(p[1])) < limite) corte = i + 1;
+    }
+    if (corte === 0 || corte >= mensagens.length) return { recente: mensagens.join('\n'), antiga: '' };
+    return { recente: mensagens.slice(corte).join('\n'), antiga: mensagens.slice(0, corte).join('\n') };
+  }
+
+  /** Linha no formato que o servidor le, com "(hoje)" calculado AGORA, nao quando foi guardada. */
+  function linhaDe(e) {
+    const hoje = new Date().toLocaleDateString('pt-BR');
+    return (e.autor === 'h' ? 'Hóspede' : 'Nós') + (e.data && e.data === hoje ? ' (hoje)' : '') + ': ' + e.texto;
   }
 
   /** '13/08/2026' + '10:02' -> '202608131002', para ordenar cronologicamente. */
@@ -144,13 +197,14 @@
   }
 
   /** Junta o que esta na tela com o que ja foi visto antes, sem duplicar. */
-  async function mesclarHistorico(atuais) {
-    if (!document.querySelector('#main')) return atuais || [];
-    const chave = chaveConversa();
-    if (!chave) return atuais || [];
-    const anterior = await lerHistorico(chave);
+  async function mesclarHistorico(atuais, chat) {
+    const daTela = (atuais || []).filter(function (m) { return m && m.texto && m.chat === chat; });
+    if (!document.querySelector('#main')) return daTela;
+    const chave = chaveConversa(chat);
+    if (!chave) return daTela;
+    const anterior = (await lerHistorico(chave)).filter(function (m) { return m && m.texto && m.chat === chat; });
     const mapa = new Map();
-    anterior.concat(atuais || []).forEach(function (m) { if (m && m.linha) mapa.set(m.linha, m); });
+    anterior.concat(daTela).forEach(function (m) { mapa.set(m.autor + '|' + m.ord + '|' + m.texto, m); });
     const juntas = [...mapa.values()].sort(function (a, b) { return a.ord < b.ord ? -1 : a.ord > b.ord ? 1 : 0; });
     await gravarHistorico(chave, juntas);
     return juntas;
@@ -438,8 +492,11 @@
 
   /** De onde veio a direcao dos baloes na ultima leitura, para o diagnostico. */
   let fontesDeDirecao = {};
+  /** Como o historico foi identificado na ultima leitura - vai para o diagnostico, sem nenhum dado do contato. */
+  let historicoFonte = 'sem-leitura';
 
   function scrapeConversation() {
+    historicoFonte = 'sem-leitura';
     // #main é o painel da conversa aberta; evita varrer a lista de contatos
     // e o próprio painel da Bella.
     const main = document.querySelector('#main') || document.body;
@@ -508,11 +565,13 @@
     if (temTexto || linhasDaConversa.length) {
       const titulo = tituloDaConversa();
       const msgs = [];
+      const datasMsgs = [];
       const estruturado = [];
       let lastIn = '';
       fontesDeDirecao = {};
       let ultimaOrdConhecida = null;
       let semDataSeguidas = 0;
+      const chatsNaTela = {};
 
       for (const row of linhasDaConversa) {
         const el = row.querySelector('.copyable-text[data-pre-plain-text]');
@@ -526,6 +585,14 @@
           m = attr.match(/\[(\d{1,2}:\d{2}),\s*(\d{1,2}\/\d{1,2}\/\d{2,4})\]\s*(.*?):\s*$/);
           const remetente = m ? m[3] : '';
           t = (el.innerText || '').replace(/ /g, ' ').trim();
+          // Resposta citando outra mensagem: a citacao vem dentro do mesmo
+          // balao. Caso real (21/10/2026): o hospede respondeu citando a
+          // saudacao da Bella, e "criancas menores de 10 anos" entrou como
+          // fala dele. O texto proprio fica no span.selectable-text; so o
+          // usamos quando o balao inteiro TERMINA nele (a citacao vem antes).
+          const proprio = el.querySelector('span.selectable-text');
+          const textoProprio = proprio ? (proprio.innerText || '').replace(/ /g, ' ').trim() : '';
+          if (textoProprio && textoProprio.length < t.length && t.endsWith(textoProprio)) t = textoProprio;
           const d = direcaoDoBalao(row, titulo, remetente);
           isIn = d.isIn;
           fontesDeDirecao[d.fonte] = (fontesDeDirecao[d.fonte] || 0) + 1;
@@ -540,6 +607,7 @@
         if (!t || t.length > 4000) continue;
         const ehHoje = m && m[2] === hoje;
         msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
+        datasMsgs.push(m ? m[2] : null);
 
         // Ordem cronologica de uma mensagem SEM data legivel - o caso do audio,
         // que nao tem data-pre-plain-text.
@@ -571,14 +639,21 @@
         // afirmando que o hospede mandou audio. Audio transcrito, esse sim,
         // tem conteudo e fica.
         const audioSemConteudo = !m && /\[mensagem de voz/.test(t);
+        const chat = chatDoBalao(row);
+        if (chat) chatsNaTela[chat] = (chatsNaTela[chat] || 0) + 1;
         if (!audioSemConteudo) {
-          estruturado.push({ linha: msgs[msgs.length - 1], ord: ord });
+          estruturado.push({ autor: isIn ? 'h' : 'n', texto: t, data: m ? m[2] : null, ord: ord, chat: chat });
         }
         if (isIn) lastIn = t;
       }
 
       if (msgs.length) {
-        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado };
+        // UM chat so na tela: e ele. Mais de um quer dizer que o WhatsApp esta
+        // no meio da troca de conversa - nao e hora de gravar nem de juntar.
+        const chats = Object.keys(chatsNaTela);
+        const chatAtual = chats.length === 1 ? chats[0] : null;
+        historicoFonte = chats.length === 1 ? 'por-chat' : chats.length > 1 ? 'chats-misturados' : 'sem-identificador';
+        return { conversation: msgs.slice(-30).join('\n'), mensagens: msgs.slice(-30), datas: datasMsgs.slice(-30), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado, chatAtual: chatAtual };
       }
     }
 
@@ -623,6 +698,7 @@
     </div>
     <div id="bella-body">
       <div id="bella-modo">…</div>
+      <div id="bella-marca" style="display:none"></div>
       <button id="bella-suggest" class="bella-btn">🤖 Sugerir resposta da Bella</button>
       <div id="bella-suggestion" style="display:none">
         <textarea id="bella-sugtext" rows="5"></textarea>
@@ -632,6 +708,7 @@
       <div id="bella-qr-title">⚡ Respostas rápidas</div>
       <div id="bella-qr">Carregando…</div>
       <div id="bella-status"></div>
+      <button id="bella-marcar" class="bella-link" style="display:none"></button>
     </div>`;
   document.body.appendChild(panel);
 
@@ -1151,6 +1228,11 @@
 
   async function sugerir(automatica) {
     if (sugerindo) return; // evita duas chamadas simultâneas (clique + automática)
+    // Guia de grupos e excursoes: quem atende e a equipe (regra do dono, 21/10/2026).
+    if (marcadoPara(tituloDaConversa())) {
+      if (!automatica) status('Guia de grupos e excursões: atendimento da equipe. A Bella não sugere aqui.', true);
+      return;
+    }
     // Puxa o histórico antes de ler: sem isso a Bella vê só a última mensagem.
     // Rolar o historico e caro (varias rolagens de ~700ms) e so precisa ser
     // feito UMA vez por conversa: depois disso a memoria local ja guarda tudo.
@@ -1166,18 +1248,40 @@
     await incluirAudios();
     const lido = scrapeConversation();
     let { conversation, lastMessage, lidas } = lido;
+    let mensagens = lido.mensagens || null;
+    let datas = lido.datas || null;
+
+    // Balões de mais de um chat na tela: o WhatsApp ainda está trocando de
+    // conversa. Sugerir agora seria responder misturando duas pessoas.
+    if (historicoFonte === 'chats-misturados') {
+      if (!automatica) status('A conversa ainda está carregando. Aguarde um instante e clique de novo.', true);
+      return;
+    }
 
     // Junta com o que a extensão já viu antes nesta conversa. O WhatsApp Web
     // descarta o histórico, então sem isso a Bella responde sem saber o que o
-    // hóspede escreveu ontem — ou até horas atrás.
+    // hóspede escreveu ontem — ou até horas atrás. Só do MESMO chat: ver
+    // chaveConversa.
+    let guardadas = 0;
     try {
-      const juntas = await mesclarHistorico(lido.estruturado);
+      const juntas = await mesclarHistorico(lido.estruturado, lido.chatAtual);
+      guardadas = juntas.length;
       if (juntas.length > (lido.estruturado || []).length) {
-        conversation = juntas.slice(-40).map(function (m) { return m.linha; }).join(String.fromCharCode(10));
+        conversation = juntas.slice(-40).map(linhaDe).join(String.fromCharCode(10));
+        mensagens = juntas.slice(-40).map(linhaDe);
+        datas = juntas.slice(-40).map(function (e) { return e.data || null; });
         lidas = juntas.length;
       }
     } catch (_) {
       /* storage indisponível — segue com o que está na tela */
+    }
+    const historico = { fonte: historicoFonte, naTela: (lido.estruturado || []).length, guardadas: guardadas };
+    // Mensagens de mais de 3 dias vao a parte, so como contexto (29/10/2026).
+    let contextoAntigo = '';
+    if (mensagens && datas) {
+      const dividida = dividirPorIdade(mensagens, datas);
+      conversation = dividida.recente;
+      contextoAntigo = dividida.antiga;
     }
     if (!conversation) {
       if (!automatica) {
@@ -1218,7 +1322,7 @@
           : 'Pensando… (pode levar alguns segundos)') + (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, anterior: anterior || undefined });
+      const r = await send('SUGGEST', { conversation, contextoAntigo: contextoAntigo || undefined, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, historico: historico, anterior: anterior || undefined, automatica: automatica || undefined });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
@@ -1231,6 +1335,7 @@
         const html = d && d.ok && d.data ? d.data.html : null;
         const r2 = await send('SUGGEST', {
           conversation: conversation,
+          contextoAntigo: contextoAntigo || undefined,
           lastMessage: lastMessage,
           disponibilidadeHtml: html || undefined,
           // Se a consulta falhou, escreve mesmo assim - sem falar de procura.
@@ -1245,6 +1350,14 @@
       }
       if (r.data.model === 'desligada') {
         status('A Bella está desligada no painel.', true);
+        return;
+      }
+      // Conversa sem nada de hotel (pessoal, fornecedor...): na sugestao
+      // automatica a Bella fica quieta. Analise de 26/10/2026.
+      if (r.data.model === 'sem-assunto') {
+        status('Conversa sem assunto de hotel: a Bella não sugere sozinha. Clique em Sugerir se quiser.');
+        panel.querySelector('#bella-suggestion').style.display = 'none';
+        sugestaoPendente = null;
         return;
       }
       // Nenhum modelo respondeu. NAO mostramos o texto de emergencia como se
@@ -1282,6 +1395,152 @@
     }
   };
 
+  // ---------- grupos e guias de excursão (21/10/2026) ----------
+  //
+  // Regras do dono: em GRUPO a Bella nao sugere sozinha; GUIA de grupos e
+  // excursoes e atendido pela equipe, e aparece com uma cor propria na lista
+  // de conversas. A lista de guias vive no servidor - a mesma do painel.
+  let contatosMarcados = [];
+
+  /** Mesma regra do servidor (common/contatos-marcados.ts): DDD + 8 ultimos digitos. */
+  function telefoneCanonico(v) {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.length >= 12 && d.length <= 13 && d.indexOf('55') === 0) d = d.slice(2);
+    if (d.length === 11 && d[2] === '9') d = d.slice(0, 2) + d.slice(3);
+    return d;
+  }
+  function nomeCanonico(v) {
+    return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+  }
+  /** O titulo da conversa (nome salvo ou numero) e de um contato marcado? */
+  function marcadoPara(titulo) {
+    if (!titulo || !contatosMarcados.length) return null;
+    const ehNumero = /^[\d\s()+.-]+$/.test(titulo);
+    const tel = ehNumero ? telefoneCanonico(titulo) : '';
+    const nome = nomeCanonico(titulo);
+    for (const m of contatosMarcados) {
+      const mTel = telefoneCanonico(m.identificador);
+      if (tel.length >= 8 && mTel.length >= 8 && tel === mTel) return m;
+      if (!ehNumero && m.nome && nomeCanonico(m.nome) === nome) return m;
+    }
+    return null;
+  }
+
+  async function carregarMarcados() {
+    const r = await send('CONTATOS_MARCADOS');
+    if (r && r.ok && Array.isArray(r.data)) {
+      contatosMarcados = r.data;
+      atualizarMarca();
+      pintarLista();
+    }
+  }
+
+  /**
+   * A conversa aberta e um grupo?
+   *
+   * O identificador do chat (data-id "...@g.us") sumiu da marcacao do
+   * WhatsApp Web em 10/2026 (o diagnostico mostra "sem-identificador"), entao
+   * nenhum sinal sozinho basta. Qualquer um destes indica grupo: icone de
+   * grupo no cabecalho, "dados do grupo", subtitulo com a lista de
+   * participantes terminando em "Você", ou tres autores diferentes nas
+   * mensagens (numa conversa individual sao so dois: o contato e nos).
+   */
+  function conversaEhGrupo() {
+    const main = document.querySelector('#main');
+    if (!main) return false;
+    const hdr = main.querySelector('header');
+    if (hdr) {
+      if (hdr.querySelector('[data-icon*="group"], [data-icon*="community"]')) return true;
+      const texto = hdr.innerText || '';
+      if (/dados do grupo|informa[çc][õo]es do grupo|group info|info\.? del grupo/i.test(texto)) return true;
+      const linhas = texto.split(String.fromCharCode(10)).map(function (x) { return x.trim(); });
+      if (linhas.some(function (l) { return l.indexOf(',') >= 0 && /(^|,\s*)(voc[êe]|you|t[úu])$/i.test(l); })) return true;
+    }
+    if (main.querySelector('[data-id*="@g.us"]')) return true;
+    const autores = new Set();
+    for (const el of main.querySelectorAll('.copyable-text[data-pre-plain-text]')) {
+      const m = (el.getAttribute('data-pre-plain-text') || '').match(/\]\s*(.*?):\s*$/);
+      if (m && m[1]) autores.add(m[1]);
+      if (autores.size >= 3) return true;
+    }
+    return false;
+  }
+
+  /** Cor com transparencia, para o fundo da linha nao brigar com o texto. */
+  function corSuave(hex, alfa) {
+    const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '');
+    if (!m) return '';
+    return 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + alfa + ')';
+  }
+
+  /** Faixa colorida no painel e no cabecalho da conversa aberta. */
+  function atualizarMarca() {
+    const caixa = panel.querySelector('#bella-marca');
+    const botao = panel.querySelector('#bella-marcar');
+    const titulo = tituloDaConversa();
+    const grupo = Boolean(titulo) && conversaEhGrupo();
+    const m = titulo && !grupo ? marcadoPara(titulo) : null;
+    const chave = (titulo || '') + '|' + grupo + '|' + (m ? m.id + m.cor : '');
+    if (caixa.dataset.chave === chave) return;
+    caixa.dataset.chave = chave;
+    if (m) {
+      caixa.style.display = 'block';
+      caixa.style.background = m.cor;
+      caixa.textContent = '🧭 Guia de grupos e excursões: atendimento da equipe. A Bella não responde aqui.';
+    } else if (grupo) {
+      caixa.style.display = 'block';
+      caixa.style.background = '#5f6b66';
+      caixa.textContent = '👥 Grupo: a Bella só sugere se você clicar.';
+    } else {
+      caixa.style.display = 'none';
+    }
+    botao.style.display = titulo && !grupo ? 'block' : 'none';
+    botao.textContent = m ? 'Desmarcar guia de grupos' : '🧭 Marcar como guia de grupos';
+    botao.dataset.id = m ? m.id : '';
+    const hdr = document.querySelector('#main header');
+    if (hdr) hdr.style.boxShadow = m ? 'inset 5px 0 0 ' + m.cor : '';
+  }
+
+  /**
+   * Pinta na lista de conversas os guias marcados. O WhatsApp reaproveita as
+   * linhas ao rolar, entao isto roda a cada ciclo do observador e compara a
+   * cor gravada na propria linha antes de mexer no estilo.
+   */
+  function pintarLista() {
+    const lado = document.querySelector('#pane-side');
+    if (!lado) return;
+    for (const linha of lado.querySelectorAll('[role="listitem"], [role="row"]')) {
+      const nome = linha.querySelector('span[title]');
+      const m = nome ? marcadoPara(nome.getAttribute('title')) : null;
+      const cor = m ? m.cor : '';
+      if ((linha.dataset.bellaCor || '') === cor) continue;
+      linha.dataset.bellaCor = cor;
+      linha.style.boxShadow = m ? 'inset 5px 0 0 ' + m.cor : '';
+      linha.style.background = m ? corSuave(m.cor, 0.14) : '';
+    }
+  }
+
+  panel.querySelector('#bella-marcar').onclick = async function () {
+    const botao = panel.querySelector('#bella-marcar');
+    const titulo = tituloDaConversa();
+    if (!titulo) return;
+    if (botao.dataset.id) {
+      if (!confirm('Desmarcar "' + titulo + '" como guia de grupos? A Bella volta a sugerir respostas para este contato.')) return;
+      const r = await send('DESMARCAR_CONTATO', { id: botao.dataset.id });
+      if (!r || !r.ok) return status('Não consegui desmarcar agora. Tente de novo.', true);
+    } else {
+      // Contato nao salvo: o titulo e o numero. Salvo: o nome, como aparece aqui.
+      const ehNumero = /^[\d\s()+.-]+$/.test(titulo) && telefoneCanonico(titulo).length >= 8;
+      const r = await send('MARCAR_CONTATO', {
+        identificador: ehNumero ? titulo : null,
+        nome: ehNumero ? null : titulo,
+      });
+      if (!r || !r.ok) return status('Não consegui marcar agora. Tente de novo.', true);
+      status('Marcado como guia de grupos: a Bella não sugere mais respostas aqui.');
+    }
+    await carregarMarcados();
+  };
+
   // ---------- modo de operação (ligada / desligada / automática) ----------
   let modo = null;
 
@@ -1290,12 +1549,17 @@
     if (!r || !r.ok) return null;
     modo = r.data;
     const rotulo = { on: '🟢 Bella ligada', off: '🔴 Bella desligada', auto: '🌙 Bella automática' }[modo.mode];
-    const detalhe =
-      modo.mode === 'auto'
-        ? modo.dentroDoHorario
-          ? ' — no horário, quem atende é a equipe'
-          : ' — fora do horário, sugerindo sozinha'
-        : '';
+    // WhatsApp ligado pela API: a Bella responde sozinha pelo servidor, e a
+    // extensao nao sugere junto (seria resposta dobrada).
+    // Desde 26/10/2026 a extensao so sugere no clique (decisao do dono): a
+    // sugestao automatica confundia conversas na troca. O rotulo diz isso.
+    const detalhe = modo.whatsappAutomatico
+      ? ' — respondendo sozinha no WhatsApp'
+      : modo.autoSuggest
+        ? ' — sugerindo sozinha'
+        : modo.mode === 'off'
+          ? ''
+          : ' — clique em Sugerir quando precisar';
     panel.querySelector('#bella-modo').textContent = rotulo + detalhe;
     panel.querySelector('#bella-suggest').style.display = modo.manualDisponivel ? 'block' : 'none';
     return modo;
@@ -1325,7 +1589,7 @@
     // chrome.storage. Numa aba que fica aberta o dia todo na recepcao, era
     // escrita continua sem nada de novo para escrever.
     if (conversation && conversation !== ultimaConversa) {
-      mesclarHistorico(lido.estruturado).catch(function () {});
+      mesclarHistorico(lido.estruturado, lido.chatAtual).catch(function () {});
     }
     if (!conversation || conversation === ultimaConversa) return;
     const trocouDeConversa = tituloDaConversa() !== tituloAnterior;
@@ -1353,6 +1617,9 @@
     // Duas travas: a fala do hospede precisa ser NOVA, e ha um intervalo minimo
     // entre sugestoes automaticas.
     if (!modo || !modo.autoSuggest) return;
+    // Grupo do WhatsApp nao e atendimento (regra do dono, 21/10/2026): a Bella
+    // so escreve ali se alguem clicar. Guia marcado: nem assim.
+    if (conversaEhGrupo() || marcadoPara(tituloDaConversa())) return;
     const falaNova = lido.lastMessage && lido.lastMessage !== ultimaFalaSugerida;
     const passouTempo = Date.now() - ultimaSugestaoAutomatica > 15000;
     if (!falaNova || !passouTempo) return;
@@ -1369,6 +1636,8 @@
       if (!extensaoViva()) return pararPorExtensaoAtualizada();
       verificarEnvio();
       aoTrocarDeConversa();
+      atualizarMarca();
+      pintarLista();
     }, 1200);
   });
   window.__bellaObservador.observe(document.body, { childList: true, subtree: true });
@@ -1376,7 +1645,11 @@
   carregarModo().then(() => aoTrocarDeConversa());
   // O modo muda no painel a qualquer momento — reconsulta de minuto em minuto,
   // e assim a virada do horário também entra sozinha.
-  window.__bellaTimerModo = setInterval(carregarModo, 60000);
+  window.__bellaTimerModo = setInterval(function () {
+    carregarModo();
+    carregarMarcados();
+  }, 60000);
+  carregarMarcados();
 
   // Remove o balde comum criado pelo bug da 1.1.5, que misturava conversas.
   try { chrome.storage.local.remove('hist:desconhecida'); } catch (_) {}

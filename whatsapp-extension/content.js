@@ -143,6 +143,31 @@
     return m ? m[1] : null;
   }
 
+  /**
+   * Separa as mensagens de mais de 3 dias, que vao ao servidor so como
+   * contexto. Caso real (29/10/2026): o hospede voltou depois de um mes, hoje
+   * so tinham saido mensagens automaticas, e a Bella respondeu a conversa de
+   * setembro. O servidor nao ve datas - so "(hoje)" -, entao nao distingue
+   * "ontem" (que precisa de resposta) de "setembro". A mensagem sem data (audio)
+   * herda a data da anterior. Sem nada recente, manda tudo como antes.
+   */
+  function dividirPorIdade(mensagens, datas) {
+    const limite = new Date();
+    limite.setHours(0, 0, 0, 0);
+    limite.setDate(limite.getDate() - 3);
+    let ultimaData = null;
+    let corte = 0;
+    for (let i = 0; i < mensagens.length; i++) {
+      if (datas[i]) ultimaData = datas[i];
+      const p = String(ultimaData || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+      if (!p) continue;
+      const ano = p[3].length === 2 ? 2000 + Number(p[3]) : Number(p[3]);
+      if (new Date(ano, Number(p[2]) - 1, Number(p[1])) < limite) corte = i + 1;
+    }
+    if (corte === 0 || corte >= mensagens.length) return { recente: mensagens.join('\n'), antiga: '' };
+    return { recente: mensagens.slice(corte).join('\n'), antiga: mensagens.slice(0, corte).join('\n') };
+  }
+
   /** Linha no formato que o servidor le, com "(hoje)" calculado AGORA, nao quando foi guardada. */
   function linhaDe(e) {
     const hoje = new Date().toLocaleDateString('pt-BR');
@@ -540,6 +565,7 @@
     if (temTexto || linhasDaConversa.length) {
       const titulo = tituloDaConversa();
       const msgs = [];
+      const datasMsgs = [];
       const estruturado = [];
       let lastIn = '';
       fontesDeDirecao = {};
@@ -581,6 +607,7 @@
         if (!t || t.length > 4000) continue;
         const ehHoje = m && m[2] === hoje;
         msgs.push((isIn ? 'Hóspede' : 'Nós') + (ehHoje ? ' (hoje)' : '') + ': ' + t);
+        datasMsgs.push(m ? m[2] : null);
 
         // Ordem cronologica de uma mensagem SEM data legivel - o caso do audio,
         // que nao tem data-pre-plain-text.
@@ -626,7 +653,7 @@
         const chats = Object.keys(chatsNaTela);
         const chatAtual = chats.length === 1 ? chats[0] : null;
         historicoFonte = chats.length === 1 ? 'por-chat' : chats.length > 1 ? 'chats-misturados' : 'sem-identificador';
-        return { conversation: msgs.slice(-30).join('\n'), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado, chatAtual: chatAtual };
+        return { conversation: msgs.slice(-30).join('\n'), mensagens: msgs.slice(-30), datas: datasMsgs.slice(-30), lastMessage: lastIn, lidas: msgs.length, estruturado: estruturado, chatAtual: chatAtual };
       }
     }
 
@@ -1221,6 +1248,8 @@
     await incluirAudios();
     const lido = scrapeConversation();
     let { conversation, lastMessage, lidas } = lido;
+    let mensagens = lido.mensagens || null;
+    let datas = lido.datas || null;
 
     // Balões de mais de um chat na tela: o WhatsApp ainda está trocando de
     // conversa. Sugerir agora seria responder misturando duas pessoas.
@@ -1239,12 +1268,21 @@
       guardadas = juntas.length;
       if (juntas.length > (lido.estruturado || []).length) {
         conversation = juntas.slice(-40).map(linhaDe).join(String.fromCharCode(10));
+        mensagens = juntas.slice(-40).map(linhaDe);
+        datas = juntas.slice(-40).map(function (e) { return e.data || null; });
         lidas = juntas.length;
       }
     } catch (_) {
       /* storage indisponível — segue com o que está na tela */
     }
     const historico = { fonte: historicoFonte, naTela: (lido.estruturado || []).length, guardadas: guardadas };
+    // Mensagens de mais de 3 dias vao a parte, so como contexto (29/10/2026).
+    let contextoAntigo = '';
+    if (mensagens && datas) {
+      const dividida = dividirPorIdade(mensagens, datas);
+      conversation = dividida.recente;
+      contextoAntigo = dividida.antiga;
+    }
     if (!conversation) {
       if (!automatica) {
         // Distingue "nenhuma conversa aberta" de "não consegui LER a conversa",
@@ -1284,7 +1322,7 @@
           : 'Pensando… (pode levar alguns segundos)') + (lidas ? ` (${lidas} msgs)` : ''),
     );
     try {
-      const r = await send('SUGGEST', { conversation, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, historico: historico, anterior: anterior || undefined, automatica: automatica || undefined });
+      const r = await send('SUGGEST', { conversation, contextoAntigo: contextoAntigo || undefined, lastMessage, versao: versaoDaExtensao(), sinaisAudio: sinaisDeAudio.slice(0, 5), fontesDirecao: fontesDeDirecao, historico: historico, anterior: anterior || undefined, automatica: automatica || undefined });
 
       // Segunda passagem: o servidor pede a disponibilidade porque ele proprio
       // nao alcanca o Silbeck (o Cloudflare bloqueia o datacenter). Daqui, do
@@ -1297,6 +1335,7 @@
         const html = d && d.ok && d.data ? d.data.html : null;
         const r2 = await send('SUGGEST', {
           conversation: conversation,
+          contextoAntigo: contextoAntigo || undefined,
           lastMessage: lastMessage,
           disponibilidadeHtml: html || undefined,
           // Se a consulta falhou, escreve mesmo assim - sem falar de procura.

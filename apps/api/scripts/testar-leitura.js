@@ -247,6 +247,25 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   conferir('periodo', 'NAO: 10/11 a 12 pessoas', per('10/11 a 12 pessoas'), '[]');
   conferir('periodo', 'NAO: dia 10/11 à 14h', per('dia 10/11 à 14h'), '[]');
 
+  // Conversa de outros dias e contexto (29/10/2026): a Bella respondeu a uma
+  // conversa de setembro porque hoje so tinham saido mensagens automaticas.
+  {
+    const ca = require('../dist/common/conversa-antiga.js');
+    conferir('antiga', 'sem antiga: igual a antes', ca.comConversaAntiga('Hóspede (hoje): oi'), 'Conversa até aqui:\nHóspede (hoje): oi');
+    const bloco = ca.comConversaAntiga('Hóspede (hoje): 01/11 a 02/11, 2 pessoas', 'Hóspede: LI E CONCORDO');
+    conferir('antiga', 'antiga rotulada como so contexto', /DIAS ANTERIORES[\s\S]*LI E CONCORDO[\s\S]*CONVERSA RECENTE[\s\S]*01\/11/.test(bloco), true);
+    // A divisao por data acontece na extensao: o servidor so ve "(hoje)".
+    const fonteExt = require('fs').readFileSync(require('path').join(__dirname, '../../../whatsapp-extension/content.js'), 'utf8');
+    const corpo = fonteExt.match(/function dividirPorIdade\(mensagens, datas\) \{[\s\S]*?\r?\n  \}\r?\n/)[0];
+    const dividir = new Function(corpo + '; return dividirPorIdade;')();
+    const d = (dias) => { const x = new Date(); x.setDate(x.getDate() - dias); return x.toLocaleDateString('pt-BR'); };
+    const ms = ['Hóspede: LI E CONCORDO', 'Nós: Solicitação de reserva realizada', 'Nós (hoje): Para dúvidas urgentes', 'Hóspede (hoje): 01/11 a 02/11, 2 pessoas'];
+    conferir('antiga', 'setembro sai da conversa recente', JSON.stringify(dividir(ms, [d(45), d(45), d(0), d(0)])), JSON.stringify({ recente: ms.slice(2).join('\n'), antiga: ms.slice(0, 2).join('\n') }));
+    conferir('antiga', 'pedido de ontem continua recente', dividir(ms, [d(1), d(1), d(0), d(0)]).antiga, '');
+    conferir('antiga', 'audio sem data herda a anterior', dividir(ms, [d(45), null, d(0), d(0)]).antiga, ms.slice(0, 2).join('\n'));
+    conferir('antiga', 'tudo antigo: manda tudo', dividir(ms.slice(0, 2), [d(45), d(45)]).antiga, '');
+  }
+
   console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
   process.exit(falhas ? 1 : 0);
 })().catch((e) => {
