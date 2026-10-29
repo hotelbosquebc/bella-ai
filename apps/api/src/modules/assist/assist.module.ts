@@ -20,6 +20,7 @@ import { corrigirLinks, garantirLink } from '../../common/links';
 import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
 import { comConversaAntiga } from '../../common/conversa-antiga';
+import { contextoDeCancelamento } from '../../common/cancelamento';
 import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
@@ -681,10 +682,12 @@ export function intervalosNaFala(
   // "26" era lido como se fosse dia e o periodo saia torto - a Bella nao
   // montava link e ainda respondia com datas de outra conversa.
   const rDoisMeses = /\b(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\.?(?:\s*(?:de\s*)?(\d{4}|\d{2})\b)?\s*(?:at[ée]|ao|[aà]s|a|à|e|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*\.?(?:\s*(?:de\s*)?(\d{4}|\d{2})\b)?/gi;
-  // 14 a 19 janeiro  |  de 8 a 13 de setembro
-  const rUmMes = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
-  // 15 a 17/10  |  15 a 17/10/2026 - o mes vem so na segunda data
-  const rUmMesNumerico = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
+  // 14 a 19 janeiro  |  de 8 a 13 de setembro  |  do dia 2 ao dia 3 de abril
+  const rUmMes = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\s*(?:de\s*)?(jan|fev|mar[cç]o|abr|maio|junh|julh|agos|set|outu|nove|dez)[a-zç]*/gi;
+  // 15 a 17/10  |  15 a 17/10/2026 - o mes vem so na segunda data. Tambem
+  // "do dia 2 ao dia 3/04" (caso real de 29/10/2026: sem leitura, o link saiu
+  // com o periodo de ontem, ate 04/04, para quem pediu 1 diaria).
+  const rUmMesNumerico = /\b(\d{1,2})\s*(?:a|à|ao|até|ate|-|–)\s*(?:o\s*)?(?:dia\s*)?(\d{1,2})\s*\/\s*(\d{1,2})(?:\s*\/\s*(\d{2,4}))?\b/gi;
 
   let m: RegExpExecArray | null;
   while ((m = rNumerico.exec(t)) !== null) push(m[1], m[2], m[4], m[5], m[3], m[6]);
@@ -1704,8 +1707,12 @@ export function normalizarOcupacao(stay: any): any {
   if (!idades.length) return stay;
 
   stay.adults = (Number(stay.adults) || 0) + idades.filter((i) => i >= 10).length;
-  stay.children0_6 = (Number(stay.children0_6) || 0) + idades.filter((i) => i <= 6).length;
-  stay.children7_9 = (Number(stay.children7_9) || 0) + idades.filter((i) => i >= 7 && i <= 9).length;
+  // Crianca com idade NAO se soma ao que o extrator ja contou: ele costuma
+  // preencher children0_6 E idades para as mesmas criancas, apesar da
+  // instrucao. Caso real (29/10/2026): "2 criancas (3 e 4 anos)" saiu no link
+  // como 4 criancas de 0 a 6. Vale o maior dos dois.
+  stay.children0_6 = Math.max(Number(stay.children0_6) || 0, idades.filter((i) => i <= 6).length);
+  stay.children7_9 = Math.max(Number(stay.children7_9) || 0, idades.filter((i) => i >= 7 && i <= 9).length);
   // Consumidas: uma segunda passagem nao pode somar de novo.
   stay.idades = null;
   return stay;
@@ -4393,7 +4400,13 @@ ${url}`;
     // (que ficam em cache) e devolve o pedido; o texto e escrito uma vez so, ja
     // com a disponibilidade real.
     if (!body.disponibilidadeHtml && !body.pularDisponibilidade) {
-      const s: any = await this.extrair(conversation);
+      // Copia com a mesma leitura de ocupacao do bookingContext: a consulta de
+      // vaga saia com a contagem crua da IA (4 criancas no lugar de 2, 29/10/2026).
+      const bruto: any = await this.extrair(conversation);
+      const s: any = { ...bruto };
+      const daFala = ocupacaoNaFala(apenasFalasDoHospede(conversation));
+      if (daFala) Object.assign(s, { adults: daFala.adultos, children0_6: 0, children7_9: 0, idades: daFala.idades });
+      normalizarOcupacao(s);
       // So com a ocupacao lida. Caso real (22/10/2026): "4 funcionarios" nao
       // foi entendido, a consulta saiu para 1 adulto (o padrao), voltou com
       // vaga - e a Bella escreveu "temos disponibilidade para 4 pessoas".
@@ -4482,6 +4495,10 @@ ${url}`;
       (await this.contextoDasLicoes(hotelId)) +
       contextoDeIdioma(apenasFalasDoHospede(conversation)) +
       contextoDaPergunta(conversation) +
+      contextoDeCancelamento(
+        falasPendentesDoHospede(conversation).join('\n') || ultimaFalaDoHospede(conversation),
+        apenasFalasDoHospede(conversation),
+      ) +
       contextoDeHorario() +
       reserva +
       (() => {

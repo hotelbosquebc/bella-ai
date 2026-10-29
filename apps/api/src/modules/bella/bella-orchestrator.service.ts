@@ -14,6 +14,7 @@ import { semCustoDeHorarioExtra } from '../../common/horario-extra';
 import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semPrecoInventado } from '../../common/preco';
 import { contextoDeConversaAntiga, inicioDaConversaRecente } from '../../common/conversa-antiga';
+import { contextoDeCancelamento } from '../../common/cancelamento';
 import { motivoParaHumano, assuntoForaDoAtendimento, hospedePediuAtendente } from './escalonamento';
 import { buscarContatoMarcado } from '../contatos/contatos.module';
 import { GuardrailsService } from './guardrails.service';
@@ -319,7 +320,11 @@ export class BellaOrchestratorService {
       .replaceAll('{{policiesContext}}', relevantPolicies.map((p) => `[${p.category}] ${p.content}`).join('\n') || 'Nenhuma.')
       .replaceAll('{{knowledgeContext}}', (knowledgeText || 'Nenhum.') + (bookingContext ? `\n\nDADOS DE RESERVA (use exatamente estes valores):\n${bookingContext}` : '')) +
       contextoDeHorario() +
-      contextoDeConversaAntiga(conversaAntiga);
+      contextoDeConversaAntiga(conversaAntiga) +
+      contextoDeCancelamento(
+        inbound.content,
+        mem.recentMessages.filter((m: any) => m.sender === MessageSender.GUEST).map((m: any) => m.content).join('\n'),
+      );
 
     const history = mem.recentMessages.map((m) => ({
       role: m.sender === MessageSender.GUEST ? ('user' as const) : ('assistant' as const),

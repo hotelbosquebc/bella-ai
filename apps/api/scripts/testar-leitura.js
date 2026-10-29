@@ -266,6 +266,33 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
     conferir('antiga', 'tudo antigo: manda tudo', dividir(ms.slice(0, 2), [d(45), d(45)]).antiga, '');
   }
 
+  // 29/10/2026: cafe, estacionamento e link ja respondidos; so "O cancelamento
+  // e gratuito?" pendente - e o link das 10:45 tinha saido com 4 criancas e o
+  // periodo de ontem.
+  {
+    const canc = require('../dist/common/cancelamento.js');
+    const conversa = [
+      'Hóspede: Tem café da manhã e estacionamento incluídos?',
+      'Hóspede (hoje): Qual seria o valor de 1 diária, do dia 2 ao dia 3/04?',
+      'Nós (hoje): O café da manhã está incluso. Quantas pessoas seriam?',
+      'Hóspede (hoje): 4 pessoas, sendo 2 adultos e 2 crianças (3 e 4 anos)',
+      'Nós (hoje): Segue o link: https://sbreserva.silbeck.com.br/hotelbosque/pt-br/reserva/busca/?checkin=2027-04-02&checkout=2027-04-03&adultos-000001=2&criancas-000003=2&criancas-000004=0',
+      'Hóspede (hoje): O cancelamento é gratuito?',
+    ].join('\n');
+    conferir('cancelamento', 'so a pergunta do cancelamento pendente', m.falasPendentesDoHospede(conversa), ['O cancelamento é gratuito?']);
+    conferir('cancelamento', 'quem esta orcando recebe a regra direta', /10% do valor total[\s\S]*NÃO pergunte onde/.test(canc.contextoDeCancelamento('O cancelamento é gratuito?', m.apenasFalasDoHospede(conversa))), true);
+    conferir('cancelamento', 'quem ja reservou segue a base', canc.contextoDeCancelamento('quero cancelar', 'Fiz uma reserva pela Booking'), '');
+    conferir('cancelamento', 'sem pergunta de cancelamento nada muda', canc.contextoDeCancelamento('tem estacionamento?', ''), '');
+    conferir('cancelamento', 'horario so ao encaminhar', /SÓ SE você for encaminhar/.test(require('../dist/modules/bella/business-hours.js').contextoDeHorario(new Date('2026-10-29T15:40:00Z'))), true);
+    const per = (s) => JSON.stringify(m.intervalosNaFala('Hóspede: ' + s, hoje));
+    conferir('periodo', 'do dia 2 ao dia 3/04', per('Qual seria o valor de 1 diária, do dia 2 ao dia 3/04?'), JSON.stringify([{ checkin: '2027-04-02', checkout: '2027-04-03' }]));
+    conferir('periodo', 'do dia 2 ao dia 3 de abril', per('do dia 2 ao dia 3 de abril'), JSON.stringify([{ checkin: '2027-04-02', checkout: '2027-04-03' }]));
+    const dupla = m.normalizarOcupacao({ adults: 2, children0_6: 2, idades: [3, 4] });
+    conferir('bebe', 'IA conta criancas E idades: nao soma duas vezes', [dupla.adults, dupla.children0_6], [2, 2]);
+    const r = await pedido(conversa.split('\nNós (hoje): Segue')[0], { checkin: '2027-04-02', checkout: '2027-04-04', adults: 2, children0_6: 2, idades: [3, 4], intent: 'booking' });
+    conferir('pedido', '1 diaria, 2 adultos e 2 criancas', (r.ctx.match(/checkin=\S+/) || [''])[0].replace(/[),.]+$/, ''), 'checkin=2027-04-02&checkout=2027-04-03&adultos-000001=2&criancas-000003=2&criancas-000004=0');
+  }
+
   console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
   process.exit(falhas ? 1 : 0);
 })().catch((e) => {

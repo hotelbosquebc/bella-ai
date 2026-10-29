@@ -81,7 +81,11 @@ export function inicioDoDiaEmSaoPaulo(now = new Date()): Date {
 export function contextoDeHorario(now = new Date()): string {
   return isWithinBusinessHours(now)
     ? `\n\nAGORA: o setor de reservas ESTÁ atendendo. Ao encaminhar para um humano, diga que um atendente assume em instantes.`
-    : `\n\nAGORA: o setor de reservas NÃO está atendendo (funciona ${HORARIO_RESERVAS_TEXTO}). ` +
-        `NÃO prometa que um atendente assume agora nem diga "só um momento". Informe o horário de atendimento ` +
-        `e ofereça a recepção 24h pelo telefone ${TELEFONE_RECEPCAO}.`;
+    : // Horario so ao encaminhar. Caso real (29/10/2026): "O cancelamento e
+      // gratuito?" no intervalo de almoco recebeu so o horario do setor - a
+      // instrucao mandava informar o horario em TODA resposta.
+      `\n\nAGORA: o setor de reservas NÃO está atendendo (funciona ${HORARIO_RESERVAS_TEXTO}). ` +
+        `SÓ SE você for encaminhar para um humano: NÃO prometa que um atendente assume agora nem diga "só um momento"; ` +
+        `informe o horário de atendimento e ofereça a recepção 24h pelo telefone ${TELEFONE_RECEPCAO}. ` +
+        `Se você mesma responde a pergunta, NÃO fale de horário de atendimento.`;
 }
