@@ -217,18 +217,20 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
   const saudacao = 'Nós: Olá! Sou a Bella, assistente online do Hotel do Bosque.\nPara verificarmos os valores e disponibilidade por gentileza me informe:\n📆 Período da estadia (data de entrada e saída);\n👪 Quantidade total de pessoas;';
   // 27/10/2026: pedido ontem, so "bom dia" hoje -> passou para humano sem link.
   const r1 = await pedido(saudacao + '\nHóspede: Gostaria de efetuar uma reserva de 31/10 a 03/11, seriam dois quartos para casal.\nHóspede (hoje): Olá,bom dia!!');
-  conferir('pedido', 'dois quartos para casal + bom dia hoje', r1.decisoes, ['ocupacao pelo tipo de apartamento: 2x2', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada']);
+  conferir('pedido', 'dois quartos para casal + bom dia hoje', r1.decisoes, ['ocupacao pelo tipo de apartamento: 2x2', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada', 'link conferido']);
   conferir('pedido', 'dois quartos para casal: nao pergunta juntos', /JÁ ESCOLHEU/.test(r1.ctx), true);
   // 27/10/2026: "do dia 08/11 ao dia 13" + "03 adultos e um bebê" -> pediu a idade do bebe, sem link.
   const r2 = await pedido('Hóspede: preciso saber se a internet é boa\nNós: Olá! Esta é uma mensagem automática.\nHóspede (hoje): do dia 08/11 ao dia 13\nHóspede (hoje): para 03 adultos e um bebê\nHóspede (hoje): qual é o valor dos quartos por nome para que eu faça a escolha');
-  conferir('pedido', '08/11 ao dia 13, 3 adultos e um bebe', r2.decisoes, ['link montado']);
+  conferir('pedido', '08/11 ao dia 13, 3 adultos e um bebe', r2.decisoes, ['link montado', 'link conferido']);
   conferir('pedido', 'bebe vai como crianca 0-6', /checkin=2026-11-08&checkout=2026-11-13&adultos-000001=3&criancas-000003=1/.test(r2.ctx), true);
 
   // 28/10/2026: "dois quartos individuais" + datas -> perguntou "quantas pessoas?".
   // "Hoje e sair na sexta" quem le e a IA: o teste entrega o que ela devolveu em producao.
+  // Datas relativas a HOJE: a conferencia do link bloqueia entrada no passado.
+  const isoDaqui = (n) => new Date(Date.now() - 3 * 3600000 + n * 86400000).toISOString().slice(0, 10);
   const r3 = await pedido('Hóspede (hoje): Gostaria de reservar dois quartos individuais novamente\nHóspede (hoje): Hoje e sair na sexta',
-    { checkin: '2026-10-28', checkout: '2026-10-30', adults: null, intent: 'booking' });
-  conferir('pedido', 'dois quartos individuais = 2 apartamentos de 1', r3.decisoes, ['ocupacao pelo tipo de apartamento: 2x1', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada']);
+    { checkin: isoDaqui(0), checkout: isoDaqui(2), adults: null, intent: 'booking' });
+  conferir('pedido', 'dois quartos individuais = 2 apartamentos de 1', r3.decisoes, ['ocupacao pelo tipo de apartamento: 2x1', 'divisao escrita pelo hospede: 2 apartamentos', 'varios apartamentos: um link para cada', 'link conferido']);
 
   // Bebe sem idade = crianca de 0 a 6 (regra do dono: bebe e sempre menor de 6).
   const oc = (s) => JSON.stringify(m.ocupacaoNaFala('Hóspede: ' + s));
@@ -291,6 +293,43 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
     conferir('bebe', 'IA conta criancas E idades: nao soma duas vezes', [dupla.adults, dupla.children0_6], [2, 2]);
     const r = await pedido(conversa.split('\nNós (hoje): Segue')[0], { checkin: '2027-04-02', checkout: '2027-04-04', adults: 2, children0_6: 2, idades: [3, 4], intent: 'booking' });
     conferir('pedido', '1 diaria, 2 adultos e 2 criancas', (r.ctx.match(/checkin=\S+/) || [''])[0].replace(/[),.]+$/, ''), 'checkin=2027-04-02&checkout=2027-04-03&adultos-000001=2&criancas-000003=2&criancas-000004=0');
+  }
+
+  // Conferencia do link antes de sair (regra do dono, 29/10/2026).
+  {
+    const cl = require('../dist/common/conferencia-link.js');
+    const B = cl.PADRAO_DO_LINK;
+    const hojeIso = '2026-10-29';
+    const pad = (u) => cl.problemasDePadrao(u, hojeIso);
+    conferir('conferencia', 'link certo passa', pad(B + '?checkin=2027-04-02&checkout=2027-04-03&adultos-000001=2&criancas-000003=2&criancas-000004=0'), []);
+    conferir('conferencia', 'endereco sem /busca/', pad('https://sbreserva.silbeck.com.br/hotelbosque/pt-br/reserva?checkin=2027-04-02&checkout=2027-04-03&adultos-000001=2').length, 1);
+    conferir('conferencia', 'parametro inventado', pad(B + '?checkin=2027-04-02&checkout=2027-04-03&adultos=2'), ['parâmetro desconhecido: adultos', 'sem adultos']);
+    conferir('conferencia', 'entrada no passado', pad(B + '?checkin=2026-10-20&checkout=2026-10-22&adultos-000001=2'), ['entrada no passado']);
+    conferir('conferencia', 'saida antes da entrada', pad(B + '?checkin=2027-04-03&checkout=2027-04-02&adultos-000001=2'), ['saída não é depois da entrada']);
+    conferir('conferencia', '7 pessoas num apartamento', pad(B + '?checkin=2027-04-02&checkout=2027-04-03&adultos-000001=5&criancas-000003=2'), ['mais de 6 pessoas num apartamento']);
+
+    // O link real das 10:45 (29/10/2026), conferido contra a conversa.
+    const conversa = [
+      'Hóspede: Gostaria do valor para 2 adultos de 02/04 a 04/04',
+      'Hóspede (hoje): Qual seria o valor de 1 diária, do dia 2 ao dia 3/04?',
+      'Nós (hoje): Quantas pessoas seriam?',
+      'Hóspede (hoje): 4 pessoas, sendo 2 adultos e 2 crianças (3 e 4 anos)',
+    ].join('\n');
+    const R2 = require('../dist/modules/reservations/reservation-engine.service.js');
+    const c = new m.AssistController(banco, {}, {}, {}, new R2.ReservationEngineService({}), {}, { definirLeitorDoPedido() {} });
+    const errado = `Envie este link:\n${B}?checkin=2027-04-02&checkout=2027-04-04&adultos-000001=2&criancas-000003=4&criancas-000004=0`;
+    const conferido = c.conferirLinksDoContexto(errado, conversa, new Date('2026-10-29T13:00:00-03:00'));
+    conferir('conferencia', 'link das 10:45 sai corrigido', (conferido.match(/https\S+/) || [''])[0], B + '?checkin=2027-04-02&checkout=2027-04-03&adultos-000001=2&criancas-000003=2&criancas-000004=0');
+    conferir('conferencia', 'atendente ve o motivo', /LINK CORRIGIDO NA CONFERÊNCIA: período 02\/04 a 04\/04, mas o hóspede pediu 02\/04 a 03\/04/.test(conferido), true);
+    // Sem ocupacao legivel nao da para corrigir: bloqueia.
+    const semGente = conversa.split('\nNós (hoje)')[0];
+    const bloqueado = c.conferirLinksDoContexto(errado, semGente, new Date('2026-10-29T13:00:00-03:00'));
+    conferir('conferencia', 'sem como corrigir: bloqueia o link', [/https/.test(bloqueado), /LINK BLOQUEADO/.test(bloqueado)], [false, true]);
+    // Pedido mudado de um jeito que nao da para ler: nao "corrige" para o velho.
+    const relativo = conversa + '\nHóspede (hoje): na verdade queremos sair só no domingo';
+    const certo = `${B}?checkin=2027-04-02&checkout=2027-04-04&adultos-000001=2&criancas-000003=2&criancas-000004=0`;
+    conferir('conferencia', 'data relativa depois: nao confere o periodo', /LINK CONFERIDO/.test(c.conferirLinksDoContexto(certo, relativo, new Date('2026-10-29T13:00:00-03:00'))), true);
+    conferir('conferencia', 'noites na fala', [m.noitesNaFala('valor de 1 diária'), m.noitesNaFala('duas noites'), m.noitesNaFala('café na diária')], [1, 2, null]);
   }
 
   console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');

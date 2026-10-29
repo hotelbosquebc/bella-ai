@@ -21,6 +21,7 @@ import { semPromessaDeRegistro } from '../../common/registro';
 import { semCustoDeHorarioExtra } from '../../common/horario-extra';
 import { comConversaAntiga } from '../../common/conversa-antiga';
 import { contextoDeCancelamento } from '../../common/cancelamento';
+import { Esperado, problemasDePadrao, problemasDeConteudo, resumoDoLink as resumoConferido } from '../../common/conferencia-link';
 import { semRaciocinioVazado, semAssuntoNaoPerguntado, semOfertaDeAtendente, semPedidoDeDadosComLink } from '../../common/resposta-limpa';
 import { semGarantiaDeVaga } from '../../common/disponibilidade';
 import { fraseTemPreco, semPrecoInventado } from '../../common/preco';
@@ -2219,6 +2220,69 @@ export function temIndicioDeData(falasDoHospede: string): boolean {
   );
 }
 
+/** Cada mensagem do hospede, sem o prefixo, com as linhas de continuacao. */
+export function mensagensDoHospede(conversation: string): string[] {
+  const saida: string[] = [];
+  let atual: string[] | null = null;
+  for (const linha of (conversation || '').split(/\r?\n/)) {
+    const hospede = linha.match(/^\s*H[óo]spede\s*(?:\(hoje\))?\s*:\s*(.*)$/i);
+    if (hospede) {
+      atual = [hospede[1]];
+      saida.push('');
+    } else if (/^\s*N[óo]s\s*(?:\(hoje\))?\s*:/i.test(linha)) {
+      atual = null;
+      continue;
+    } else if (atual) {
+      atual.push(linha);
+    }
+    if (atual) saida[saida.length - 1] = atual.join('\n').trim();
+  }
+  return saida.filter(Boolean);
+}
+
+/** "1 diaria", "3 noites" - numero de diarias dito na fala. */
+export function noitesNaFala(fala: string): number | null {
+  const porExtenso: Record<string, number> = { um: 1, uma: 1, duas: 2, dois: 2, tres: 3, 'três': 3, quatro: 4, cinco: 5, seis: 6, sete: 7 };
+  const m = (fala || '').match(/\b(\d{1,2}|uma?|duas|dois|tr[êe]s|quatro|cinco|seis|sete)\s*(?:di[áa]rias?|noites?|pernoites?)(?![a-zà-ÿ])/i);
+  if (!m) return null;
+  const n = /^\d+$/.test(m[1]) ? Number(m[1]) : porExtenso[m[1].toLowerCase()];
+  return n || null;
+}
+
+/**
+ * O que o hospede pediu POR ULTIMO, lido de novo e separado da montagem do
+ * link, para conferir o link antes de ele sair (common/conferencia-link).
+ *
+ * Periodo: a mensagem mais recente com periodo legivel. Se depois dela veio
+ * outra falando de data ou de diarias de um jeito que nao da para ler ("so 1
+ * diaria", "hoje e sair na sexta"), o periodo nao e conferido - melhor nao
+ * conferir do que "corrigir" para o pedido velho.
+ * Ocupacao: a mensagem mais recente que a traz, com a mesma regra.
+ */
+export function leituraIndependente(conversation: string, hoje = new Date()): Esperado {
+  const msgs = mensagensDoHospede(conversation);
+  const esperado: Esperado = { periodos: null, noites: null, ocupacao: null };
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const ps = intervalosNaFala('Hóspede: ' + msgs[i], hoje);
+    if (ps.length) {
+      esperado.periodos = ps.map((p) => ({ checkin: p.checkin, checkout: p.checkout }));
+      esperado.noites = noitesNaFala(msgs[i]);
+      break;
+    }
+    if (temIndicioDeData(msgs[i]) || noitesNaFala(msgs[i]) || /\b(di[áa]rias?|noites?|sa[íi]da|sair|entrada|entrar|check-?(?:in|out)|chegada|chegar)\b/i.test(msgs[i])) break;
+  }
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const o = ocupacaoNaFala('Hóspede: ' + msgs[i]);
+    if (o) {
+      const s = normalizarOcupacao({ adults: o.adultos, idades: o.idades });
+      esperado.ocupacao = { adultos: Number(s.adults) || 0, criancas0_6: Number(s.children0_6) || 0, criancas7_9: Number(s.children7_9) || 0 };
+      break;
+    }
+    if (/\b(pessoas?|adultos?|crian[çc]as?|beb[êe]s?|casal|casais|filhos?|filhas?|anos)(?![a-zà-ÿ])/i.test(msgs[i])) break;
+  }
+  return esperado;
+}
+
 /**
  * A resposta que a casa daria, escrita sem IA nenhuma.
  *
@@ -2652,7 +2716,67 @@ export class AssistController implements OnModuleInit {
     return extraido;
   }
 
+  /**
+   * A leitura do pedido, com o link CONFERIDO antes de sair - ver
+   * common/conferencia-link. Os dois caminhos (extensao e automatico) passam
+   * por aqui, entao nenhum link sai sem conferencia.
+   */
   private async bookingContext(conversation: string, htmlDisponibilidade?: string): Promise<string> {
+    const ctx = await this.montarContextoDeReserva(conversation, htmlDisponibilidade);
+    return this.conferirLinksDoContexto(ctx, conversation);
+  }
+
+  private conferirLinksDoContexto(ctx: string, conversation: string, hoje = new Date()): string {
+    const links = [...new Set((ctx.match(/https?:\/\/\S*sbreserva\.silbeck\S+/g) || []).map((u) => u.replace(/[),.]+$/, '')))];
+    if (!links.length) return ctx;
+    const hojeIso = new Date(hoje.getTime() - 3 * 3600000).toISOString().slice(0, 10); // data em Sao Paulo
+    const esperado = leituraIndependente(conversation, hoje);
+    // Reveillon: o periodo e esticado de proposito para o pacote de 5 diarias.
+    if (/PACOTE DE RÉVEILLON/.test(ctx)) {
+      esperado.periodos = null;
+      esperado.noites = null;
+    }
+    const umApartamento = links.length === 1 && !/UM LINK PARA CADA/.test(ctx);
+    const problemas = links.flatMap((u) => [...problemasDePadrao(u, hojeIso), ...problemasDeConteudo(u, esperado, umApartamento)]);
+    const nota = '(conferência interna — NÃO escreva isto ao hóspede)';
+
+    if (!problemas.length) {
+      this.registrarDecisao('link conferido', {});
+      return ctx + `\n\n${nota} LINK CONFERIDO: ${links.map((u) => resumoConferido(u)).join(' | ')}`;
+    }
+
+    // Da para corrigir pela fala do hospede: um apartamento, UM periodo e a
+    // ocupacao lidos sem duvida. O contexto e refeito do zero - o anterior
+    // falava das datas e da vaga do link errado.
+    const periodo = esperado.periodos && esperado.periodos.length === 1 ? esperado.periodos[0] : null;
+    if (umApartamento && periodo && esperado.ocupacao) {
+      const corrigido = this.reservations.buildBookingLink({
+        checkin: periodo.checkin,
+        checkout: periodo.checkout,
+        adults: esperado.ocupacao.adultos,
+        children0_6: esperado.ocupacao.criancas0_6,
+        children7_9: esperado.ocupacao.criancas7_9,
+      } as any);
+      if (!problemasDePadrao(corrigido, hojeIso).length && !problemasDeConteudo(corrigido, esperado, true).length) {
+        this.registrarDecisao(`conferencia: link corrigido (${problemas.join('; ')})`, {});
+        return (
+          `\n\nLINK DE RESERVA (conferido com o que o hóspede escreveu): envie EXATAMENTE este link, sem alterar nada:\n${corrigido}\n` +
+          `Período e ocupação do link: ${resumoConferido(corrigido)}. NÃO afirme que há vaga: o link mostra a disponibilidade.` +
+          `\n\n${nota} LINK CORRIGIDO NA CONFERÊNCIA: ${problemas.join('; ')}. Agora: ${resumoConferido(corrigido)}`
+        );
+      }
+    }
+
+    this.registrarDecisao(`conferencia: link bloqueado (${problemas.join('; ')})`, {});
+    return (
+      `\n\nSEM LINK NESTA MENSAGEM: o link montado não bateu com o que o hóspede escreveu. NÃO mande link nenhum. ` +
+      `Confirme com ele, em uma frase, o período (entrada e saída) e quantas pessoas são (adultos e a idade das crianças) ` +
+      `para montar o orçamento certo.` +
+      `\n\n${nota} LINK BLOQUEADO NA CONFERÊNCIA: ${problemas.join('; ')}`
+    );
+  }
+
+  private async montarContextoDeReserva(conversation: string, htmlDisponibilidade?: string): Promise<string> {
     // Sem nenhum sinal de estadia na fala do hospede, nao ha o que extrair:
     // poupa uma chamada de IA por sugestao (ver pareceOrcamento).
     //
@@ -4758,6 +4882,12 @@ ${url}`;
       model: draft.model,
       attachments: anexos,
       precisaDeHumano: motivoHumano,
+      // O que a conferencia do link achou, para o atendente ver antes de enviar.
+      conferenciaLink: (() => {
+        const c = reserva.match(/LINK (CONFERIDO|CORRIGIDO NA CONFERÊNCIA|BLOQUEADO NA CONFERÊNCIA): (.+)$/m);
+        if (!c) return undefined;
+        return { estado: c[1] === 'CONFERIDO' ? 'ok' : c[1].startsWith('CORRIGIDO') ? 'corrigido' : 'bloqueado', texto: c[2].trim() };
+      })(),
     };
   }
 }

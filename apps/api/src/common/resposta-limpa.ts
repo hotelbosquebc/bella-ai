@@ -40,6 +40,8 @@ export function semRaciocinioVazado(texto: string): string {
   const limpo = t
     .split(/\r?\n/)
     .filter((linha) => !/^\s*\(?[a-e]\)\s/i.test(linha))
+    // Nota da conferencia do link (common/conferencia-link): e para o atendente.
+    .filter((linha) => !/confer[êe]ncia interna|LINK (?:CONFERIDO|CORRIGIDO NA CONFER|BLOQUEADO NA CONFER)/i.test(linha))
     .filter((linha) => !/^\s*\**\s*(?:invent[áa]rio|rascunho|resposta|an[áa]lise|checklist)\b[^\n]{0,30}:?\s*\**\s*$/i.test(linha))
     .filter((linha) => !/^\s*O\s+h[óo]spede\s+(?:tamb[ée]m\s+)?(?:perguntou|informou|disse|quer|pediu|mencionou|est[áa])\b/i.test(linha))
     .join('\n')

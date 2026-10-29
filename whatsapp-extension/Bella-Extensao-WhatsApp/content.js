@@ -1370,6 +1370,13 @@
         return;
       }
       status(automatica ? 'Sugestão pronta — revise antes de enviar.' : '');
+      // Conferencia do link feita no servidor (29/10/2026): o atendente ve o
+      // periodo e a ocupacao do link antes de enviar, e o aviso quando o link
+      // foi corrigido ou retido.
+      const conf = r.data.conferenciaLink;
+      if (conf && conf.estado === 'ok') status('✓ Link conferido: ' + conf.texto);
+      else if (conf && conf.estado === 'corrigido') status('⚠ Link corrigido na conferência — confira: ' + conf.texto, true);
+      else if (conf && conf.estado === 'bloqueado') status('⚠ Link retido na conferência: ' + conf.texto, true);
       panel.querySelector('#bella-suggestion').style.display = 'block';
       panel.querySelector('#bella-sugtext').value = r.data.suggestion || '';
       ultimaFalaDaSugestao = lastMessage || null;
