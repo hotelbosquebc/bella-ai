@@ -1238,31 +1238,67 @@ export function pessoasEmCadaApartamento(
 export function apartamentosPorTipo(
   falasDoHospede: string,
 ): { adultos: number; idades: number[]; criancas0_6: number; criancas7_9: number }[] | null {
-  const t = semPrefixos(falasDoHospede || '');
-  if (PALAVRA_DE_CRIANCA.test(t)) return null;
+  // Meses de bebe viram anos antes: "bebe de 11 meses" = 0 ano.
+  const t = mesesViramAnos(semPrefixos(falasDoHospede || ''));
   const ocupacao: Record<string, number> = { individua: 1, single: 1, dupl: 2, casal: 2, tripl: 3, 'quádrupl': 4, quadrupl: 4, 'quíntupl': 5, quintupl: 5, 'sêxtupl': 6, sextupl: 6 };
   // A quantidade pode vir por extenso e com o numero entre parenteses. Caso
   // real (26/10/2026): "por ora dois (02) quartos individuais standard" nao
   // casava, e a Bella perguntou "juntos ou separados?" a quem ja tinha pedido
   // dois individuais.
-  const m = t.match(
-    /(?<![\d\/a-zà-ÿ])(\d{1,2}|uma?|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez)(?:[ \t]*\(\d{1,2}\))?[ \t]*(?:apartamentos?|aptos?|quartos?|su[íi]tes?|unidades?)[ \t]+(?:(?:de[ \t]+)?[a-zà-ÿ]+[ \t]+){0,2}?(?:de[ \t]+)?(individua(?:l|is)|single|dupl[oa]s?|casal|tripl[oa]s?|qu[áa]drupl[oa]s?|qu[íi]ntupl[oa]s?|s[êe]xtupl[oa]s?)(?![a-zà-ÿ])/i,
-  );
-  if (!m) return null;
-  // "o apartamento tem 2 quartos de casal?" e pergunta sobre a PLANTA, nao
-  // pedido de dois apartamentos: fora quando e pergunta ou vem depois de
-  // "tem/possui/com".
-  const i = m.index ?? 0;
-  if (/\b(?:tem|t[êe]m|possui|possuem|com)[ \t]*$/i.test(t.slice(Math.max(0, i - 15), i))) return null;
-  const fimRel = t.slice(i).search(/[.!\n]|\?/);
-  if (fimRel >= 0 && t[i + fimRel] === '?') return null;
+  const rTipo =
+    /(?<![\d\/a-zà-ÿ])(\d{1,2}|uma?|dois|duas|tr[êe]s|quatro|cinco|seis|sete|oito|nove|dez)(?:[ \t]*\(\d{1,2}\))?[ \t]*(?:apartamentos?|aptos?|quartos?|su[íi]tes?|unidades?)[ \t]+(?:(?:de[ \t]+)?[a-zà-ÿ]+[ \t]+){0,2}?(?:de[ \t]+)?(individua(?:l|is)|single|dupl[oa]s?|casal|tripl[oa]s?|qu[áa]drupl[oa]s?|qu[íi]ntupl[oa]s?|s[êe]xtupl[oa]s?)(?![a-zà-ÿ])/gi;
+  const achados = [...t.matchAll(rTipo)];
+  if (!achados.length) return null;
   const porExtenso: Record<string, number> = { um: 1, uma: 1, dois: 2, duas: 2, 'três': 3, tres: 3, quatro: 4, cinco: 5, seis: 6, sete: 7, oito: 8, nove: 9, dez: 10 };
-  const quantos = /^\d+$/.test(m[1]) ? Number(m[1]) : porExtenso[m[1].toLowerCase()] || 0;
-  const tipo = m[2].toLowerCase();
-  const chave = Object.keys(ocupacao).find((k) => tipo.startsWith(k));
-  const porApto = chave ? ocupacao[chave] : 0;
-  if (!porApto || quantos < 1 || quantos > 10) return null;
-  return Array.from({ length: quantos }, () => ({ adultos: porApto, idades: [], criancas0_6: 0, criancas7_9: 0 }));
+
+  // VARIOS tipos numa lista, cada linha com o que vai nela. Caso real
+  // (30/10/2026): "2 quartos triplos / 1 quartos single para 1 pessoas /
+  // 1 quarto de casal + berco para 1 bebe de 11 meses". So o primeiro tipo
+  // era lido e, com bebe na fala, nada: a Bella somou 10 pessoas e perguntou
+  // a divisao que estava escrita. Agora cada tipo leva o trecho dele (ate a
+  // proxima linha ou o proximo tipo), e a crianca fica no apartamento onde
+  // ela foi escrita.
+  const apartamentos: { adultos: number; idades: number[]; criancas0_6: number; criancas7_9: number }[] = [];
+  let foraDosTrechos = t.slice(0, achados[0].index ?? 0);
+  for (let k = 0; k < achados.length; k++) {
+    const m = achados[k];
+    const i = m.index ?? 0;
+    // "o apartamento tem 2 quartos de casal?" e pergunta sobre a PLANTA, nao
+    // pedido de dois apartamentos: fora quando vem depois de "tem/possui/com"
+    // ou e pergunta - menos "voce teria...?", que e pedido.
+    if (/\b(?:tem|t[êe]m|possui|possuem|com)[ \t]*$/i.test(t.slice(Math.max(0, i - 15), i))) return null;
+    const fimRel = t.slice(i).search(/[.!\n]|\?/);
+    const pedido = /\b(?:teria|teriam|tem dispon|gostaria|quero|queremos|preciso|precisamos|reservar)\b/i.test(t.slice(0, i));
+    if (fimRel >= 0 && t[i + fimRel] === '?' && !pedido) return null;
+
+    const fimDaLinha = t.indexOf('\n', i);
+    const proximo = k + 1 < achados.length ? achados[k + 1].index ?? t.length : t.length;
+    const fim = Math.min(proximo, fimDaLinha >= 0 ? fimDaLinha : t.length);
+    const trecho = t.slice(i + m[0].length, fim);
+    foraDosTrechos += t.slice(fim, proximo);
+
+    const quantos = /^\d+$/.test(m[1]) ? Number(m[1]) : porExtenso[m[1].toLowerCase()] || 0;
+    const tipo = m[2].toLowerCase();
+    const chave = Object.keys(ocupacao).find((x) => tipo.startsWith(x));
+    let porApto = chave ? ocupacao[chave] : 0;
+    // "1 quarto single para 1 pessoa": o numero dito confirma ou ajusta o tipo.
+    const ditas = trecho.match(/\bpara[ \t]+(\d)[ \t]*(?:pessoas?|adultos?|h[óo]spedes?)\b/i);
+    if (ditas && Number(ditas[1]) >= 1 && Number(ditas[1]) <= 6) porApto = Number(ditas[1]);
+    if (!porApto || quantos < 1 || quantos > 10) return null;
+
+    let idades: number[] = [];
+    if (PALAVRA_DE_CRIANCA.test(trecho)) {
+      // Crianca sem idade, ou crianca num pedido de varios iguais ("2 quartos
+      // de casal com 1 crianca"): em qual deles? Nao decide.
+      idades = [...trecho.matchAll(/(\d{1,2})(?=(?:[ \t]*(?:,|e)[ \t]*\d{1,2})*[ \t]*anos?\b)/gi)].map((x) => Number(x[1]));
+      if (!idades.length || quantos > 1) return null;
+    }
+    for (let n = 0; n < quantos; n++) apartamentos.push({ adultos: porApto, idades: [...idades], criancas0_6: 0, criancas7_9: 0 });
+  }
+  // Crianca fora de qualquer apartamento da lista: nao da para saber onde fica.
+  if (PALAVRA_DE_CRIANCA.test(foraDosTrechos)) return null;
+  if (apartamentos.length > 10) return null;
+  return apartamentos;
 }
 
 /**
@@ -2220,6 +2256,30 @@ export function temIndicioDeData(falasDoHospede: string): boolean {
   );
 }
 
+/**
+ * O pedido de atendente ainda vale?
+ *
+ * Caso real (30/10/2026): "Falar com um atendente" as 10:31; o atendente
+ * respondeu com o /dados, o hospede mandou os quartos e as datas - e a Bella
+ * continuou "entregando para a equipe", sem link, porque uma trava olhava a
+ * conversa inteira. Vale so o que esta pendente; e se depois de pedir gente
+ * ele mandou o pedido de orcamento, o que ele quer agora e o orcamento.
+ */
+export function pediuAtendenteAgora(conversation: string): boolean {
+  const pendentes = falasPendentesDoHospede(conversation);
+  const recente = pendentes.length ? pendentes.join('\n') : ultimaFalaDoHospede(conversation);
+  if (!hospedePediuAtendente(recente)) return false;
+  const msgs = mensagensDoHospede(conversation);
+  let ultimoPedido = -1;
+  msgs.forEach((t, i) => {
+    if (hospedePediuAtendente(t)) ultimoPedido = i;
+  });
+  if (ultimoPedido < 0) return true;
+  return !msgs
+    .slice(ultimoPedido + 1)
+    .some((t) => temIndicioDeData(t) || Boolean(ocupacaoNaFala('Hóspede: ' + t)) || /\b(quartos?|apartamentos?|su[íi]tes?|pessoas?|adultos?)(?![a-zà-ÿ])/i.test(t));
+}
+
 /** Cada mensagem do hospede, sem o prefixo, com as linhas de continuacao. */
 export function mensagensDoHospede(conversation: string): string[] {
   const saida: string[] = [];
@@ -2827,7 +2887,7 @@ export class AssistController implements OnModuleInit {
     // e pessoas (pergunta do dono, 26/10/2026). Aqui olha so o que ele disse
     // depois da nossa ultima mensagem - um pedido antigo, ja atendido, nao
     // pode prender a conversa para sempre.
-    if (hospedePediuAtendente(falasDoHospedeDepoisDaNossa(conversation) || ultimaFalaDoHospede(conversation))) {
+    if (pediuAtendenteAgora(conversation)) {
       this.registrarDecisao('hospede pediu atendente: entregar contato', {});
       return (
         `\n\nO HÓSPEDE PEDIU PARA FALAR COM UMA PESSOA. NÃO insista, NÃO tente responder a dúvida ` +
@@ -3014,11 +3074,22 @@ export class AssistController implements OnModuleInit {
     // Tambem quando a leitura contou UM apartamento so: "dois quartos para
     // casal" saia como 2 adultos - sao 2 casais, 4 adultos.
     const porTipo = apartamentosPorTipo(falasDoHospede);
-    const totalPorTipo = porTipo ? porTipo.reduce((s, a) => s + a.adultos, 0) : 0;
-    if (porTipo && (!Number(stay.adults) || (porTipo.length > 1 && Number(stay.adults) === porTipo[0].adultos))) {
+    const idadesPorTipo = porTipo ? porTipo.flatMap((a) => a.idades) : [];
+    const totalPorTipo = porTipo ? porTipo.reduce((s, a) => s + a.adultos, 0) + idadesPorTipo.filter((i) => i >= 10).length : 0;
+    // Lista de VARIOS apartamentos por tipo e a fala mais explicita que existe:
+    // vence a soma do extrator (caso de 30/10/2026: 10 pessoas somadas, e a
+    // divisao escrita ignorada).
+    if (porTipo && (!Number(stay.adults) || porTipo.length > 1)) {
       stay.adults = totalPorTipo;
+      stay.children0_6 = idadesPorTipo.filter((i) => i <= 6).length;
+      stay.children7_9 = idadesPorTipo.filter((i) => i >= 7 && i <= 9).length;
+      stay.idades = null;
       stay.apartamentos = porTipo.length;
-      this.registrarDecisao(`ocupacao pelo tipo de apartamento: ${porTipo.length}x${porTipo[0].adultos}`, stay);
+      const iguais = porTipo.every((a) => a.adultos === porTipo[0].adultos && !a.idades.length);
+      this.registrarDecisao(
+        `ocupacao pelo tipo de apartamento: ${iguais ? `${porTipo.length}x${porTipo[0].adultos}` : porTipo.map((a) => a.adultos + (a.idades.length ? `+${a.idades.length}cr` : '')).join(' / ')}`,
+        stay,
+      );
     }
 
     // Trava contra data inventada.
@@ -3390,10 +3461,14 @@ export class AssistController implements OnModuleInit {
         ? null
         : pessoasEmCadaApartamento(fonteDaDivisao, Number(stay.adults) || 0) ||
           pessoasEmCadaApartamento(falasDoHospede, Number(stay.adults) || 0);
+    // Por tipo, a crianca ja vem no apartamento dela ("1 quarto de casal +
+    // berco para 1 bebe"): vale quando bate com as criancas do pedido.
+    const porTipoNaFala = apartamentosPorTipo(fonteDaDivisao) || apartamentosPorTipo(falasDoHospede);
+    const criancasPorTipo = porTipoNaFala ? porTipoNaFala.flatMap((a) => a.idades).filter((i) => i < 10).length : 0;
     const divisaoEscrita =
       divisaoPorApartamento(fonteDaDivisao) ||
       emCada ||
-      (criancasNoPedido > 0 ? null : apartamentosPorTipo(fonteDaDivisao) || apartamentosPorTipo(falasDoHospede));
+      (criancasNoPedido === criancasPorTipo ? porTipoNaFala : null);
     if (divisaoEscrita) {
       detalhe = divisaoEscrita;
       this.registrarDecisao(`divisao escrita pelo hospede: ${divisaoEscrita.length} apartamentos`, stay);
@@ -3450,7 +3525,7 @@ export class AssistController implements OnModuleInit {
     // Pedido do dono (15/10/2026). O caminho automatico ja escalava nesse caso;
     // o da extensao nao enxergava, e a Bella seguia tentando resolver sozinha
     // alguem que acabou de dizer que nao queria falar com ela.
-    if (hospedePediuAtendente(falasDoHospede)) {
+    if (pediuAtendenteAgora(conversation)) {
       this.registrarDecisao('hospede pediu atendente: entregar contato', stay);
       return (
         `\n\nO HÓSPEDE PEDIU PARA FALAR COM UMA PESSOA. NÃO insista, NÃO tente responder a dúvida ` +

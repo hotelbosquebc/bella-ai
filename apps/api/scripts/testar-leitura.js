@@ -332,6 +332,28 @@ for (const t of ['o atendente foi muito atencioso na última vez', 'a recepção
     conferir('conferencia', 'noites na fala', [m.noitesNaFala('valor de 1 diária'), m.noitesNaFala('duas noites'), m.noitesNaFala('café na diária')], [1, 2, null]);
   }
 
+  // 30/10/2026: pediu atendente as 10:31, o atendente mandou o /dados, e o
+  // hospede escreveu os quartos por tipo e as datas. Sem link: a trava de
+  // atendente olhava a conversa inteira e a lista por tipo nao era lida.
+  {
+    const lista = 'Vc teria:\n2 quartos triplos\n1 quartos single para 1 pessoas\n1 quarto de casal + berço para 1 bebê de 11 meses';
+    conferir('tipo', 'lista de tipos com bebe no quarto do casal', JSON.stringify(m.apartamentosPorTipo('Hóspede: ' + lista).map((a) => [a.adultos, a.idades])), JSON.stringify([[3, []], [3, []], [1, []], [2, [0]]]));
+    conferir('tipo', 'NAO: crianca fora da lista', m.apartamentosPorTipo('Hóspede: 2 quartos triplos\ne 2 crianças de 5 anos'), null);
+    conferir('tipo', 'NAO: crianca sem idade no quarto', m.apartamentosPorTipo('Hóspede: 1 quarto de casal com uma criança'), null);
+    conferir('tipo', 'NAO: pergunta sobre a planta', m.apartamentosPorTipo('Hóspede: o apartamento tem 2 quartos de casal?'), null);
+    const conversa = [
+      'Hóspede (hoje): Falar com um atendente',
+      'Nós (hoje): Olá! Tudo bem com você? Me chamo Victor.\nPara que eu possa preparar seu orçamento, por favor, me informe:\nCaso tenha crianças menores de 10 anos, gentileza informar as idades.',
+      'Hóspede (hoje): ' + lista,
+      'Hóspede (hoje): 21 a 24 de novembro de 2026',
+    ].join('\n');
+    conferir('atendente', 'pedido de atendente seguido do pedido de orcamento: vale o orcamento', m.pediuAtendenteAgora(conversa), false);
+    conferir('atendente', 'pedido de atendente agora: vale', m.pediuAtendenteAgora('Nós: Olá!\nHóspede (hoje): quero falar com um atendente'), true);
+    const r = await pedido(conversa + '\nNós (hoje): Certo um momento que vou verificar e gerar os links\nHóspede (hoje): Ok!', { checkin: '2026-11-21', checkout: '2026-11-24', adults: 10, intent: 'booking' });
+    conferir('pedido', 'lista por tipo vira 4 links', r.decisoes, ['ocupacao pelo tipo de apartamento: 3 / 3 / 1 / 2+1cr', 'divisao escrita pelo hospede: 4 apartamentos', 'varios apartamentos: um link para cada', 'link conferido']);
+    conferir('pedido', 'bebe no link do casal', /adultos-000001=2&criancas-000003=1/.test(r.ctx), true);
+  }
+
   console.log(falhas ? `\n${falhas} FALHA(S) - nao publicar` : '\ntudo certo');
   process.exit(falhas ? 1 : 0);
 })().catch((e) => {
